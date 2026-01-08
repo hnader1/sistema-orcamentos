@@ -7,18 +7,15 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   const [buscaCidade, setBuscaCidade] = useState('')
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false)
   
-  // Seleções
   const [modalidade, setModalidade] = useState(freteAtual?.modalidade || '')
   const [tipoVeiculo, setTipoVeiculo] = useState(freteAtual?.tipo_veiculo || '')
   const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidade || '')
   
-  // Frete manual
   const [freteManual, setFreteManual] = useState(false)
   const [valorManual, setValorManual] = useState('')
   
   const [calculoFrete, setCalculoFrete] = useState(null)
 
-  // Capacidades dos veículos em KG
   const capacidadesVeiculo = {
     'Toco 8t': 8000,
     'Truck 14t': 14000,
@@ -45,8 +42,6 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       if (error) throw error
       
       setFretes(data || [])
-      
-      // Extrair localidades únicas
       const locsUnicas = [...new Set(data?.map(f => f.cidade) || [])]
       setLocalidades(locsUnicas.sort())
     } catch (error) {
@@ -54,10 +49,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     }
   }
 
-  // Filtrar cidades para autocomplete
   const cidadesFiltradas = localidades.filter(cidade =>
     cidade.toLowerCase().includes(buscaCidade.toLowerCase())
-  ).slice(0, 10)
+  ).slice(0, 8)
 
   const selecionarCidade = (cidade) => {
     setCidadeSelecionada(cidade)
@@ -66,7 +60,6 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   }
 
   const calcularFrete = () => {
-    // Se FOB, frete = 0
     if (modalidade === 'FOB') {
       const resultado = {
         tipo_frete: 'FOB',
@@ -85,7 +78,6 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // Se frete manual
     if (freteManual && valorManual) {
       const resultado = {
         tipo_frete: modalidade,
@@ -105,29 +97,20 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // Se CIF, precisa selecionar tudo
     if (!modalidade || !tipoVeiculo || !cidadeSelecionada) {
       setCalculoFrete(null)
       notificarFrete(null)
       return
     }
 
-    // Buscar frete na tabela
-    const modalidadeBusca = modalidade === 'CIF_COM_DESCARGA' 
-      ? 'COM DESCARGA' 
-      : 'SEM DESCARGA'
-    
+    const modalidadeBusca = modalidade === 'CIF_COM_DESCARGA' ? 'COM DESCARGA' : 'SEM DESCARGA'
     const veiculoBusca = `${tipoVeiculo} - ${modalidadeBusca}`
     
-    // Buscar frete verificando cidade, tipo_veiculo E modalidade
     const frete = fretes.find(f => 
       f.cidade === cidadeSelecionada && 
       f.tipo_veiculo === veiculoBusca &&
       f.modalidade === modalidade
     )
-
-    console.log('Buscando frete:', { cidadeSelecionada, veiculoBusca, modalidade })
-    console.log('Frete encontrado:', frete)
 
     if (!frete) {
       setCalculoFrete(null)
@@ -135,7 +118,6 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // Calcular número de viagens
     const pesoTotalKg = pesoTotal || 0
     const capacidadeKg = frete.capacidade_kg || capacidadesVeiculo[tipoVeiculo]
     
@@ -152,7 +134,6 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         : 100
     }
 
-    // Usar preco_fixo - valor fixo por viagem (do banco de dados)
     const valorUnitarioViagem = frete.preco_fixo || frete.preco_por_kg || 0
     const valorTotalFrete = valorUnitarioViagem * viagensNecessarias
 
@@ -174,9 +155,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   }
 
   const notificarFrete = (dadosFrete) => {
-    if (onFreteChange) {
-      onFreteChange(dadosFrete)
-    }
+    if (onFreteChange) onFreteChange(dadosFrete)
   }
 
   const resetarSelecoes = () => {
@@ -187,301 +166,203 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     setValorManual('')
   }
 
-  // Tipos de veículos disponíveis
   const tiposVeiculo = [
     { valor: 'Toco 8t', nome: 'Toco', capacidade: '8 ton', icon: '🚚' },
     { valor: 'Truck 14t', nome: 'Truck', capacidade: '14 ton', icon: '🚛' },
     { valor: 'Carreta 32t', nome: 'Carreta', capacidade: '32 ton', icon: '🚛' }
   ]
 
-  // Verificar se é um pedido grande
   const isPedidoGrande = (pesoTotal || 0) >= 8000
 
   return (
-    <div className="space-y-4">
-      {/* ANÁLISE DE CARGA - Cards */}
-      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Package className="text-purple-600" size={20} />
-          <h3 className="font-semibold text-purple-900">Análise de Carga</h3>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {/* Peso Total do Pedido */}
-          <div className="bg-white rounded-lg p-3 border border-purple-100">
-            <span className="text-xs text-purple-600 block mb-1">Peso Total do Pedido</span>
-            <p className="text-xl font-bold text-gray-900">
-              {((pesoTotal || 0) / 1000).toFixed(2)} ton
-            </p>
+    <div className="space-y-3">
+      {/* ANÁLISE DE CARGA - COMPACTA */}
+      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Package className="text-purple-600" size={16} />
+            <h3 className="font-semibold text-purple-900 text-sm">Análise de Carga</h3>
           </div>
-
-          {/* Total de Pallets */}
-          <div className="bg-white rounded-lg p-3 border border-purple-100">
-            <span className="text-xs text-purple-600 block mb-1">Total de Pallets</span>
-            <p className="text-xl font-bold text-purple-600">
-              {(totalPallets || 0).toFixed(2)}
-            </p>
-          </div>
-
-          {/* Capacidade do Veículo */}
-          {tipoVeiculo && (
-            <div className="bg-white rounded-lg p-3 border border-purple-100">
-              <span className="text-xs text-purple-600 block mb-1">Capacidade do Veículo</span>
-              <p className="text-xl font-bold text-gray-900">
-                {(capacidadesVeiculo[tipoVeiculo] / 1000).toFixed(0)} ton
-              </p>
-              <span className="text-xs text-gray-500">{tipoVeiculo.toUpperCase()}</span>
-            </div>
-          )}
-
-          {/* Viagens Necessárias */}
-          {calculoFrete && calculoFrete.viagens_necessarias > 0 && (
-            <div className="bg-white rounded-lg p-3 border border-orange-200">
-              <span className="text-xs text-orange-600 block mb-1">Viagens Necessárias</span>
-              <p className="text-xl font-bold text-orange-600">
-                {calculoFrete.viagens_necessarias} viagens
-              </p>
-              {calculoFrete.viagens_completas > 0 && (
-                <span className="text-xs text-gray-500">
-                  {calculoFrete.viagens_completas} x 100%
-                </span>
-              )}
-            </div>
+          {isPedidoGrande && (
+            <span className="flex items-center gap-1 text-green-700 bg-green-100 px-2 py-0.5 rounded text-xs">
+              <CheckCircle size={12} /> Pedido grande!
+            </span>
           )}
         </div>
 
-        {/* Barras de Viagens */}
+        <div className="grid grid-cols-4 gap-2">
+          <div className="bg-white rounded p-2 border border-purple-100 text-center">
+            <span className="text-xs text-purple-600 block">Peso Total</span>
+            <p className="text-base font-bold">{((pesoTotal || 0) / 1000).toFixed(2)} ton</p>
+          </div>
+          <div className="bg-white rounded p-2 border border-purple-100 text-center">
+            <span className="text-xs text-purple-600 block">Pallets</span>
+            <p className="text-base font-bold text-purple-600">{(totalPallets || 0).toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded p-2 border border-purple-100 text-center">
+            <span className="text-xs text-purple-600 block">Capacidade</span>
+            <p className="text-base font-bold">
+              {tipoVeiculo ? `${(capacidadesVeiculo[tipoVeiculo] / 1000).toFixed(0)} ton` : '-'}
+            </p>
+          </div>
+          <div className="bg-white rounded p-2 border border-orange-200 text-center">
+            <span className="text-xs text-orange-600 block">Viagens</span>
+            <p className="text-base font-bold text-orange-600">
+              {calculoFrete?.viagens_necessarias || '-'}
+            </p>
+          </div>
+        </div>
+
+        {/* Barras Compactas */}
         {calculoFrete && calculoFrete.viagens_necessarias > 0 && modalidade !== 'FOB' && (
-          <div className="mt-4 space-y-2">
-            {/* Viagens Completas */}
-            {calculoFrete.viagens_completas > 0 && (
-              <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
-                  <span>Viagens Completas:</span>
-                  <span>{calculoFrete.viagens_completas} x 100%</span>
-                </div>
-                <div className="flex gap-1">
-                  {[...Array(Math.min(calculoFrete.viagens_completas, 10))].map((_, i) => (
-                    <div key={i} className="flex-1 h-3 bg-green-500 rounded" />
-                  ))}
-                </div>
-                {calculoFrete.viagens_completas > 10 && (
-                  <span className="text-xs text-gray-500">+ {calculoFrete.viagens_completas - 10} viagens completas</span>
-                )}
-              </div>
-            )}
-
-            {/* Última Viagem (parcial) */}
-            {calculoFrete.ultima_viagem_percentual > 0 && calculoFrete.ultima_viagem_percentual < 100 && (
-              <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-1">
-                  <span>Última Viagem (parcial):</span>
-                  <span>{calculoFrete.ultima_viagem_percentual.toFixed(1)}%</span>
-                </div>
-                <div className="w-full h-3 bg-gray-200 rounded overflow-hidden">
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <span className="text-gray-500 w-16">Ocupação:</span>
+            <div className="flex-1 flex gap-0.5 items-center">
+              {[...Array(Math.min(calculoFrete.viagens_completas, 10))].map((_, i) => (
+                <div key={i} className="h-2 w-4 bg-green-500 rounded-sm" />
+              ))}
+              {calculoFrete.ultima_viagem_percentual > 0 && calculoFrete.ultima_viagem_percentual < 100 && (
+                <div className="h-2 w-4 bg-gray-200 rounded-sm overflow-hidden">
                   <div 
-                    className={`h-full rounded ${calculoFrete.ultima_viagem_percentual < 50 ? 'bg-red-500' : 'bg-orange-400'}`}
+                    className={`h-full ${calculoFrete.ultima_viagem_percentual < 50 ? 'bg-red-400' : 'bg-orange-400'}`}
                     style={{ width: `${calculoFrete.ultima_viagem_percentual}%` }}
                   />
                 </div>
-                {calculoFrete.ultima_viagem_percentual < 50 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <span className="text-red-600 text-xs">✗</span>
-                    <span className="text-xs text-red-600">Muito baixa</span>
-                  </div>
-                )}
-              </div>
+              )}
+              {calculoFrete.viagens_completas > 10 && (
+                <span className="text-gray-500">+{calculoFrete.viagens_completas - 10}</span>
+              )}
+            </div>
+            {calculoFrete.ultima_viagem_percentual > 0 && calculoFrete.ultima_viagem_percentual < 100 && (
+              <span className={calculoFrete.ultima_viagem_percentual < 50 ? 'text-red-600' : 'text-gray-500'}>
+                Última: {calculoFrete.ultima_viagem_percentual.toFixed(0)}%
+              </span>
             )}
-          </div>
-        )}
-
-        {/* Indicador de Pedido Grande */}
-        {isPedidoGrande && (
-          <div className="mt-3 flex items-center gap-2 text-green-700 bg-green-50 p-2 rounded-lg">
-            <CheckCircle size={16} />
-            <span className="text-sm font-medium">Pedido grande - Excelente venda!</span>
           </div>
         )}
       </div>
 
-      {/* INFORMAÇÕES DE FRETE */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Truck className="text-blue-600" size={20} />
-          <h3 className="font-semibold text-gray-900">Informações de Frete</h3>
+      {/* FRETE - COMPACTO */}
+      <div className="bg-white border border-gray-200 rounded-lg p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Truck className="text-blue-600" size={16} />
+          <h3 className="font-semibold text-gray-900 text-sm">Informações de Frete</h3>
         </div>
 
-        {/* Modalidade de Frete - DROPDOWN */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Modalidade de Frete
-          </label>
-          <select
-            value={modalidade}
-            onChange={(e) => {
-              setModalidade(e.target.value)
-              if (e.target.value === 'FOB') {
-                resetarSelecoes()
-              }
-            }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-          >
-            <option value="">Selecione a modalidade</option>
-            <option value="FOB">FOB (Cliente Retira - Sem Frete)</option>
-            <option value="CIF_SEM_DESCARGA">CIF - Sem Descarga</option>
-            <option value="CIF_COM_DESCARGA">CIF - Com Descarga</option>
-          </select>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Modalidade</label>
+            <select
+              value={modalidade}
+              onChange={(e) => {
+                setModalidade(e.target.value)
+                if (e.target.value === 'FOB') resetarSelecoes()
+              }}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+            >
+              <option value="">Selecione...</option>
+              <option value="FOB">FOB (Cliente Retira)</option>
+              <option value="CIF_SEM_DESCARGA">CIF - Sem Descarga</option>
+              <option value="CIF_COM_DESCARGA">CIF - Com Descarga</option>
+            </select>
+          </div>
 
-        {/* Mensagem FOB */}
-        {modalidade === 'FOB' && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-            <div className="flex items-start gap-2">
-              <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+          {(modalidade === 'CIF_SEM_DESCARGA' || modalidade === 'CIF_COM_DESCARGA') && (
+            <>
               <div>
-                <p className="font-semibold text-green-900">FOB - Free on Board</p>
-                <p className="text-sm text-green-700 mt-1">
-                  Cliente retira na fábrica. Não há cobrança de frete.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tipo de Veículo - DROPDOWN (só se CIF) */}
-        {(modalidade === 'CIF_SEM_DESCARGA' || modalidade === 'CIF_COM_DESCARGA') && (
-          <>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de Veículo
-              </label>
-              <select
-                value={tipoVeiculo}
-                onChange={(e) => setTipoVeiculo(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              >
-                <option value="">Selecione o veículo</option>
-                {tiposVeiculo.map(v => (
-                  <option key={v.valor} value={v.valor}>
-                    {v.icon} {v.nome} ({v.capacidade})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Destino - Campo de Busca com Autocomplete */}
-            <div className="mb-4 relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="flex items-center gap-1">
-                  <Search size={14} />
-                  Destino (Cidade/Bairro)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={buscaCidade}
-                onChange={(e) => {
-                  setBuscaCidade(e.target.value)
-                  setCidadeSelecionada('')
-                  setMostrarSugestoes(true)
-                }}
-                onFocus={() => setMostrarSugestoes(true)}
-                placeholder="Ex: Betim, BH Centro, Contagem..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              
-              {/* Sugestões de Cidades */}
-              {mostrarSugestoes && buscaCidade && cidadesFiltradas.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
-                  {cidadesFiltradas.map(cidade => (
-                    <button
-                      key={cidade}
-                      onClick={() => selecionarCidade(cidade)}
-                      className="w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-50"
-                    >
-                      {cidade}
-                    </button>
+                <label className="block text-xs text-gray-600 mb-1">Veículo</label>
+                <select
+                  value={tipoVeiculo}
+                  onChange={(e) => setTipoVeiculo(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  {tiposVeiculo.map(v => (
+                    <option key={v.valor} value={v.valor}>{v.icon} {v.nome} ({v.capacidade})</option>
                   ))}
-                </div>
-              )}
+                </select>
+              </div>
 
-              {/* Cidade Encontrada */}
-              {cidadeSelecionada && (
-                <div className="mt-2 flex items-center gap-2 text-green-700 bg-green-50 p-2 rounded-lg">
-                  <CheckCircle size={16} />
-                  <span className="text-sm">Localidade encontrada: {cidadeSelecionada}</span>
-                </div>
-              )}
-            </div>
-          </>
+              <div className="relative">
+                <label className="block text-xs text-gray-600 mb-1">
+                  <Search size={10} className="inline" /> Destino
+                </label>
+                <input
+                  type="text"
+                  value={buscaCidade}
+                  onChange={(e) => {
+                    setBuscaCidade(e.target.value)
+                    setCidadeSelecionada('')
+                    setMostrarSugestoes(true)
+                  }}
+                  onFocus={() => setMostrarSugestoes(true)}
+                  placeholder="Digite a cidade..."
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                />
+                {mostrarSugestoes && buscaCidade && cidadesFiltradas.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-32 overflow-auto">
+                    {cidadesFiltradas.map(cidade => (
+                      <button
+                        key={cidade}
+                        onClick={() => selecionarCidade(cidade)}
+                        className="w-full px-2 py-1 text-left text-sm hover:bg-blue-50"
+                      >
+                        {cidade}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {cidadeSelecionada && (
+          <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+            <CheckCircle size={12} /> {cidadeSelecionada}
+          </p>
         )}
 
-        {/* Cálculo do Frete */}
+        {modalidade === 'FOB' && (
+          <p className="mt-2 text-sm text-green-700 bg-green-50 px-2 py-1 rounded flex items-center gap-1">
+            <CheckCircle size={14} /> FOB - Cliente retira. Sem frete.
+          </p>
+        )}
+
         {calculoFrete && modalidade !== 'FOB' && cidadeSelecionada && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Valor por Viagem:</span>
-                <span className="font-semibold">
-                  R$ {calculoFrete.valor_unitario_viagem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Qtd de Viagens:</span>
-                <span className="font-semibold">{calculoFrete.viagens_necessarias}x</span>
-              </div>
-              <div className="border-t border-blue-200 pt-2 mt-2">
-                <div className="flex justify-between">
-                  <span className="font-bold text-blue-900">Valor Total de Frete:</span>
-                  <span className="text-xl font-bold text-blue-600">
-                    R$ {calculoFrete.valor_total_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-green-600 text-xs">
-                <CheckCircle size={14} />
-                <span>Frete calculado automaticamente</span>
-              </div>
+          <div className="mt-2 bg-blue-50 border border-blue-200 rounded p-2 flex justify-between items-center">
+            <span className="text-sm text-gray-600">
+              R$ {calculoFrete.valor_unitario_viagem.toFixed(2)} × {calculoFrete.viagens_necessarias}
+            </span>
+            <div className="text-right">
+              <p className="text-lg font-bold text-blue-600">
+                R$ {calculoFrete.valor_total_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <span className="text-xs text-green-600">✓ Automático</span>
             </div>
           </div>
         )}
 
-        {/* Frete Manual */}
         {modalidade && modalidade !== 'FOB' && (
-          <div className="border-t border-gray-200 pt-4">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <label className="flex items-center gap-1 cursor-pointer text-gray-600">
               <input
                 type="checkbox"
                 checked={freteManual}
                 onChange={(e) => setFreteManual(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="w-3 h-3"
               />
-              <span className="text-sm text-gray-700">Definir valor de frete manualmente</span>
+              Manual
             </label>
-
             {freteManual && (
-              <div className="mt-3">
-                <input
-                  type="number"
-                  value={valorManual}
-                  onChange={(e) => setValorManual(e.target.value)}
-                  placeholder="Digite o valor do frete"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <input
+                type="number"
+                value={valorManual}
+                onChange={(e) => setValorManual(e.target.value)}
+                placeholder="R$ 0,00"
+                className="w-24 px-2 py-1 border rounded text-sm"
+              />
             )}
-          </div>
-        )}
-
-        {/* Aviso se não tem peso e não é FOB */}
-        {(!pesoTotal || pesoTotal === 0) && modalidade && modalidade !== 'FOB' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={16} />
-              <p className="text-sm text-yellow-700">
-                Selecione um tipo de veículo para calcular o número de viagens necessárias.
-              </p>
-            </div>
           </div>
         )}
       </div>
