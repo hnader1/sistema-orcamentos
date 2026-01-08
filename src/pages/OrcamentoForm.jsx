@@ -129,7 +129,7 @@ export default function OrcamentoForm() {
           cidade: orc.frete_cidade,
           tipo_veiculo: orc.frete_tipo_veiculo,
           modalidade: orc.frete_modalidade || 'CIF',
-          valor_total: orc.frete || 0
+          valor_total_frete: orc.frete || 0
         })
       }
 
@@ -270,6 +270,15 @@ export default function OrcamentoForm() {
       const pesoItem = parseFloat(item.peso_unitario) || 0
       const quantidade = parseInt(item.quantidade) || 0
       return sum + (pesoItem * quantidade)
+    }, 0)
+  }
+
+  // Cálculo de pallets total
+  const calcularTotalPallets = () => {
+    return produtosSelecionados.reduce((sum, item) => {
+      const quantidade = parseInt(item.quantidade) || 0
+      const qtdPorPallet = parseInt(item.qtd_por_pallet) || 1
+      return sum + (quantidade / qtdPorPallet)
     }, 0)
   }
 
@@ -555,220 +564,236 @@ export default function OrcamentoForm() {
           </div>
         </div>
 
-        {/* Produtos - SELEÇÃO EM CASCATA */}
+        {/* PRODUTOS - TABELA HORIZONTAL IGUAL AO MODELO */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Produtos</h2>
             <button
               onClick={adicionarProduto}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
             >
-              <Plus size={16} />
-              Adicionar
+              <Plus size={18} />
+              Adicionar Produto
             </button>
           </div>
 
-          {produtosSelecionados.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              Clique em "Adicionar" para incluir produtos no orçamento
+          {produtosSelecionados.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg">
+              Clique em "Adicionar Produto" para incluir produtos no orçamento
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              {/* Cabeçalho da Tabela */}
+              <div className="min-w-[1000px]">
+                <div className="grid grid-cols-12 gap-2 bg-gray-100 p-3 rounded-t-lg text-xs font-semibold text-gray-600 uppercase">
+                  <div className="col-span-3">Produto</div>
+                  <div className="col-span-1">Classe</div>
+                  <div className="col-span-1">MPa</div>
+                  <div className="col-span-1 text-center">Qtd</div>
+                  <div className="col-span-1 text-right">Preço Tab.</div>
+                  <div className="col-span-1 text-right">Peso Unit.</div>
+                  <div className="col-span-1 text-right">Peso Total</div>
+                  <div className="col-span-1 text-right">Subtotal</div>
+                  <div className="col-span-1 text-center">Pallets</div>
+                </div>
+
+                {/* Linhas da Tabela */}
+                {produtosSelecionados.map((item, index) => (
+                  <div 
+                    key={index} 
+                    className={`grid grid-cols-12 gap-2 p-3 items-center border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                  >
+                    {/* Produto */}
+                    <div className="col-span-3">
+                      <select
+                        value={item.produto}
+                        onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Selecione...</option>
+                        {getProdutosUnicos().map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Classe */}
+                    <div className="col-span-1">
+                      <select
+                        value={item.classe}
+                        onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
+                        disabled={!item.produto}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      >
+                        <option value="">-</option>
+                        {getClassesDisponiveis(item.produto).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* MPA */}
+                    <div className="col-span-1">
+                      <select
+                        value={item.mpa}
+                        onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
+                        disabled={!item.classe}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      >
+                        <option value="">-</option>
+                        {getMPAsDisponiveis(item.produto, item.classe).map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Quantidade */}
+                    <div className="col-span-1">
+                      <input
+                        type="number"
+                        value={item.quantidade}
+                        onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-blue-500"
+                        min="1"
+                      />
+                    </div>
+
+                    {/* Preço Tab. */}
+                    <div className="col-span-1">
+                      <input
+                        type="text"
+                        value={item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
+                        disabled
+                        className="w-full px-2 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-right"
+                      />
+                    </div>
+
+                    {/* Peso Unit. */}
+                    <div className="col-span-1">
+                      <input
+                        type="text"
+                        value={item.peso_unitario ? `${item.peso_unitario} kg` : '-'}
+                        disabled
+                        className="w-full px-2 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-right"
+                      />
+                    </div>
+
+                    {/* Peso Total */}
+                    <div className="col-span-1">
+                      <input
+                        type="text"
+                        value={item.peso_unitario && item.quantidade 
+                          ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
+                          : '-'}
+                        disabled
+                        className="w-full px-2 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-right"
+                      />
+                    </div>
+
+                    {/* Subtotal */}
+                    <div className="col-span-1">
+                      <input
+                        type="text"
+                        value={item.preco && item.quantidade 
+                          ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                          : '-'}
+                        disabled
+                        className="w-full px-2 py-2 border border-gray-200 rounded-lg bg-yellow-50 text-sm text-right font-semibold"
+                      />
+                    </div>
+
+                    {/* Pallets + Botão Remover */}
+                    <div className="col-span-1 flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={item.qtd_por_pallet && item.quantidade 
+                          ? (item.quantidade / item.qtd_por_pallet).toFixed(2) 
+                          : '-'}
+                        disabled
+                        className="w-full px-2 py-2 border border-purple-200 rounded-lg bg-purple-50 text-sm text-center font-semibold text-purple-700"
+                      />
+                      <button
+                        onClick={() => removerProduto(index)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0"
+                        title="Remover produto"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-
-          {produtosSelecionados.map((item, index) => (
-            <div key={index} className="mb-6 pb-6 border-b border-gray-200 last:border-b-0">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-gray-700">Produto {index + 1}</span>
-                <button
-                  onClick={() => removerProduto(index)}
-                  className="p-1 text-red-600 hover:bg-red-50 rounded-lg"
-                  title="Remover produto"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                {/* Produto */}
-                <div className="md:col-span-3">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">1. Produto *</label>
-                  <select
-                    value={item.produto}
-                    onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Selecione...</option>
-                    {getProdutosUnicos().map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Classe */}
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">2. Classe *</label>
-                  <select
-                    value={item.classe}
-                    onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
-                    disabled={!item.produto}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="">Selecione...</option>
-                    {getClassesDisponiveis(item.produto).map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* MPA */}
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">3. MPA *</label>
-                  <select
-                    value={item.mpa}
-                    onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
-                    disabled={!item.classe}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="">Selecione...</option>
-                    {getMPAsDisponiveis(item.produto, item.classe).map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Quantidade */}
-                <div className="md:col-span-1">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Qtd *</label>
-                  <input
-                    type="number"
-                    value={item.quantidade}
-                    onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
-                    className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm"
-                    min="1"
-                  />
-                </div>
-
-                {/* Preço - FIXO (NÃO EDITÁVEL) */}
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Preço Unit.</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.preco}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm font-semibold"
-                  />
-                </div>
-
-                {/* Subtotal */}
-                <div className="md:col-span-1">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Subtotal</label>
-                  <input
-                    type="text"
-                    value={`R$ ${(item.quantidade * item.preco).toFixed(2)}`}
-                    disabled
-                    className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-gray-100 text-xs font-semibold"
-                  />
-                </div>
-
-                {/* CÓDIGO - ÚLTIMA COLUNA */}
-                <div className="md:col-span-1">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Código</label>
-                  <input
-                    type="text"
-                    value={item.codigo}
-                    disabled
-                    className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-blue-50 text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Informações adicionais */}
-              {item.produto_id && (
-                <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
-                  <div>
-                    <span className="font-medium">Peso unitário:</span> {item.peso_unitario} kg
-                  </div>
-                  <div>
-                    <span className="font-medium">Qtd/Pallet:</span> {item.qtd_por_pallet} pç
-                  </div>
-                  <div>
-                    <span className="font-medium">Pallets:</span> {(item.quantidade / item.qtd_por_pallet).toFixed(2)}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
         </div>
 
-        {/* FRETE - COMPONENTE VISUAL */}
+        {/* FRETE - COMPONENTE COM ANÁLISE DE CARGA */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Frete</h2>
           <FreteSelector 
             pesoTotal={calcularPesoTotal()}
+            totalPallets={calcularTotalPallets()}
             onFreteChange={setDadosFrete}
             freteAtual={dadosFrete}
           />
         </div>
 
-        {/* Totais - CÁLCULO CORRETO */}
+        {/* TOTAIS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Valores</h2>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            
-            {/* Subtotal Produtos */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subtotal Produtos</label>
-              <input
-                type="text"
-                value={`R$ ${calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
-              />
+          <div className="max-w-md ml-auto space-y-3">
+            {/* Subtotal sem desconto */}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Subtotal (sem desconto):</span>
+              <span className="font-medium">
+                R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
 
             {/* Desconto */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Desconto (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.desconto_geral}
-                onChange={(e) => setFormData({ ...formData, desconto_geral: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="flex justify-between items-center">
+              <label className="text-sm text-gray-600 flex items-center gap-2">
+                Desconto Geral (%):
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.desconto_geral}
+                  onChange={(e) => setFormData({ ...formData, desconto_geral: e.target.value })}
+                  className="w-20 px-3 py-2 border border-yellow-400 rounded-lg focus:ring-2 focus:ring-yellow-500 text-center bg-yellow-50"
+                />
+              </div>
             </div>
 
-            {/* Subtotal com Desconto */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subtotal c/ Desc.</label>
-              <input
-                type="text"
-                value={`R$ ${(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold"
-              />
+            {/* Subtotal de Produtos */}
+            <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
+              <span className="text-gray-700 font-medium">Subtotal de Produtos:</span>
+              <span className="font-semibold">
+                R$ {(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
 
-            {/* Frete (SEM DESCONTO!) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Frete</label>
-              <input
-                type="text"
-                value={`R$ ${(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
-              />
+            {/* Total Produtos */}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Total Produtos:</span>
+              <span className="font-medium">
+                R$ {(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
 
-            {/* Total */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
-              <input
-                type="text"
-                value={`R$ ${calcularTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-green-100 font-bold text-lg text-green-700"
-              />
+            {/* Total Frete */}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Total Frete:</span>
+              <span className="font-medium">
+                R$ {(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {/* TOTAL GERAL */}
+            <div className="flex justify-between items-center border-t-2 border-blue-200 pt-3 mt-3">
+              <span className="text-lg font-bold text-gray-900">Total Geral:</span>
+              <span className="text-2xl font-bold text-blue-600">
+                R$ {calcularTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
         </div>
@@ -785,9 +810,6 @@ export default function OrcamentoForm() {
           />
         </div>
       </div>
-    </div>
-  )
-}
     </div>
   )
 }
