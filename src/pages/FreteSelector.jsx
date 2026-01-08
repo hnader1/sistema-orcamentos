@@ -440,4 +440,51 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               </div>
               <div className="flex items-center gap-1 text-green-600 text-xs">
                 <CheckCircle size={14} />
-                <span>Frete calculado automat
+                <span>Frete calculado automaticamente</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Frete Manual */}
+        {modalidade && modalidade !== 'FOB' && (
+          <div className="border-t border-gray-200 pt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={freteManual}
+                onChange={(e) => setFreteManual(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Definir valor de frete manualmente</span>
+            </label>
+
+            {freteManual && (
+              <div className="mt-3">
+                <input
+                  type="number"
+                  value={valorManual}
+                  onChange={(e) => setValorManual(e.target.value)}
+                  placeholder="Digite o valor do frete"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Aviso se não tem peso e não é FOB */}
+        {(!pesoTotal || pesoTotal === 0) && modalidade && modalidade !== 'FOB' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={16} />
+              <p className="text-sm text-yellow-700">
+                Selecione um tipo de veículo para calcular o número de viagens necessárias.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
