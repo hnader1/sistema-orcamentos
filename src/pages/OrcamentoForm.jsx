@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../services/supabase'
+import FreteSelector from '../components/FreteSelector'
 
 export default function OrcamentoForm() {
   const navigate = useNavigate()
@@ -9,6 +10,7 @@ export default function OrcamentoForm() {
   const [loading, setLoading] = useState(false)
   const [produtos, setProdutos] = useState([])
   const [produtosSelecionados, setProdutosSelecionados] = useState([])
+  const [dadosFrete, setDadosFrete] = useState(null)
   
   const [formData, setFormData] = useState({
     numero: '',
@@ -24,7 +26,6 @@ export default function OrcamentoForm() {
     condicoes_pagamento: '',
     prazo_entrega: '',
     desconto_geral: 0,
-    frete: 0,
     observacoes: '',
     status: 'rascunho'
   })
@@ -118,10 +119,19 @@ export default function OrcamentoForm() {
         condicoes_pagamento: orc.condicoes_pagamento || '',
         prazo_entrega: orc.prazo_entrega || '',
         desconto_geral: orc.desconto_geral || 0,
-        frete: orc.frete || 0,
         observacoes: orc.observacoes || '',
         status: orc.status || 'rascunho'
       })
+
+      // Carregar dados do frete se existirem
+      if (orc.frete_cidade) {
+        setDadosFrete({
+          cidade: orc.frete_cidade,
+          tipo_veiculo: orc.frete_tipo_veiculo,
+          modalidade: orc.frete_modalidade || 'CIF',
+          valor_total: orc.frete || 0
+        })
+      }
 
       const { data: itens, error: errorItens } = await supabase
         .from('orcamentos_itens')
@@ -207,7 +217,6 @@ export default function OrcamentoForm() {
     const novos = [...produtosSelecionados]
     
     if (campo === 'produto') {
-      // Resetar seleção quando muda produto
       novos[index] = {
         ...novos[index],
         produto: valor,
@@ -220,7 +229,6 @@ export default function OrcamentoForm() {
         qtd_por_pallet: 0
       }
     } else if (campo === 'classe') {
-      // Resetar MPA quando muda classe
       novos[index] = {
         ...novos[index],
         classe: valor,
@@ -232,7 +240,6 @@ export default function OrcamentoForm() {
         qtd_por_pallet: 0
       }
     } else if (campo === 'mpa') {
-      // Quando seleciona MPA, buscar produto completo
       const produtoCompleto = getProdutoCompleto(
         novos[index].produto,
         novos[index].classe,
@@ -257,15 +264,29 @@ export default function OrcamentoForm() {
     setProdutosSelecionados(novos)
   }
 
-  const calcularSubtotal = () => {
+  // Cálculo de peso total para o frete
+  const calcularPesoTotal = () => {
     return produtosSelecionados.reduce((sum, item) => {
-      const precoComDesconto = item.preco * (1 - (formData.desconto_geral || 0) / 100)
-      return sum + (item.quantidade * precoComDesconto)
+      const pesoItem = parseFloat(item.peso_unitario) || 0
+      const quantidade = parseInt(item.quantidade) || 0
+      return sum + (pesoItem * quantidade)
     }, 0)
   }
 
+  // Subtotal SEM desconto (desconto é aplicado depois)
+  const calcularSubtotal = () => {
+    return produtosSelecionados.reduce((sum, item) => {
+      return sum + (item.quantidade * item.preco)
+    }, 0)
+  }
+
+  // Total: Produtos com desconto + Frete sem desconto
   const calcularTotal = () => {
-    return calcularSubtotal() + parseFloat(formData.frete || 0)
+    const subtotal = calcularSubtotal()
+    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+    const subtotalComDesconto = subtotal - desconto
+    const frete = dadosFrete?.valor_total || 0
+    return subtotalComDesconto + frete
   }
 
   const salvar = async () => {
@@ -280,7 +301,6 @@ export default function OrcamentoForm() {
         return
       }
 
-      // Validar se todos os produtos têm produto, classe e MPA selecionados
       const produtoIncompleto = produtosSelecionados.find(
         p => !p.produto || !p.classe || !p.mpa
       )
@@ -292,7 +312,10 @@ export default function OrcamentoForm() {
       setLoading(true)
 
       const subtotal = calcularSubtotal()
-      const total = calcularTotal()
+      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+      const subtotalComDesconto = subtotal - desconto
+      const frete = dadosFrete?.valor_total_frete || 0
+      const total = subtotalComDesconto + frete
 
       const dadosOrcamento = {
         numero: formData.numero,
@@ -308,8 +331,12 @@ export default function OrcamentoForm() {
         condicoes_pagamento: formData.condicoes_pagamento,
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral),
-        frete: parseFloat(formData.frete),
-        subtotal,
+        subtotal: subtotalComDesconto,
+        frete: frete,
+        frete_tipo_frete: dadosFrete?.tipo_frete || 'FOB',
+        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+        frete_localidade: dadosFrete?.localidade || null,
+        frete_cidade: dadosFrete?.localidade || null,
         total,
         observacoes: formData.observacoes,
         status: formData.status
@@ -318,7 +345,6 @@ export default function OrcamentoForm() {
       let orcamentoId = id
 
       if (id) {
-        // Atualizar existente
         const { error } = await supabase
           .from('orcamentos')
           .update(dadosOrcamento)
@@ -326,13 +352,11 @@ export default function OrcamentoForm() {
 
         if (error) throw error
 
-        // Deletar itens antigos
         await supabase
           .from('orcamentos_itens')
           .delete()
           .eq('orcamento_id', id)
       } else {
-        // Criar novo
         const { data, error } = await supabase
           .from('orcamentos')
           .insert([dadosOrcamento])
@@ -343,7 +367,6 @@ export default function OrcamentoForm() {
         orcamentoId = data.id
       }
 
-      // Inserir itens
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcamentoId,
         produto_id: item.produto_id,
@@ -355,7 +378,7 @@ export default function OrcamentoForm() {
         preco_unitario: parseFloat(item.preco),
         peso_unitario: parseFloat(item.peso_unitario),
         qtd_por_pallet: parseInt(item.qtd_por_pallet),
-        subtotal: item.quantidade * item.preco * (1 - (formData.desconto_geral || 0) / 100),
+        subtotal: item.quantidade * item.preco,
         ordem: index
       }))
 
@@ -565,7 +588,7 @@ export default function OrcamentoForm() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                {/* PASSO 1: Selecionar Produto */}
+                {/* Produto */}
                 <div className="md:col-span-3">
                   <label className="block text-xs font-medium text-gray-600 mb-1">1. Produto *</label>
                   <select
@@ -580,7 +603,7 @@ export default function OrcamentoForm() {
                   </select>
                 </div>
 
-                {/* PASSO 2: Selecionar Classe */}
+                {/* Classe */}
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">2. Classe *</label>
                   <select
@@ -596,7 +619,7 @@ export default function OrcamentoForm() {
                   </select>
                 </div>
 
-                {/* PASSO 3: Selecionar MPA */}
+                {/* MPA */}
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">3. MPA *</label>
                   <select
@@ -612,17 +635,6 @@ export default function OrcamentoForm() {
                   </select>
                 </div>
 
-                {/* Código (exibido após seleção completa) */}
-                <div className="md:col-span-1">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Código</label>
-                  <input
-                    type="text"
-                    value={item.codigo}
-                    disabled
-                    className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-gray-100 text-xs"
-                  />
-                </div>
-
                 {/* Quantidade */}
                 <div className="md:col-span-1">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Qtd *</label>
@@ -635,15 +647,15 @@ export default function OrcamentoForm() {
                   />
                 </div>
 
-                {/* Preço Unitário */}
+                {/* Preço - FIXO (NÃO EDITÁVEL) */}
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Preço Unit.</label>
                   <input
                     type="number"
                     step="0.01"
                     value={item.preco}
-                    onChange={(e) => atualizarProduto(index, 'preco', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm font-semibold"
                   />
                 </div>
 
@@ -652,14 +664,25 @@ export default function OrcamentoForm() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Subtotal</label>
                   <input
                     type="text"
-                    value={`R$ ${(item.quantidade * item.preco * (1 - (formData.desconto_geral || 0) / 100)).toFixed(2)}`}
+                    value={`R$ ${(item.quantidade * item.preco).toFixed(2)}`}
                     disabled
                     className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-gray-100 text-xs font-semibold"
                   />
                 </div>
+
+                {/* CÓDIGO - ÚLTIMA COLUNA */}
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Código</label>
+                  <input
+                    type="text"
+                    value={item.codigo}
+                    disabled
+                    className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-blue-50 text-xs font-mono"
+                  />
+                </div>
               </div>
 
-              {/* Informações adicionais (quando produto completo selecionado) */}
+              {/* Informações adicionais */}
               {item.produto_id && (
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
                   <div>
@@ -677,19 +700,33 @@ export default function OrcamentoForm() {
           ))}
         </div>
 
-        {/* Totais */}
+        {/* FRETE - COMPONENTE VISUAL */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Frete</h2>
+          <FreteSelector 
+            pesoTotal={calcularPesoTotal()}
+            onFreteChange={setDadosFrete}
+            freteAtual={dadosFrete}
+          />
+        </div>
+
+        {/* Totais - CÁLCULO CORRETO */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Valores</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            
+            {/* Subtotal Produtos */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subtotal</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subtotal Produtos</label>
               <input
                 type="text"
                 value={`R$ ${calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                 disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
               />
             </div>
+
+            {/* Desconto */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Desconto (%)</label>
               <input
@@ -700,16 +737,30 @@ export default function OrcamentoForm() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
+            {/* Subtotal com Desconto */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Frete (R$)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subtotal c/ Desc.</label>
               <input
-                type="number"
-                step="0.01"
-                value={formData.frete}
-                onChange={(e) => setFormData({ ...formData, frete: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                type="text"
+                value={`R$ ${(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold"
               />
             </div>
+
+            {/* Frete (SEM DESCONTO!) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Frete</label>
+              <input
+                type="text"
+                value={`R$ ${(dadosFrete?.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+              />
+            </div>
+
+            {/* Total */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
               <input
