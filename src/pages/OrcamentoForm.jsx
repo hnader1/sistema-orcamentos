@@ -285,7 +285,7 @@ export default function OrcamentoForm() {
     const subtotal = calcularSubtotal()
     const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
     const subtotalComDesconto = subtotal - desconto
-    const frete = dadosFrete?.valor_total || 0
+    const frete = dadosFrete?.valor_total_frete || 0
     return subtotalComDesconto + frete
   }
 
@@ -754,7 +754,7 @@ export default function OrcamentoForm() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Frete</label>
               <input
                 type="text"
-                value={`R$ ${(dadosFrete?.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                value={`R$ ${(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                 disabled
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
               />

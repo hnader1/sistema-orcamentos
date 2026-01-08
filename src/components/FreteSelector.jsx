@@ -80,10 +80,16 @@ export default function FreteSelector({ pesoTotal, onFreteChange, freteAtual }) 
     
     const veiculoBusca = `${tipoCaminhao} - ${modalidadeBusca}`
     
+    // Buscar frete verificando cidade, tipo_veiculo E modalidade
     const frete = fretes.find(f => 
       f.cidade === localidade && 
-      f.tipo_veiculo === veiculoBusca
+      f.tipo_veiculo === veiculoBusca &&
+      f.modalidade === tipoFrete
     )
+
+    // Log para debug (remover depois)
+    console.log('Buscando frete:', { localidade, veiculoBusca, tipoFrete })
+    console.log('Frete encontrado:', frete)
 
     if (!frete) {
       setCalculoFrete(null)
@@ -101,7 +107,8 @@ export default function FreteSelector({ pesoTotal, onFreteChange, freteAtual }) 
       ? Math.ceil(pesoTotalKg / capacidadeKg) 
       : 1
 
-    const valorUnitarioViagem = frete.preco_kg // Na verdade é preço fixo
+    // Usar preco_fixo - valor fixo por viagem (do banco de dados)
+    const valorUnitarioViagem = frete.preco_fixo || frete.preco_por_kg || 0
     const valorTotalFrete = valorUnitarioViagem * viagensNecessarias
 
     const resultado = {
