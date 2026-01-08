@@ -134,7 +134,7 @@ export default function OrcamentoForm() {
         setProdutosSelecionados(itens.map(item => ({
           produto_id: item.produto_id,
           codigo: item.produto_codigo,
-          nome: item.produto,
+          produto: item.produto,
           classe: item.classe,
           mpa: item.mpa,
           quantidade: item.quantidade,
@@ -151,11 +151,45 @@ export default function OrcamentoForm() {
     }
   }
 
+  // Funções para seleção em cascata
+  const getProdutosUnicos = () => {
+    const unicos = [...new Set(produtos.map(p => p.produto))]
+    return unicos.sort()
+  }
+
+  const getClassesDisponiveis = (nomeProduto) => {
+    if (!nomeProduto) return []
+    const classes = [...new Set(
+      produtos
+        .filter(p => p.produto === nomeProduto)
+        .map(p => p.classe)
+    )]
+    return classes.sort()
+  }
+
+  const getMPAsDisponiveis = (nomeProduto, classe) => {
+    if (!nomeProduto || !classe) return []
+    const mpas = [...new Set(
+      produtos
+        .filter(p => p.produto === nomeProduto && p.classe === classe)
+        .map(p => p.mpa)
+    )]
+    return mpas.sort()
+  }
+
+  const getProdutoCompleto = (nomeProduto, classe, mpa) => {
+    return produtos.find(p => 
+      p.produto === nomeProduto && 
+      p.classe === classe && 
+      p.mpa === mpa
+    )
+  }
+
   const adicionarProduto = () => {
     setProdutosSelecionados([...produtosSelecionados, {
       produto_id: '',
       codigo: '',
-      nome: '',
+      produto: '',
       classe: '',
       mpa: '',
       quantidade: 1,
@@ -172,19 +206,48 @@ export default function OrcamentoForm() {
   const atualizarProduto = (index, campo, valor) => {
     const novos = [...produtosSelecionados]
     
-    if (campo === 'produto_id') {
-      const produto = produtos.find(p => p.id === valor)
-      if (produto) {
+    if (campo === 'produto') {
+      // Resetar seleção quando muda produto
+      novos[index] = {
+        ...novos[index],
+        produto: valor,
+        classe: '',
+        mpa: '',
+        produto_id: '',
+        codigo: '',
+        preco: 0,
+        peso_unitario: 0,
+        qtd_por_pallet: 0
+      }
+    } else if (campo === 'classe') {
+      // Resetar MPA quando muda classe
+      novos[index] = {
+        ...novos[index],
+        classe: valor,
+        mpa: '',
+        produto_id: '',
+        codigo: '',
+        preco: 0,
+        peso_unitario: 0,
+        qtd_por_pallet: 0
+      }
+    } else if (campo === 'mpa') {
+      // Quando seleciona MPA, buscar produto completo
+      const produtoCompleto = getProdutoCompleto(
+        novos[index].produto,
+        novos[index].classe,
+        valor
+      )
+      
+      if (produtoCompleto) {
         novos[index] = {
           ...novos[index],
-          produto_id: produto.id,
-          codigo: produto.codigo_sistema,
-          nome: produto.produto,
-          classe: produto.classe,
-          mpa: produto.mpa,
-          preco: produto.preco,
-          peso_unitario: produto.peso_unitario,
-          qtd_por_pallet: produto.qtd_por_pallet
+          mpa: valor,
+          produto_id: produtoCompleto.id,
+          codigo: produtoCompleto.codigo_sistema,
+          preco: produtoCompleto.preco,
+          peso_unitario: produtoCompleto.peso_unitario,
+          qtd_por_pallet: produtoCompleto.qtd_por_pallet
         }
       }
     } else {
@@ -214,6 +277,15 @@ export default function OrcamentoForm() {
 
       if (produtosSelecionados.length === 0) {
         alert('Adicione pelo menos um produto!')
+        return
+      }
+
+      // Validar se todos os produtos têm produto, classe e MPA selecionados
+      const produtoIncompleto = produtosSelecionados.find(
+        p => !p.produto || !p.classe || !p.mpa
+      )
+      if (produtoIncompleto) {
+        alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
         return
       }
 
@@ -276,7 +348,7 @@ export default function OrcamentoForm() {
         orcamento_id: orcamentoId,
         produto_id: item.produto_id,
         produto_codigo: item.codigo,
-        produto: item.nome,
+        produto: item.produto,
         classe: item.classe,
         mpa: item.mpa,
         quantidade: parseInt(item.quantidade),
@@ -460,7 +532,7 @@ export default function OrcamentoForm() {
           </div>
         </div>
 
-        {/* Produtos */}
+        {/* Produtos - SELEÇÃO EM CASCATA */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Produtos</h2>
@@ -473,58 +545,134 @@ export default function OrcamentoForm() {
             </button>
           </div>
 
+          {produtosSelecionados.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              Clique em "Adicionar" para incluir produtos no orçamento
+            </div>
+          )}
+
           {produtosSelecionados.map((item, index) => (
-            <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 pb-3 border-b border-gray-200">
-              <div className="md:col-span-4">
-                <select
-                  value={item.produto_id}
-                  onChange={(e) => atualizarProduto(index, 'produto_id', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                >
-                  <option value="">Selecione...</option>
-                  {produtos.map(p => (
-                    <option key={p.id} value={p.id}>
-                      [{p.codigo_sistema}] {p.produto} - {p.classe} - {p.mpa}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <input
-                  type="number"
-                  value={item.quantidade}
-                  onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  placeholder="Qtd"
-                  min="1"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={item.preco}
-                  onChange={(e) => atualizarProduto(index, 'preco', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  placeholder="Preço"
-                />
-              </div>
-              <div className="md:col-span-3">
-                <input
-                  type="text"
-                  value={`R$ ${(item.quantidade * item.preco * (1 - (formData.desconto_geral || 0) / 100)).toFixed(2)}`}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm"
-                />
-              </div>
-              <div className="md:col-span-1 flex items-center justify-center">
+            <div key={index} className="mb-6 pb-6 border-b border-gray-200 last:border-b-0">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-700">Produto {index + 1}</span>
                 <button
                   onClick={() => removerProduto(index)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  className="p-1 text-red-600 hover:bg-red-50 rounded-lg"
+                  title="Remover produto"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                {/* PASSO 1: Selecionar Produto */}
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">1. Produto *</label>
+                  <select
+                    value={item.produto}
+                    onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione...</option>
+                    {getProdutosUnicos().map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* PASSO 2: Selecionar Classe */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">2. Classe *</label>
+                  <select
+                    value={item.classe}
+                    onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
+                    disabled={!item.produto}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">Selecione...</option>
+                    {getClassesDisponiveis(item.produto).map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* PASSO 3: Selecionar MPA */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">3. MPA *</label>
+                  <select
+                    value={item.mpa}
+                    onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
+                    disabled={!item.classe}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">Selecione...</option>
+                    {getMPAsDisponiveis(item.produto, item.classe).map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Código (exibido após seleção completa) */}
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Código</label>
+                  <input
+                    type="text"
+                    value={item.codigo}
+                    disabled
+                    className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-gray-100 text-xs"
+                  />
+                </div>
+
+                {/* Quantidade */}
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Qtd *</label>
+                  <input
+                    type="number"
+                    value={item.quantidade}
+                    onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
+                    className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm"
+                    min="1"
+                  />
+                </div>
+
+                {/* Preço Unitário */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Preço Unit.</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={item.preco}
+                    onChange={(e) => atualizarProduto(index, 'preco', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+
+                {/* Subtotal */}
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Subtotal</label>
+                  <input
+                    type="text"
+                    value={`R$ ${(item.quantidade * item.preco * (1 - (formData.desconto_geral || 0) / 100)).toFixed(2)}`}
+                    disabled
+                    className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-gray-100 text-xs font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Informações adicionais (quando produto completo selecionado) */}
+              {item.produto_id && (
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                  <div>
+                    <span className="font-medium">Peso unitário:</span> {item.peso_unitario} kg
+                  </div>
+                  <div>
+                    <span className="font-medium">Qtd/Pallet:</span> {item.qtd_por_pallet} pç
+                  </div>
+                  <div>
+                    <span className="font-medium">Pallets:</span> {(item.quantidade / item.qtd_por_pallet).toFixed(2)}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -532,9 +680,18 @@ export default function OrcamentoForm() {
         {/* Totais */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Valores</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Desconto Geral (%)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subtotal</label>
+              <input
+                type="text"
+                value={`R$ ${calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Desconto (%)</label>
               <input
                 type="number"
                 step="0.01"
@@ -559,7 +716,7 @@ export default function OrcamentoForm() {
                 type="text"
                 value={`R$ ${calcularTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                 disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold text-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-green-100 font-bold text-lg text-green-700"
               />
             </div>
           </div>
