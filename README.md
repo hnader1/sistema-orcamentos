@@ -34,6 +34,8 @@ npm install
 
 ### 3. Configure o Supabase
 
+
+
 #### 3.1 Criar projeto no Supabase
 1. Acesse [supabase.com](https://supabase.com)
 2. Clique em "Start your project"
