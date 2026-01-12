@@ -27,6 +27,15 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
   }, [])
 
   useEffect(() => {
+  if (freteAtual && fretes.length > 0) {
+    setModalidade(freteAtual.modalidade || freteAtual.tipo_frete || '')
+    setTipoVeiculo(freteAtual.tipo_veiculo || freteAtual.tipo_caminhao || '')
+    setCidadeSelecionada(freteAtual.localidade || '')
+    setBuscaCidade(freteAtual.localidade || '')
+  }
+}, [freteAtual, fretes])
+
+  useEffect(() => {
     calcularFrete()
   }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, freteManual, valorManual])
 
