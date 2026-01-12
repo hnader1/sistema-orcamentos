@@ -383,14 +383,15 @@ export default function OrcamentoForm() {
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
-        frete: frete,
-         frete_modalidade: dadosFrete?.modalidade || dadosFrete?.tipo_frete || 'FOB',
-        frete_qtd_viagens: dadosFrete?.qtd_viagens || dadosFrete?.quantidade_viagens || 0,
-        frete_valor_viagem: dadosFrete?.valor_por_viagem || dadosFrete?.valor_frete || 0,
-        frete_cidade: dadosFrete?.localidade || null,
-        total,
-        observacoes: formData.observacoes,
-        status: formData.status
+       frete: frete,
+frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+frete_cidade: dadosFrete?.localidade || null,
+frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+total,
+observacoes: formData.observacoes,
+status: formData.status
       }
 
       let orcamentoId = id
