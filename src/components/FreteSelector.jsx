@@ -4,7 +4,7 @@ import { Truck, Package, AlertCircle, CheckCircle, Search } from 'lucide-react'
 export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, freteAtual }) {
   const [fretes, setFretes] = useState([])
   const [localidades, setLocalidades] = useState([])
-  const [buscaCidade, setBuscaCidade] = useState('')
+  const [buscaCidade, setBuscaCidade] = useState(freteAtual?.localidade || '')
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false)
 
 const [modalidade, setModalidade] = useState(freteAtual?.modalidade || '')
