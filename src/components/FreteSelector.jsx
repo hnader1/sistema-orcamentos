@@ -26,6 +26,12 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
     carregarFretes()
   }, [])
 
+
+  useEffect(() => {
+    calcularFrete()
+  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, freteManual, valorManual])
+
+  
   useEffect(() => {
   if (freteAtual && fretes.length > 0) {
     setModalidade(freteAtual.modalidade || freteAtual.tipo_frete || '')
@@ -35,10 +41,7 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
   }
 }, [freteAtual, fretes])
 
-  useEffect(() => {
-    calcularFrete()
-  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, freteManual, valorManual])
-
+  
   const carregarFretes = async () => {
     try {
       const { supabase } = await import('../services/supabase')
