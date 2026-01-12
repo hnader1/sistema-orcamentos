@@ -209,7 +209,7 @@ export default function PropostaComercial({
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>VIAGENS</div>
-                    <div style={styles.freteValor}>{dadosFrete?.qtd_viagens || dadosFrete?.quantidade_viagens || 0}</div>
+                    <div style={styles.freteValor}>{dadosFrete?.qtd_viagens || dadosFrete?.viagens_necessarias || 0}</div>
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>VALOR/VIAGEM</div>
