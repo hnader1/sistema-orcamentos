@@ -5,7 +5,6 @@ import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
 
-// CONSTANTE PARA GARANTIR USO CONSISTENTE DA TABELA
 const TABELA_ITENS = 'orcamentos_itens'
 
 export default function OrcamentoForm() {
@@ -17,7 +16,6 @@ export default function OrcamentoForm() {
   const [dadosFrete, setDadosFrete] = useState(null)
   const [mostrarProposta, setMostrarProposta] = useState(false)
   
-  // Controle de desconto com senha
   const [descontoLiberado, setDescontoLiberado] = useState(false)
   const [mostrarModalSenha, setMostrarModalSenha] = useState(false)
   const [senhaDigitada, setSenhaDigitada] = useState('')
@@ -112,7 +110,7 @@ export default function OrcamentoForm() {
     try {
       setLoading(true)
       
-      console.log('🔍 Carregando orçamento ID:', id)
+      console.log('🔍 [CARREGAR] Iniciando carregamento do orçamento ID:', id)
       
       const { data: orc, error: errorOrc } = await supabase
         .from('orcamentos')
@@ -122,7 +120,7 @@ export default function OrcamentoForm() {
 
       if (errorOrc) throw errorOrc
 
-      console.log('✅ Orçamento carregado:', orc.numero)
+      console.log('✅ [CARREGAR] Orçamento carregado:', orc.numero)
 
       setFormData({
         numero: orc.numero,
@@ -161,8 +159,7 @@ export default function OrcamentoForm() {
         })
       }
 
-      // 🔥 CORREÇÃO PRINCIPAL: Buscar itens com filtro explícito
-      console.log(`🔍 Buscando itens da tabela ${TABELA_ITENS} para orcamento_id:`, id)
+      console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
       
       const { data: itens, error: errorItens } = await supabase
         .from(TABELA_ITENS)
@@ -171,11 +168,20 @@ export default function OrcamentoForm() {
         .order('ordem', { ascending: true })
 
       if (errorItens) {
-        console.error('❌ Erro ao buscar itens:', errorItens)
+        console.error('❌ [CARREGAR] Erro ao buscar itens:', errorItens)
         throw errorItens
       }
 
-      console.log('📦 Itens encontrados:', itens?.length || 0, itens)
+      console.log('📦 [CARREGAR] Itens encontrados:', itens?.length || 0)
+      
+      if (itens && itens.length > 0) {
+        console.table(itens.map(i => ({
+          produto: i.produto,
+          classe: i.classe,
+          mpa: i.mpa,
+          qtd: i.quantidade
+        })))
+      }
 
       if (itens && itens.length > 0) {
         const produtosCarregados = itens.map(item => ({
@@ -190,14 +196,14 @@ export default function OrcamentoForm() {
           qtd_por_pallet: item.qtd_por_pallet
         }))
         
-        console.log('✅ Produtos carregados:', produtosCarregados)
+        console.log('✅ [CARREGAR] Produtos carregados com sucesso')
         setProdutosSelecionados(produtosCarregados)
       } else {
-        console.warn('⚠️ Nenhum item encontrado para este orçamento')
+        console.log('⚠️ [CARREGAR] Nenhum item encontrado')
         setProdutosSelecionados([])
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar orçamento:', error)
+      console.error('❌ [CARREGAR] Erro ao carregar orçamento:', error)
       alert('Erro ao carregar orçamento: ' + error.message)
     } finally {
       setLoading(false)
@@ -423,32 +429,44 @@ export default function OrcamentoForm() {
       let orcamentoId = id
 
       if (id) {
-        // EDITANDO ORÇAMENTO EXISTENTE
-        console.log('📝 Atualizando orçamento ID:', id)
+        // 🔥 EDITANDO ORÇAMENTO EXISTENTE
+        console.log('📝 [SALVAR] Atualizando orçamento ID:', id)
         
         const { error } = await supabase
           .from('orcamentos')
           .update(dadosOrcamento)
           .eq('id', id)
 
-        if (error) throw error
+        if (error) {
+          console.error('❌ [SALVAR] Erro ao atualizar orçamento:', error)
+          throw error
+        }
 
-        // 🔥 CORREÇÃO: Deletar TODOS os itens antigos deste orçamento
-        console.log(`🗑️ Deletando itens antigos da tabela ${TABELA_ITENS}`)
-        const { error: errorDelete } = await supabase
+        console.log('✅ [SALVAR] Orçamento atualizado')
+
+        // 🔥 SUPER IMPORTANTE: DELETAR TODOS OS ITENS ANTIGOS
+        console.log(`🗑️ [SALVAR] Deletando TODOS os itens antigos do orcamento_id: ${id}`)
+        
+        const { error: errorDelete, count } = await supabase
           .from(TABELA_ITENS)
           .delete()
           .eq('orcamento_id', id)
 
         if (errorDelete) {
-          console.error('❌ Erro ao deletar itens antigos:', errorDelete)
+          console.error('❌ [SALVAR] Erro ao deletar itens antigos:', errorDelete)
           throw errorDelete
         }
         
-        console.log('✅ Itens antigos deletados')
+        console.log(`✅ [SALVAR] Itens antigos deletados (${count || 'todos'})`)
+
+        // 🔥 AGUARDAR 500ms para garantir que o delete foi processado
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        console.log('⏳ [SALVAR] Aguardou 500ms após delete')
+
       } else {
         // CRIANDO NOVO ORÇAMENTO
-        console.log('✨ Criando novo orçamento:', formData.numero)
+        console.log('✨ [SALVAR] Criando novo orçamento:', formData.numero)
         
         const { data, error } = await supabase
           .from('orcamentos')
@@ -456,15 +474,18 @@ export default function OrcamentoForm() {
           .select()
           .single()
 
-        if (error) throw error
+        if (error) {
+          console.error('❌ [SALVAR] Erro ao criar orçamento:', error)
+          throw error
+        }
         
         orcamentoId = data.id
-        console.log('✅ Novo orçamento criado com ID:', orcamentoId)
+        console.log('✅ [SALVAR] Novo orçamento criado com ID:', orcamentoId)
       }
 
-      // 🔥 INSERIR NOVOS ITENS COM ORCAMENTO_ID CORRETO
+      // 🔥 INSERIR NOVOS ITENS
       const itens = produtosSelecionados.map((item, index) => ({
-        orcamento_id: orcamentoId,  // ID correto garantido
+        orcamento_id: orcamentoId,
         produto_id: item.produto_id,
         produto_codigo: item.codigo,
         produto: item.produto,
@@ -478,7 +499,14 @@ export default function OrcamentoForm() {
         ordem: index
       }))
 
-      console.log(`💾 Inserindo ${itens.length} itens na tabela ${TABELA_ITENS}:`, itens)
+      console.log(`💾 [SALVAR] Inserindo ${itens.length} novos itens para orcamento_id: ${orcamentoId}`)
+      console.table(itens.map(i => ({
+        produto: i.produto,
+        classe: i.classe,
+        mpa: i.mpa,
+        qtd: i.quantidade,
+        ordem: i.ordem
+      })))
 
       const { data: itensInseridos, error: errorItens } = await supabase
         .from(TABELA_ITENS)
@@ -486,28 +514,32 @@ export default function OrcamentoForm() {
         .select()
 
       if (errorItens) {
-        console.error('❌ Erro ao inserir itens:', errorItens)
+        console.error('❌ [SALVAR] Erro ao inserir itens:', errorItens)
         throw errorItens
       }
 
-      console.log('✅ Itens inseridos com sucesso:', itensInseridos)
+      console.log('✅ [SALVAR] Itens inseridos:', itensInseridos.length)
 
-      // 🔥 VERIFICAÇÃO FINAL: Confirmar que os itens foram salvos
-      const { data: verificacao, error: errorVerif } = await supabase
+      // 🔥 VERIFICAÇÃO FINAL: Confirmar quantos itens tem no banco
+      const { data: verificacao, count: countVerif } = await supabase
         .from(TABELA_ITENS)
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('orcamento_id', orcamentoId)
 
-      if (errorVerif) {
-        console.error('❌ Erro na verificação:', errorVerif)
+      console.log('🔍 [VERIFICAÇÃO] Total de itens no banco para este orçamento:', countVerif)
+      
+      if (countVerif !== produtosSelecionados.length) {
+        console.error('⚠️ [VERIFICAÇÃO] ATENÇÃO! Quantidade divergente!')
+        console.error(`   Esperado: ${produtosSelecionados.length}`)
+        console.error(`   No banco: ${countVerif}`)
       } else {
-        console.log('🔍 Verificação - Itens salvos no banco:', verificacao.length, verificacao)
+        console.log('✅ [VERIFICAÇÃO] Quantidade correta!')
       }
 
       alert('Orçamento salvo com sucesso!')
       navigate('/orcamentos')
     } catch (error) {
-      console.error('❌ Erro ao salvar:', error)
+      console.error('❌ [SALVAR] Erro ao salvar:', error)
       alert('Erro ao salvar orçamento: ' + error.message)
     } finally {
       setLoading(false)
@@ -752,7 +784,7 @@ export default function OrcamentoForm() {
           </div>
         </div>
 
-        {/* PRODUTOS - TABELA COMPACTA (MANTIDA IGUAL) */}
+        {/* PRODUTOS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Produtos</h2>
@@ -885,7 +917,7 @@ export default function OrcamentoForm() {
           />
         </div>
 
-        {/* TOTAIS (MANTIDO IGUAL) */}
+        {/* TOTAIS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="max-w-md ml-auto space-y-2">
             <div className="flex justify-between text-sm">
