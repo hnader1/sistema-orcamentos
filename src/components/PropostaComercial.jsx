@@ -14,7 +14,11 @@ export default function PropostaComercial({
   if (!isOpen) return null
 
   // Calcular totais
-  const totalProdutos = produtos.reduce((acc, p) => acc + (p.quantidade * p.preco), 0)
+  const totalProdutos = produtos.reduce((acc, p) => {
+  const qty = parseFloat(p.quantidade) || 0
+  const price = parseFloat(p.preco) || 0
+  return acc + (qty * price)
+}, 0)
   const desconto = (totalProdutos * (dadosOrcamento.desconto_geral || 0)) / 100
   const totalProdutosComDesconto = totalProdutos - desconto
   const totalFrete = dadosFrete?.valor_total_frete || 0
