@@ -70,14 +70,14 @@ export default function PropostaComercial({
   // Estilos inline
   const styles = {
     container: { maxWidth: '800px', margin: '0 auto', backgroundColor: '#fff', padding: '20px' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #1a365d', paddingBottom: '15px', marginBottom: '15px' },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #4c7f8a', paddingBottom: '15px', marginBottom: '15px' },
     logo: { height: '50px', maxWidth: '150px' },
     headerRight: { textAlign: 'right' },
-    titulo: { fontSize: '18px', fontWeight: 'bold', color: '#1a365d', marginBottom: '3px' },
+    titulo: { fontSize: '18px', fontWeight: 'bold', color: '#4c7f8a', marginBottom: '3px' },
     numero: { fontSize: '14px', color: '#666' },
     dataLocal: { fontSize: '11px', color: '#666' },
     secao: { marginBottom: '15px' },
-    secaoTitulo: { backgroundColor: '#1a365d', color: '#fff', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' },
+    secaoTitulo: { backgroundColor: '#4c7f8a', color: '#fff', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' },
     grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' },
     campo: { marginBottom: '4px' },
     label: { fontSize: '9px', color: '#666', textTransform: 'uppercase', fontWeight: 'bold' },
@@ -91,23 +91,23 @@ export default function PropostaComercial({
     freteGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', textAlign: 'center' },
     freteItem: { padding: '8px' },
     freteLabel: { fontSize: '9px', color: '#666', marginBottom: '3px' },
-    freteValor: { fontSize: '13px', fontWeight: 'bold', color: '#1a365d' },
+    freteValor: { fontSize: '13px', fontWeight: 'bold', color: '#4c7f8a' },
     freteAviso: { backgroundColor: '#fef3c7', border: '1px solid #f59e0b', padding: '6px 10px', fontSize: '10px', fontWeight: 'bold', color: '#92400e', textAlign: 'center', marginTop: '8px' },
-    totalBox: { backgroundColor: '#1a365d', color: '#fff', padding: '12px', marginBottom: '15px' },
+    totalBox: { backgroundColor: '#4c7f8a', color: '#fff', padding: '12px', marginBottom: '15px' },
     totalGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', textAlign: 'center' },
     totalItem: { },
     totalLabel: { fontSize: '9px', opacity: 0.8 },
     totalValor: { fontSize: '14px', fontWeight: 'bold' },
     totalGeral: { fontSize: '20px', fontWeight: 'bold', color: '#f6ad55' },
     clausula: { marginBottom: '10px' },
-    clausulaTitulo: { fontSize: '10px', fontWeight: 'bold', color: '#1a365d', marginBottom: '4px' },
+    clausulaTitulo: { fontSize: '10px', fontWeight: 'bold', color: '#4c7f8a', marginBottom: '4px' },
     clausulaTexto: { fontSize: '9px', color: '#4a5568', paddingLeft: '10px' },
     destaque: { backgroundColor: '#ebf8ff', border: '1px solid #3182ce', padding: '8px', textAlign: 'center', margin: '8px 0' },
     destaqueValor: { fontSize: '16px', fontWeight: 'bold', color: '#2b6cb0' },
     observacoes: { backgroundColor: '#fffbeb', border: '1px dashed #d69e2e', padding: '10px', marginTop: '8px' },
-    footer: { borderTop: '2px solid #1a365d', paddingTop: '12px', marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' },
+    footer: { borderTop: '2px solid #4c7f8a', paddingTop: '12px', marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' },
     assinatura: { },
-    validadeBox: { backgroundColor: '#1a365d', color: '#fff', padding: '10px 20px', textAlign: 'center' },
+    validadeBox: { backgroundColor: '#4c7f8a', color: '#fff', padding: '10px 20px', textAlign: 'center' },
     validadeDias: { fontSize: '20px', fontWeight: 'bold', color: '#f6ad55' },
     validadeTexto: { fontSize: '9px' }
   }
@@ -117,7 +117,7 @@ export default function PropostaComercial({
       <div style={{ backgroundColor: '#fff', borderRadius: '8px', width: '100%', maxWidth: '900px', maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         
         {/* Header Modal */}
-        <div style={{ backgroundColor: '#1a365d', color: '#fff', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ backgroundColor: '#4c7f8a', color: '#fff', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: 'bold' }}>Proposta Comercial - Pré-visualização</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px' }}>
             <X size={20} />
@@ -333,7 +333,7 @@ export default function PropostaComercial({
             <div style={styles.footer}>
               <div style={styles.assinatura}>
                 <div style={{ fontStyle: 'italic', color: '#666', marginBottom: '5px' }}>Atenciosamente,</div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1a365d' }}>CONSTRUCOM</div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4c7f8a' }}>CONSTRUCOM</div>
                 <div style={{ fontSize: '11px', marginTop: '8px' }}>
                   <strong>{dadosOrcamento.vendedor || 'Vendedor'}</strong><br/>
                   {dadosOrcamento.vendedor_telefone && <span>📞 {dadosOrcamento.vendedor_telefone}</span>}
@@ -353,7 +353,7 @@ export default function PropostaComercial({
           <button onClick={onClose} style={{ padding: '10px 20px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
             Fechar
           </button>
-          <button onClick={imprimir} style={{ padding: '10px 20px', backgroundColor: '#1a365d', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={imprimir} style={{ padding: '10px 20px', backgroundColor: '#4c7f8a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Printer size={18} />
             Imprimir / Salvar PDF
           </button>
