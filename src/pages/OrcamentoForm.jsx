@@ -5,6 +5,9 @@ import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
 
+// CONSTANTE PARA GARANTIR USO CONSISTENTE DA TABELA
+const TABELA_ITENS = 'orcamentos_itens'
+
 export default function OrcamentoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -109,6 +112,8 @@ export default function OrcamentoForm() {
     try {
       setLoading(true)
       
+      console.log('🔍 Carregando orçamento ID:', id)
+      
       const { data: orc, error: errorOrc } = await supabase
         .from('orcamentos')
         .select('*')
@@ -116,6 +121,8 @@ export default function OrcamentoForm() {
         .single()
 
       if (errorOrc) throw errorOrc
+
+      console.log('✅ Orçamento carregado:', orc.numero)
 
       setFormData({
         numero: orc.numero,
@@ -141,27 +148,37 @@ export default function OrcamentoForm() {
         setDescontoLiberado(true)
       }
 
-if (orc.frete_cidade || orc.frete_modalidade) {
-  setDadosFrete({
-    modalidade: orc.frete_modalidade || '',
-    tipo_veiculo: orc.frete_tipo_caminhao || '',
-    localidade: orc.frete_cidade || '',
-    tipo_frete: orc.frete_modalidade || 'FOB',
-    tipo_caminhao: orc.frete_tipo_caminhao || '',
-    viagens_necessarias: orc.frete_qtd_viagens || 0,
-    valor_unitario_viagem: orc.frete_valor_viagem || 0,
-    valor_total_frete: orc.frete || 0
-  })
-}
+      if (orc.frete_cidade || orc.frete_modalidade) {
+        setDadosFrete({
+          modalidade: orc.frete_modalidade || '',
+          tipo_veiculo: orc.frete_tipo_caminhao || '',
+          localidade: orc.frete_cidade || '',
+          tipo_frete: orc.frete_modalidade || 'FOB',
+          tipo_caminhao: orc.frete_tipo_caminhao || '',
+          viagens_necessarias: orc.frete_qtd_viagens || 0,
+          valor_unitario_viagem: orc.frete_valor_viagem || 0,
+          valor_total_frete: orc.frete || 0
+        })
+      }
+
+      // 🔥 CORREÇÃO PRINCIPAL: Buscar itens com filtro explícito
+      console.log(`🔍 Buscando itens da tabela ${TABELA_ITENS} para orcamento_id:`, id)
+      
       const { data: itens, error: errorItens } = await supabase
-        .from('orcamentos_itens')
+        .from(TABELA_ITENS)
         .select('*')
         .eq('orcamento_id', id)
+        .order('ordem', { ascending: true })
 
-      if (errorItens) throw errorItens
+      if (errorItens) {
+        console.error('❌ Erro ao buscar itens:', errorItens)
+        throw errorItens
+      }
+
+      console.log('📦 Itens encontrados:', itens?.length || 0, itens)
 
       if (itens && itens.length > 0) {
-        setProdutosSelecionados(itens.map(item => ({
+        const produtosCarregados = itens.map(item => ({
           produto_id: item.produto_id,
           codigo: item.produto_codigo,
           produto: item.produto,
@@ -171,11 +188,17 @@ if (orc.frete_cidade || orc.frete_modalidade) {
           preco: item.preco_unitario,
           peso_unitario: item.peso_unitario,
           qtd_por_pallet: item.qtd_por_pallet
-        })))
+        }))
+        
+        console.log('✅ Produtos carregados:', produtosCarregados)
+        setProdutosSelecionados(produtosCarregados)
+      } else {
+        console.warn('⚠️ Nenhum item encontrado para este orçamento')
+        setProdutosSelecionados([])
       }
     } catch (error) {
-      console.error('Erro ao carregar orçamento:', error)
-      alert('Erro ao carregar orçamento')
+      console.error('❌ Erro ao carregar orçamento:', error)
+      alert('Erro ao carregar orçamento: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -386,20 +409,23 @@ if (orc.frete_cidade || orc.frete_modalidade) {
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
-       frete: frete,
-frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
-frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-frete_cidade: dadosFrete?.localidade || null,
-frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
-total,
-observacoes: formData.observacoes,
-status: formData.status
+        frete: frete,
+        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+        total,
+        observacoes: formData.observacoes,
+        status: formData.status
       }
 
       let orcamentoId = id
 
       if (id) {
+        // EDITANDO ORÇAMENTO EXISTENTE
+        console.log('📝 Atualizando orçamento ID:', id)
+        
         const { error } = await supabase
           .from('orcamentos')
           .update(dadosOrcamento)
@@ -407,11 +433,23 @@ status: formData.status
 
         if (error) throw error
 
-        await supabase
-          .from('orcamentos_itens')
+        // 🔥 CORREÇÃO: Deletar TODOS os itens antigos deste orçamento
+        console.log(`🗑️ Deletando itens antigos da tabela ${TABELA_ITENS}`)
+        const { error: errorDelete } = await supabase
+          .from(TABELA_ITENS)
           .delete()
           .eq('orcamento_id', id)
+
+        if (errorDelete) {
+          console.error('❌ Erro ao deletar itens antigos:', errorDelete)
+          throw errorDelete
+        }
+        
+        console.log('✅ Itens antigos deletados')
       } else {
+        // CRIANDO NOVO ORÇAMENTO
+        console.log('✨ Criando novo orçamento:', formData.numero)
+        
         const { data, error } = await supabase
           .from('orcamentos')
           .insert([dadosOrcamento])
@@ -419,11 +457,14 @@ status: formData.status
           .single()
 
         if (error) throw error
+        
         orcamentoId = data.id
+        console.log('✅ Novo orçamento criado com ID:', orcamentoId)
       }
 
+      // 🔥 INSERIR NOVOS ITENS COM ORCAMENTO_ID CORRETO
       const itens = produtosSelecionados.map((item, index) => ({
-        orcamento_id: orcamentoId,
+        orcamento_id: orcamentoId,  // ID correto garantido
         produto_id: item.produto_id,
         produto_codigo: item.codigo,
         produto: item.produto,
@@ -437,16 +478,36 @@ status: formData.status
         ordem: index
       }))
 
-      const { error: errorItens } = await supabase
-        .from('orcamentos_itens')
-        .insert(itens)
+      console.log(`💾 Inserindo ${itens.length} itens na tabela ${TABELA_ITENS}:`, itens)
 
-      if (errorItens) throw errorItens
+      const { data: itensInseridos, error: errorItens } = await supabase
+        .from(TABELA_ITENS)
+        .insert(itens)
+        .select()
+
+      if (errorItens) {
+        console.error('❌ Erro ao inserir itens:', errorItens)
+        throw errorItens
+      }
+
+      console.log('✅ Itens inseridos com sucesso:', itensInseridos)
+
+      // 🔥 VERIFICAÇÃO FINAL: Confirmar que os itens foram salvos
+      const { data: verificacao, error: errorVerif } = await supabase
+        .from(TABELA_ITENS)
+        .select('*')
+        .eq('orcamento_id', orcamentoId)
+
+      if (errorVerif) {
+        console.error('❌ Erro na verificação:', errorVerif)
+      } else {
+        console.log('🔍 Verificação - Itens salvos no banco:', verificacao.length, verificacao)
+      }
 
       alert('Orçamento salvo com sucesso!')
       navigate('/orcamentos')
     } catch (error) {
-      console.error('Erro ao salvar:', error)
+      console.error('❌ Erro ao salvar:', error)
       alert('Erro ao salvar orçamento: ' + error.message)
     } finally {
       setLoading(false)
@@ -530,7 +591,6 @@ status: formData.status
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              {/* NOVO: Botão Gerar Proposta Comercial */}
               <button
                 onClick={() => setMostrarProposta(true)}
                 disabled={produtosSelecionados.length === 0}
@@ -585,7 +645,6 @@ status: formData.status
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            {/* NOVO: Telefone do Vendedor */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">📞 Tel. Vendedor</label>
               <input
@@ -680,7 +739,6 @@ status: formData.status
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            {/* NOVO: Endereço de Entrega */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">📍 Endereço de Entrega</label>
               <input
