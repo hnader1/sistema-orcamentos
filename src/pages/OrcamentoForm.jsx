@@ -369,120 +369,199 @@ export default function OrcamentoForm() {
     const frete = dadosFrete?.valor_total_frete || 0
     return subtotalComDesconto + frete
   }
+// =====================================================
+// FUNÇÃO SALVAR COM STORED PROCEDURE
+// Substitua a função salvar() no OrcamentoForm.jsx
+// =====================================================
 
-  const salvar = async () => {
-    try {
-      if (!formData.numero || !formData.cliente_nome) {
-        alert('Preencha os campos obrigatórios!')
-        return
+const salvar = async () => {
+  try {
+    if (!formData.numero || !formData.cliente_nome) {
+      alert('Preencha os campos obrigatórios!')
+      return
+    }
+
+    if (produtosSelecionados.length === 0) {
+      alert('Adicione pelo menos um produto!')
+      return
+    }
+
+    const produtoIncompleto = produtosSelecionados.find(
+      p => !p.produto || !p.classe || !p.mpa
+    )
+    if (produtoIncompleto) {
+      alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
+      return
+    }
+
+    setLoading(true)
+
+    const subtotal = calcularSubtotal()
+    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+    const subtotalComDesconto = subtotal - desconto
+    const frete = dadosFrete?.valor_total_frete || 0
+    const total = subtotalComDesconto + frete
+
+    const dadosOrcamento = {
+      numero: formData.numero,
+      cliente_nome: formData.cliente_nome,
+      cliente_empresa: formData.cliente_empresa,
+      cliente_email: formData.cliente_email,
+      cliente_telefone: formData.cliente_telefone,
+      cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
+      endereco_entrega: formData.endereco_entrega,
+      vendedor: formData.vendedor,
+      vendedor_telefone: formData.vendedor_telefone,
+      data_orcamento: formData.data_orcamento,
+      validade_dias: parseInt(formData.validade_dias),
+      data_validade: formData.data_validade,
+      condicoes_pagamento: formData.condicoes_pagamento,
+      prazo_entrega: formData.prazo_entrega,
+      desconto_geral: parseFloat(formData.desconto_geral),
+      subtotal: subtotalComDesconto,
+      frete: frete,
+      frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+      frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+      frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+      frete_cidade: dadosFrete?.localidade || null,
+      frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+      total,
+      observacoes: formData.observacoes,
+      status: formData.status
+    }
+
+    let orcamentoId = id
+
+    // Preparar itens no formato JSONB para a stored procedure
+    const itensParaInserir = produtosSelecionados.map((item, index) => ({
+      produto_id: item.produto_id,
+      produto_codigo: item.codigo,
+      produto: item.produto,
+      classe: item.classe,
+      mpa: item.mpa,
+      quantidade: parseInt(item.quantidade),
+      preco_unitario: parseFloat(item.preco),
+      peso_unitario: parseFloat(item.peso_unitario),
+      qtd_por_pallet: parseInt(item.qtd_por_pallet),
+      subtotal: item.quantidade * item.preco,
+      ordem: index
+    }))
+
+    if (id) {
+      // 🔥 EDITANDO - Usar stored procedure
+      console.log('═══════════════════════════════════════════════')
+      console.log('🔥 [STORED PROCEDURE] Editando orçamento:', id)
+      console.log('═══════════════════════════════════════════════')
+      
+      // Atualizar dados do orçamento
+      const { error: errorUpdate } = await supabase
+        .from('orcamentos')
+        .update(dadosOrcamento)
+        .eq('id', id)
+
+      if (errorUpdate) {
+        console.error('❌ Erro ao atualizar orçamento:', errorUpdate)
+        throw errorUpdate
       }
 
-      if (produtosSelecionados.length === 0) {
-        alert('Adicione pelo menos um produto!')
-        return
-      }
+      console.log('✅ Orçamento atualizado')
+      console.log(`🔥 Chamando stored procedure para ${itensParaInserir.length} itens...`)
 
-      const produtoIncompleto = produtosSelecionados.find(
-        p => !p.produto || !p.classe || !p.mpa
+      // 🔥 Chamar stored procedure (delete + insert atômico)
+      const { data: resultado, error: errorRpc } = await supabase.rpc(
+        'substituir_itens_orcamento',
+        {
+          p_orcamento_id: id,
+          p_itens: itensParaInserir
+        }
       )
-      if (produtoIncompleto) {
-        alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
-        return
+
+      if (errorRpc) {
+        console.error('❌ Erro na stored procedure:', errorRpc)
+        throw errorRpc
       }
 
-      setLoading(true)
-
-      const subtotal = calcularSubtotal()
-      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-      const subtotalComDesconto = subtotal - desconto
-      const frete = dadosFrete?.valor_total_frete || 0
-      const total = subtotalComDesconto + frete
-
-      const dadosOrcamento = {
-        numero: formData.numero,
-        cliente_nome: formData.cliente_nome,
-        cliente_empresa: formData.cliente_empresa,
-        cliente_email: formData.cliente_email,
-        cliente_telefone: formData.cliente_telefone,
-        cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
-        endereco_entrega: formData.endereco_entrega,
-        vendedor: formData.vendedor,
-        vendedor_telefone: formData.vendedor_telefone,
-        data_orcamento: formData.data_orcamento,
-        validade_dias: parseInt(formData.validade_dias),
-        data_validade: formData.data_validade,
-        condicoes_pagamento: formData.condicoes_pagamento,
-        prazo_entrega: formData.prazo_entrega,
-        desconto_geral: parseFloat(formData.desconto_geral),
-        subtotal: subtotalComDesconto,
-        frete: frete,
-        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
-        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-        frete_cidade: dadosFrete?.localidade || null,
-        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
-        total,
-        observacoes: formData.observacoes,
-        status: formData.status
+      console.log('✅ Stored procedure executada com sucesso!')
+      console.log('📊 Resultado:', resultado)
+      if (resultado && resultado.length > 0) {
+        console.log(`   Itens deletados: ${resultado[0].itens_deletados}`)
+        console.log(`   Itens inseridos: ${resultado[0].itens_inseridos}`)
       }
 
-      let orcamentoId = id
+      // Verificação final
+      const { count: countFinal } = await supabase
+        .from(TABELA_ITENS)
+        .select('*', { count: 'exact', head: true })
+        .eq('orcamento_id', id)
 
-      if (id) {
-        // 🔥 EDITANDO ORÇAMENTO EXISTENTE
-        console.log('📝 [SALVAR] Atualizando orçamento ID:', id)
-        
-        const { error } = await supabase
-          .from('orcamentos')
-          .update(dadosOrcamento)
-          .eq('id', id)
+      console.log(`🔍 Verificação final: ${countFinal} itens no banco`)
+      console.log(`🔍 Esperado: ${itensParaInserir.length}`)
 
-        if (error) {
-          console.error('❌ [SALVAR] Erro ao atualizar orçamento:', error)
-          throw error
-        }
-
-        console.log('✅ [SALVAR] Orçamento atualizado')
-
-        // 🔥 SUPER IMPORTANTE: DELETAR TODOS OS ITENS ANTIGOS
-        console.log(`🗑️ [SALVAR] Deletando TODOS os itens antigos do orcamento_id: ${id}`)
-        
-        const { error: errorDelete, count } = await supabase
-          .from(TABELA_ITENS)
-          .delete()
-          .eq('orcamento_id', id)
-
-        if (errorDelete) {
-          console.error('❌ [SALVAR] Erro ao deletar itens antigos:', errorDelete)
-          throw errorDelete
-        }
-        
-        console.log(`✅ [SALVAR] Itens antigos deletados (${count || 'todos'})`)
-
-        // 🔥 AGUARDAR 500ms para garantir que o delete foi processado
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        console.log('⏳ [SALVAR] Aguardou 500ms após delete')
-
+      if (countFinal !== itensParaInserir.length) {
+        console.error('⚠️ ATENÇÃO! Quantidade divergente!')
+        console.error(`   Esperado: ${itensParaInserir.length}`)
+        console.error(`   No banco: ${countFinal}`)
       } else {
-        // CRIANDO NOVO ORÇAMENTO
-        console.log('✨ [SALVAR] Criando novo orçamento:', formData.numero)
-        
-        const { data, error } = await supabase
-          .from('orcamentos')
-          .insert([dadosOrcamento])
-          .select()
-          .single()
-
-        if (error) {
-          console.error('❌ [SALVAR] Erro ao criar orçamento:', error)
-          throw error
-        }
-        
-        orcamentoId = data.id
-        console.log('✅ [SALVAR] Novo orçamento criado com ID:', orcamentoId)
+        console.log('✅ Quantidade CORRETA!')
       }
 
+    } else {
+      // CRIANDO NOVO ORÇAMENTO
+      console.log('═══════════════════════════════════════════════')
+      console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
+      console.log('═══════════════════════════════════════════════')
+      
+      const { data, error } = await supabase
+        .from('orcamentos')
+        .insert([dadosOrcamento])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('❌ Erro ao criar orçamento:', error)
+        throw error
+      }
+      
+      orcamentoId = data.id
+      console.log('✅ Novo orçamento criado com ID:', orcamentoId)
+
+      // Para novo orçamento, usar insert normal
+      const itens = itensParaInserir.map(item => ({
+        ...item,
+        orcamento_id: orcamentoId
+      }))
+
+      console.log(`💾 Inserindo ${itens.length} itens...`)
+
+      const { error: errorItens } = await supabase
+        .from(TABELA_ITENS)
+        .insert(itens)
+
+      if (errorItens) {
+        console.error('❌ Erro ao inserir itens:', errorItens)
+        throw errorItens
+      }
+
+      console.log('✅ Itens inseridos com sucesso')
+    }
+
+    console.log('═══════════════════════════════════════════════')
+    console.log('🎉 SALVAMENTO CONCLUÍDO')
+    console.log('═══════════════════════════════════════════════')
+
+    alert('Orçamento salvo com sucesso!')
+    navigate('/orcamentos')
+  } catch (error) {
+    console.error('═══════════════════════════════════════════════')
+    console.error('❌❌❌ ERRO FATAL ❌❌❌')
+    console.error('═══════════════════════════════════════════════')
+    console.error(error)
+    alert('Erro ao salvar orçamento: ' + error.message)
+  } finally {
+    setLoading(false)
+  }
+}
+  
       // 🔥 INSERIR NOVOS ITENS
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcamentoId,
