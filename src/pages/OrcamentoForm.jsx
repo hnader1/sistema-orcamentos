@@ -432,8 +432,152 @@ const salvar = async () => {
 
     let orcamentoId = id
 
-    // Preparar itens no formato JSONB para a stored procedure
-    const itensParaInserir = produtosSelecionados.map((item, index) => ({
+    if (id) {
+      // 🔥 EDITANDO - DELETE SUPER AGRESSIVO
+      console.log('═══════════════════════════════════════════════')
+      console.log('🔥 [EDITAR] MODO AGRESSIVO - Orçamento:', id)
+      console.log('═══════════════════════════════════════════════')
+
+      // PASSO 1: Contar itens ANTES
+      const { data: itensAntes, count: countAntes } = await supabase
+        .from(TABELA_ITENS)
+        .select('id, produto, classe', { count: 'exact' })
+        .eq('orcamento_id', id)
+
+      console.log(`📊 [ANTES] ${countAntes} itens encontrados:`)
+      if (itensAntes && itensAntes.length > 0) {
+        console.table(itensAntes)
+      }
+
+      // PASSO 2: Buscar TODOS os IDs
+      if (itensAntes && itensAntes.length > 0) {
+        const todosIds = itensAntes.map(item => item.id)
+        console.log(`🗑️ [DELETE] Deletando ${todosIds.length} itens por ID...`)
+        console.log('   IDs:', todosIds)
+
+        // TENTATIVA 1: Delete por array de IDs
+        const { error: errorDelete1, data: dataDelete1 } = await supabase
+          .from(TABELA_ITENS)
+          .delete()
+          .in('id', todosIds)
+
+        if (errorDelete1) {
+          console.error('❌ [DELETE 1] Erro:', errorDelete1)
+        } else {
+          console.log('✅ [DELETE 1] Executado')
+        }
+
+        // Aguardar 1 segundo
+        console.log('⏳ Aguardando 1 segundo...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // TENTATIVA 2: Delete por orcamento_id (garantia)
+        console.log('🗑️ [DELETE 2] Deletando por orcamento_id (garantia)...')
+        const { error: errorDelete2 } = await supabase
+          .from(TABELA_ITENS)
+          .delete()
+          .eq('orcamento_id', id)
+
+        if (errorDelete2) {
+          console.error('❌ [DELETE 2] Erro:', errorDelete2)
+        } else {
+          console.log('✅ [DELETE 2] Executado')
+        }
+
+        // Aguardar mais 1 segundo
+        console.log('⏳ Aguardando mais 1 segundo...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // VERIFICAR se deletou
+        const { count: countDepois } = await supabase
+          .from(TABELA_ITENS)
+          .select('*', { count: 'exact', head: true })
+          .eq('orcamento_id', id)
+
+        console.log(`🔍 [DEPOIS] ${countDepois} itens restantes`)
+
+        if (countDepois > 0) {
+          console.error('═══════════════════════════════════════════════')
+          console.error('💀 DELETE FALHOU COMPLETAMENTE!')
+          console.error(`   Antes: ${countAntes}`)
+          console.error(`   Depois: ${countDepois}`)
+          console.error('═══════════════════════════════════════════════')
+          
+          // TENTATIVA 3: DELETE DIRETO NO POSTGRES VIA RPC
+          console.log('🔥 [DELETE 3] Tentando via SQL direto...')
+          
+          const { data: sqlResult, error: errorSql } = await supabase.rpc('executar_sql', {
+            query: `DELETE FROM orcamentos_itens WHERE orcamento_id = '${id}'`
+          })
+          
+          if (errorSql) {
+            console.error('❌ [DELETE 3] Erro:', errorSql)
+            throw new Error(`DELETE FALHOU! Ainda existem ${countDepois} itens. Não é possível continuar.`)
+          }
+          
+          console.log('✅ [DELETE 3] SQL direto executado')
+          
+          // Aguardar
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          // Verificar novamente
+          const { count: countFinal } = await supabase
+            .from(TABELA_ITENS)
+            .select('*', { count: 'exact', head: true })
+            .eq('orcamento_id', id)
+          
+          console.log(`🔍 [FINAL] ${countFinal} itens restantes`)
+          
+          if (countFinal > 0) {
+            throw new Error(`IMPOSSÍVEL DELETAR! Ainda existem ${countFinal} itens mesmo após 3 tentativas!`)
+          }
+        }
+
+        console.log('✅ [VERIFICADO] Todos os itens foram deletados (0 restantes)')
+      }
+
+      // PASSO 3: Atualizar orçamento
+      console.log('📝 [UPDATE] Atualizando dados do orçamento...')
+      const { error: errorUpdate } = await supabase
+        .from('orcamentos')
+        .update(dadosOrcamento)
+        .eq('id', id)
+
+      if (errorUpdate) {
+        console.error('❌ [UPDATE] Erro:', errorUpdate)
+        throw errorUpdate
+      }
+
+      console.log('✅ [UPDATE] Orçamento atualizado')
+
+    } else {
+      // CRIANDO NOVO
+      console.log('═══════════════════════════════════════════════')
+      console.log('✨ [CRIAR] Novo orçamento:', formData.numero)
+      console.log('═══════════════════════════════════════════════')
+      
+      const { data, error } = await supabase
+        .from('orcamentos')
+        .insert([dadosOrcamento])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('❌ [CRIAR] Erro:', error)
+        throw error
+      }
+      
+      orcamentoId = data.id
+      console.log('✅ [CRIAR] ID:', orcamentoId)
+    }
+
+    // 🔥 INSERIR NOVOS ITENS
+    console.log('═══════════════════════════════════════════════')
+    console.log(`💾 [INSERT] Inserindo ${produtosSelecionados.length} novos itens`)
+    console.log('═══════════════════════════════════════════════')
+
+    const itens = produtosSelecionados.map((item, index) => ({
+      orcamento_id: orcamentoId,
       produto_id: item.produto_id,
       produto_codigo: item.codigo,
       produto: item.produto,
@@ -447,116 +591,68 @@ const salvar = async () => {
       ordem: index
     }))
 
-    if (id) {
-      // 🔥 EDITANDO - Usar stored procedure
-      console.log('═══════════════════════════════════════════════')
-      console.log('🔥 [STORED PROCEDURE] Editando orçamento:', id)
-      console.log('═══════════════════════════════════════════════')
-      
-      // Atualizar dados do orçamento
-      const { error: errorUpdate } = await supabase
-        .from('orcamentos')
-        .update(dadosOrcamento)
-        .eq('id', id)
+    console.table(itens.map(i => ({
+      produto: i.produto,
+      classe: i.classe,
+      qtd: i.quantidade,
+      ordem: i.ordem
+    })))
 
-      if (errorUpdate) {
-        console.error('❌ Erro ao atualizar orçamento:', errorUpdate)
-        throw errorUpdate
-      }
+    const { data: itensInseridos, error: errorItens } = await supabase
+      .from(TABELA_ITENS)
+      .insert(itens)
+      .select()
 
-      console.log('✅ Orçamento atualizado')
-      console.log(`🔥 Chamando stored procedure para ${itensParaInserir.length} itens...`)
+    if (errorItens) {
+      console.error('❌ [INSERT] Erro:', errorItens)
+      throw errorItens
+    }
 
-      // 🔥 Chamar stored procedure (delete + insert atômico)
-      const { data: resultado, error: errorRpc } = await supabase.rpc(
-        'substituir_itens_orcamento',
-        {
-          p_orcamento_id: id,
-          p_itens: itensParaInserir
-        }
-      )
+    console.log(`✅ [INSERT] ${itensInseridos.length} itens inseridos`)
 
-      if (errorRpc) {
-        console.error('❌ Erro na stored procedure:', errorRpc)
-        throw errorRpc
-      }
+    // VERIFICAÇÃO FINAL
+    console.log('═══════════════════════════════════════════════')
+    console.log('🔍 [VERIFICAÇÃO FINAL]')
+    console.log('═══════════════════════════════════════════════')
 
-      console.log('✅ Stored procedure executada com sucesso!')
-      console.log('📊 Resultado:', resultado)
-      if (resultado && resultado.length > 0) {
-        console.log(`   Itens deletados: ${resultado[0].itens_deletados}`)
-        console.log(`   Itens inseridos: ${resultado[0].itens_inseridos}`)
-      }
+    await new Promise(resolve => setTimeout(resolve, 500))
 
-      // Verificação final
-      const { count: countFinal } = await supabase
-        .from(TABELA_ITENS)
-        .select('*', { count: 'exact', head: true })
-        .eq('orcamento_id', id)
+    const { data: verificacao, count: countFinal } = await supabase
+      .from(TABELA_ITENS)
+      .select('produto, classe, quantidade, ordem', { count: 'exact' })
+      .eq('orcamento_id', orcamentoId)
+      .order('ordem')
 
-      console.log(`🔍 Verificação final: ${countFinal} itens no banco`)
-      console.log(`🔍 Esperado: ${itensParaInserir.length}`)
+    console.log(`📊 Total no banco: ${countFinal}`)
+    console.log(`📊 Esperado: ${produtosSelecionados.length}`)
 
-      if (countFinal !== itensParaInserir.length) {
-        console.error('⚠️ ATENÇÃO! Quantidade divergente!')
-        console.error(`   Esperado: ${itensParaInserir.length}`)
-        console.error(`   No banco: ${countFinal}`)
-      } else {
-        console.log('✅ Quantidade CORRETA!')
-      }
-
+    if (countFinal !== produtosSelecionados.length) {
+      console.error('═══════════════════════════════════════════════')
+      console.error('⚠️⚠️⚠️ QUANTIDADE DIVERGENTE! ⚠️⚠️⚠️')
+      console.error('═══════════════════════════════════════════════')
+      console.error(`Esperado: ${produtosSelecionados.length}`)
+      console.error(`No banco: ${countFinal}`)
+      console.error('Itens no banco:')
+      console.table(verificacao)
+      alert(`ERRO! Quantidade divergente!\n\nEsperado: ${produtosSelecionados.length}\nNo banco: ${countFinal}\n\nVeja o console!`)
     } else {
-      // CRIANDO NOVO ORÇAMENTO
-      console.log('═══════════════════════════════════════════════')
-      console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
-      console.log('═══════════════════════════════════════════════')
-      
-      const { data, error } = await supabase
-        .from('orcamentos')
-        .insert([dadosOrcamento])
-        .select()
-        .single()
-
-      if (error) {
-        console.error('❌ Erro ao criar orçamento:', error)
-        throw error
-      }
-      
-      orcamentoId = data.id
-      console.log('✅ Novo orçamento criado com ID:', orcamentoId)
-
-      // Para novo orçamento, usar insert normal
-      const itens = itensParaInserir.map(item => ({
-        ...item,
-        orcamento_id: orcamentoId
-      }))
-
-      console.log(`💾 Inserindo ${itens.length} itens...`)
-
-      const { error: errorItens } = await supabase
-        .from(TABELA_ITENS)
-        .insert(itens)
-
-      if (errorItens) {
-        console.error('❌ Erro ao inserir itens:', errorItens)
-        throw errorItens
-      }
-
-      console.log('✅ Itens inseridos com sucesso')
+      console.log('✅ QUANTIDADE CORRETA!')
+      console.log('✅ Itens:')
+      console.table(verificacao)
     }
 
     console.log('═══════════════════════════════════════════════')
-    console.log('🎉 SALVAMENTO CONCLUÍDO')
+    console.log('🎉 CONCLUÍDO')
     console.log('═══════════════════════════════════════════════')
 
     alert('Orçamento salvo com sucesso!')
     navigate('/orcamentos')
   } catch (error) {
     console.error('═══════════════════════════════════════════════')
-    console.error('❌❌❌ ERRO FATAL ❌❌❌')
+    console.error('❌ ERRO FATAL')
     console.error('═══════════════════════════════════════════════')
     console.error(error)
-    alert('Erro ao salvar orçamento: ' + error.message)
+    alert('Erro ao salvar: ' + error.message)
   } finally {
     setLoading(false)
   }
