@@ -48,22 +48,47 @@ export default function Orcamentos() {
     if (!confirm(`Tem certeza que deseja excluir o orçamento ${numero}?`)) return
 
     try {
-      const { error } = await supabase
+      console.log('🗑️ Iniciando exclusão do orçamento:', numero, 'ID:', id)
+      
+      // 🔥 CORREÇÃO 1: Deletar PRIMEIRO os produtos do orçamento
+      console.log('🗑️ Deletando produtos do orçamento...')
+      const { error: errorItens } = await supabase
+        .from('orcamentos_itens')
+        .delete()
+        .eq('orcamento_id', id)
+
+      if (errorItens) {
+        console.error('❌ Erro ao deletar itens:', errorItens)
+        throw errorItens
+      }
+      
+      console.log('✅ Produtos deletados com sucesso')
+
+      // 🔥 CORREÇÃO 2: Agora deletar o orçamento
+      console.log('🗑️ Deletando orçamento...')
+      const { error: errorOrcamento } = await supabase
         .from('orcamentos')
         .delete()
         .eq('id', id)
 
-      if (error) throw error
+      if (errorOrcamento) {
+        console.error('❌ Erro ao deletar orçamento:', errorOrcamento)
+        throw errorOrcamento
+      }
+
+      console.log('✅ Orçamento deletado com sucesso!')
       alert('Orçamento excluído com sucesso!')
       carregarOrcamentos()
     } catch (error) {
-      console.error('Erro ao excluir:', error)
-      alert('Erro ao excluir orçamento')
+      console.error('❌ Erro ao excluir:', error)
+      alert('Erro ao excluir orçamento: ' + (error.message || 'Erro desconhecido'))
     }
   }
 
   const duplicar = async (id) => {
     try {
+      console.log('📋 Duplicando orçamento ID:', id)
+      
       // Buscar orçamento original
       const { data: original, error: errorOrc } = await supabase
         .from('orcamentos')
@@ -82,7 +107,11 @@ export default function Orcamentos() {
       if (errorItens) throw errorItens
 
       // Criar novo número
-      const novoNumero = `${original.numero}-COPIA`
+      const dataAtual = new Date().toISOString().split('T')[0].replace(/-/g, '')
+      const horaAtual = new Date().toTimeString().split(':').slice(0, 2).join('')
+      const novoNumero = `${original.numero}-COPIA-${dataAtual}${horaAtual}`
+
+      console.log('📝 Novo número:', novoNumero)
 
       // Criar novo orçamento
       const novoOrcamento = {
@@ -102,6 +131,8 @@ export default function Orcamentos() {
 
       if (errorCriar) throw errorCriar
 
+      console.log('✅ Orçamento duplicado com ID:', orcCriado.id)
+
       // Copiar itens
       if (itens && itens.length > 0) {
         const novosItens = itens.map(item => ({
@@ -111,17 +142,21 @@ export default function Orcamentos() {
           created_at: undefined
         }))
 
+        console.log(`📦 Copiando ${novosItens.length} produtos...`)
+
         const { error: errorItensNovos } = await supabase
           .from('orcamentos_itens')
           .insert(novosItens)
 
         if (errorItensNovos) throw errorItensNovos
+        
+        console.log('✅ Produtos copiados com sucesso!')
       }
 
       alert('Orçamento duplicado com sucesso!')
       carregarOrcamentos()
     } catch (error) {
-      console.error('Erro ao duplicar:', error)
+      console.error('❌ Erro ao duplicar:', error)
       alert('Erro ao duplicar orçamento: ' + error.message)
     }
   }
