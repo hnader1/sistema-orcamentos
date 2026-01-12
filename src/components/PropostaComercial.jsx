@@ -209,11 +209,11 @@ export default function PropostaComercial({
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>VIAGENS</div>
-                    <div style={styles.freteValor}>{dadosFrete?.quantidade_viagens || 0}</div>
+                    <div style={styles.freteValor}>{dadosFrete?.qtd_viagens || dadosFrete?.quantidade_viagens || 0}</div>
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>VALOR/VIAGEM</div>
-                    <div style={styles.freteValor}>{formatarValor(dadosFrete?.valor_frete)}</div>
+                   <div style={styles.freteValor}>{formatarValor(dadosFrete?.valor_por_viagem || dadosFrete?.valor_frete)}</div>
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>TOTAL FRETE</div>
