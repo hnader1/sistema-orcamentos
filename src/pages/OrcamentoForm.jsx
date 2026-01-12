@@ -384,9 +384,9 @@ export default function OrcamentoForm() {
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
         frete: frete,
-        frete_tipo_frete: dadosFrete?.tipo_frete || 'FOB',
-        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
-        frete_localidade: dadosFrete?.localidade || null,
+         frete_modalidade: dadosFrete?.modalidade || dadosFrete?.tipo_frete || 'FOB',
+        frete_qtd_viagens: dadosFrete?.qtd_viagens || dadosFrete?.quantidade_viagens || 0,
+        frete_valor_viagem: dadosFrete?.valor_por_viagem || dadosFrete?.valor_frete || 0,
         frete_cidade: dadosFrete?.localidade || null,
         total,
         observacoes: formData.observacoes,
@@ -783,7 +783,7 @@ export default function OrcamentoForm() {
                       <td className="px-2 py-1 text-right text-gray-600">
                         {item.peso_unitario && item.quantidade 
                           ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
-                          : '-'}
+                          : '-'} 
                       </td>
                       <td className="px-2 py-1 text-right font-semibold text-gray-900">
                         {item.preco && item.quantidade 
