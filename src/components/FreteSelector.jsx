@@ -7,20 +7,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   const [buscaCidade, setBuscaCidade] = useState('')
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false)
 
-  if (orc.frete_cidade || orc.frete_modalidade) {
-  setDadosFrete({
-    // Nomes que o FreteSelector espera para preencher os campos
-    modalidade: orc.frete_modalidade || '',
-    tipo_veiculo: orc.frete_tipo_caminhao || '',
-    localidade: orc.frete_cidade || '',
-    // Nomes que o cálculo usa
-    tipo_frete: orc.frete_modalidade || 'FOB',
-    tipo_caminhao: orc.frete_tipo_caminhao || '',
-    viagens_necessarias: orc.frete_qtd_viagens || 0,
-    valor_unitario_viagem: orc.frete_valor_viagem || 0,
-    valor_total_frete: orc.frete || 0
-  })
-}
+const [modalidade, setModalidade] = useState(freteAtual?.modalidade || '')
+const [tipoVeiculo, setTipoVeiculo] = useState(freteAtual?.tipo_veiculo || '')
+const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidade || '')
   
   const [freteManual, setFreteManual] = useState(false)
   const [valorManual, setValorManual] = useState('')
