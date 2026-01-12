@@ -141,15 +141,16 @@ export default function OrcamentoForm() {
         setDescontoLiberado(true)
       }
 
-      if (orc.frete_cidade) {
-        setDadosFrete({
-          cidade: orc.frete_cidade,
-          tipo_veiculo: orc.frete_tipo_veiculo,
-          modalidade: orc.frete_modalidade || 'CIF',
-          valor_total_frete: orc.frete || 0
-        })
-      }
-
+    if (orc.frete_cidade || orc.frete_modalidade) {
+  setDadosFrete({
+    localidade: orc.frete_cidade,
+    tipo_caminhao: orc.frete_tipo_caminhao,
+    tipo_frete: orc.frete_modalidade || 'FOB',
+    viagens_necessarias: orc.frete_qtd_viagens || 0,
+    valor_unitario_viagem: orc.frete_valor_viagem || 0,
+    valor_total_frete: orc.frete || 0
+  })
+}
       const { data: itens, error: errorItens } = await supabase
         .from('orcamentos_itens')
         .select('*')
