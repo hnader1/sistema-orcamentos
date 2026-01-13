@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Plus, Search, Eye, Edit2, Copy, Trash2, Calendar, User, DollarSign } from 'lucide-react'
+import { 
+  ArrowLeft, FileText, Plus, Search, Edit2, Copy, Ban, Calendar, User, DollarSign 
+} from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
 
@@ -19,22 +21,21 @@ export default function Orcamentos() {
     try {
       setLoading(true)
       
-      console.log('🔍 [LISTAR] Carregando orçamentos (excluido = false)')
+      console.log('🔍 Carregando orçamentos (excluido = false)')
       
-      // 🔥 FILTRAR APENAS ORÇAMENTOS NÃO EXCLUÍDOS
       const { data, error } = await supabase
         .from('orcamentos')
         .select('*')
-        .eq('excluido', false)  // Só traz os não excluídos
+        .eq('excluido', false)
         .order('created_at', { ascending: false })
 
       if (error) throw error
       
-      console.log('✅ [LISTAR] Orçamentos carregados:', data?.length || 0)
+      console.log('✅ Orçamentos carregados:', data?.length || 0)
       
       setOrcamentos(data || [])
     } catch (error) {
-      console.error('❌ [LISTAR] Erro ao carregar orçamentos:', error)
+      console.error('❌ Erro ao carregar orçamentos:', error)
       alert('Erro ao carregar orçamentos')
     } finally {
       setLoading(false)
@@ -52,42 +53,39 @@ export default function Orcamentos() {
     return matchBusca && matchStatus
   })
 
-  const excluir = async (id, numero) => {
-    if (!confirm(`Tem certeza que deseja excluir o orçamento ${numero}?\n\n⚠️ O orçamento será OCULTADO da tela, mas a numeração será preservada no sistema.`)) return
+  const cancelar = async (id, numero) => {
+    if (!confirm(`Tem certeza que deseja CANCELAR o orçamento ${numero}?\n\nO orçamento será marcado como CANCELADO.`)) return
 
     try {
-      console.log('🗑️ [EXCLUIR] Iniciando soft delete do orçamento:', numero, 'ID:', id)
+      console.log('🚫 Cancelando orçamento:', numero, 'ID:', id)
       
-      // 🔥 SOFT DELETE: Apenas marca como excluído
+      // Marcar como cancelado
       const { error } = await supabase
         .from('orcamentos')
         .update({ 
-          excluido: true,
-          data_exclusao: new Date().toISOString()
+          status: 'cancelado'
         })
         .eq('id', id)
 
       if (error) {
-        console.error('❌ [EXCLUIR] Erro ao marcar como excluído:', error)
+        console.error('❌ Erro ao cancelar:', error)
         throw error
       }
 
-      console.log('✅ [EXCLUIR] Orçamento marcado como excluído (soft delete)')
-      console.log('💡 [EXCLUIR] Numeração preservada no sistema')
+      console.log('✅ Orçamento cancelado')
       
-      alert('Orçamento excluído com sucesso!\n\nNumeração preservada no sistema.')
+      alert('Orçamento cancelado com sucesso!')
       carregarOrcamentos()
     } catch (error) {
-      console.error('❌ [EXCLUIR] Erro ao excluir:', error)
-      alert('Erro ao excluir orçamento: ' + (error.message || 'Erro desconhecido'))
+      console.error('❌ Erro ao cancelar:', error)
+      alert('Erro ao cancelar orçamento: ' + (error.message || 'Erro desconhecido'))
     }
   }
 
   const duplicar = async (id) => {
     try {
-      console.log('📋 [DUPLICAR] Duplicando orçamento ID:', id)
+      console.log('📋 Duplicando orçamento ID:', id)
       
-      // Buscar orçamento original
       const { data: original, error: errorOrc } = await supabase
         .from('orcamentos')
         .select('*')
@@ -96,7 +94,6 @@ export default function Orcamentos() {
 
       if (errorOrc) throw errorOrc
 
-      // Buscar itens do orçamento
       const { data: itens, error: errorItens } = await supabase
         .from('orcamentos_itens')
         .select('*')
@@ -104,7 +101,7 @@ export default function Orcamentos() {
 
       if (errorItens) throw errorItens
 
-      // 🔥 GERAR NOVO NÚMERO (próximo número disponível)
+      // Gerar novo número
       const { data: ultimoOrc, error: errorUltimo } = await supabase
         .from('orcamentos')
         .select('numero')
@@ -120,15 +117,14 @@ export default function Orcamentos() {
         novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
       }
 
-      console.log('📝 [DUPLICAR] Novo número gerado:', novoNumero)
+      console.log('📝 Novo número gerado:', novoNumero)
 
-      // Criar novo orçamento
       const novoOrcamento = {
         ...original,
         id: undefined,
         numero: novoNumero,
         status: 'rascunho',
-        excluido: false,  // Garantir que não está excluído
+        excluido: false,
         data_exclusao: null,
         created_at: undefined,
         updated_at: undefined
@@ -142,9 +138,8 @@ export default function Orcamentos() {
 
       if (errorCriar) throw errorCriar
 
-      console.log('✅ [DUPLICAR] Orçamento duplicado com ID:', orcCriado.id)
+      console.log('✅ Orçamento duplicado com ID:', orcCriado.id)
 
-      // Copiar itens
       if (itens && itens.length > 0) {
         const novosItens = itens.map(item => ({
           ...item,
@@ -153,7 +148,7 @@ export default function Orcamentos() {
           created_at: undefined
         }))
 
-        console.log(`📦 [DUPLICAR] Copiando ${novosItens.length} produtos...`)
+        console.log(`📦 Copiando ${novosItens.length} produtos...`)
 
         const { error: errorItensNovos } = await supabase
           .from('orcamentos_itens')
@@ -161,13 +156,13 @@ export default function Orcamentos() {
 
         if (errorItensNovos) throw errorItensNovos
         
-        console.log('✅ [DUPLICAR] Produtos copiados com sucesso!')
+        console.log('✅ Produtos copiados!')
       }
 
       alert('Orçamento duplicado com sucesso!')
       carregarOrcamentos()
     } catch (error) {
-      console.error('❌ [DUPLICAR] Erro ao duplicar:', error)
+      console.error('❌ Erro ao duplicar:', error)
       alert('Erro ao duplicar orçamento: ' + error.message)
     }
   }
@@ -178,7 +173,7 @@ export default function Orcamentos() {
       'enviado': 'bg-blue-100 text-blue-800',
       'aprovado': 'bg-green-100 text-green-800',
       'rejeitado': 'bg-red-100 text-red-800',
-      'cancelado': 'bg-gray-100 text-gray-600'
+      'cancelado': 'bg-red-100 text-red-800'
     }
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || styles.rascunho}`}>
@@ -307,13 +302,15 @@ export default function Orcamentos() {
                     >
                       <Copy size={20} />
                     </button>
-                    <button
-                      onClick={() => excluir(orc.id, orc.numero)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Excluir (ocultar)"
-                    >
-                      <Trash2 size={20} />
-                    </button>
+                    {orc.status !== 'cancelado' && (
+                      <button
+                        onClick={() => cancelar(orc.id, orc.numero)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Cancelar"
+                      >
+                        <Ban size={20} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
