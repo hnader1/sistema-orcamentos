@@ -173,15 +173,6 @@ export default function OrcamentoForm() {
       }
 
       console.log('📦 [CARREGAR] Itens encontrados:', itens?.length || 0)
-      
-      if (itens && itens.length > 0) {
-        console.table(itens.map(i => ({
-          produto: i.produto,
-          classe: i.classe,
-          mpa: i.mpa,
-          qtd: i.quantidade
-        })))
-      }
 
       if (itens && itens.length > 0) {
         const produtosCarregados = itens.map(item => ({
@@ -369,300 +360,107 @@ export default function OrcamentoForm() {
     const frete = dadosFrete?.valor_total_frete || 0
     return subtotalComDesconto + frete
   }
-// =====================================================
-// FUNÇÃO SALVAR COM STORED PROCEDURE
-// Substitua a função salvar() no OrcamentoForm.jsx
-// =====================================================
 
-const salvar = async () => {
-  try {
-    if (!formData.numero || !formData.cliente_nome) {
-      alert('Preencha os campos obrigatórios!')
-      return
-    }
-
-    if (produtosSelecionados.length === 0) {
-      alert('Adicione pelo menos um produto!')
-      return
-    }
-
-    const produtoIncompleto = produtosSelecionados.find(
-      p => !p.produto || !p.classe || !p.mpa
-    )
-    if (produtoIncompleto) {
-      alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
-      return
-    }
-
-    setLoading(true)
-
-    const subtotal = calcularSubtotal()
-    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-    const subtotalComDesconto = subtotal - desconto
-    const frete = dadosFrete?.valor_total_frete || 0
-    const total = subtotalComDesconto + frete
-
-    const dadosOrcamento = {
-      numero: formData.numero,
-      cliente_nome: formData.cliente_nome,
-      cliente_empresa: formData.cliente_empresa,
-      cliente_email: formData.cliente_email,
-      cliente_telefone: formData.cliente_telefone,
-      cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
-      endereco_entrega: formData.endereco_entrega,
-      vendedor: formData.vendedor,
-      vendedor_telefone: formData.vendedor_telefone,
-      data_orcamento: formData.data_orcamento,
-      validade_dias: parseInt(formData.validade_dias),
-      data_validade: formData.data_validade,
-      condicoes_pagamento: formData.condicoes_pagamento,
-      prazo_entrega: formData.prazo_entrega,
-      desconto_geral: parseFloat(formData.desconto_geral),
-      subtotal: subtotalComDesconto,
-      frete: frete,
-      frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
-      frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-      frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-      frete_cidade: dadosFrete?.localidade || null,
-      frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
-      total,
-      observacoes: formData.observacoes,
-      status: formData.status
-    }
-
-    let orcamentoId = id
-
-    if (id) {
-      // 🔥 EDITANDO - DELETE SUPER AGRESSIVO
-      console.log('═══════════════════════════════════════════════')
-      console.log('🔥 [EDITAR] MODO AGRESSIVO - Orçamento:', id)
-      console.log('═══════════════════════════════════════════════')
-
-      // PASSO 1: Contar itens ANTES
-      const { data: itensAntes, count: countAntes } = await supabase
-        .from(TABELA_ITENS)
-        .select('id, produto, classe', { count: 'exact' })
-        .eq('orcamento_id', id)
-
-      console.log(`📊 [ANTES] ${countAntes} itens encontrados:`)
-      if (itensAntes && itensAntes.length > 0) {
-        console.table(itensAntes)
+  const salvar = async () => {
+    try {
+      if (!formData.numero || !formData.cliente_nome) {
+        alert('Preencha os campos obrigatórios!')
+        return
       }
 
-      // PASSO 2: Buscar TODOS os IDs
-      if (itensAntes && itensAntes.length > 0) {
-        const todosIds = itensAntes.map(item => item.id)
-        console.log(`🗑️ [DELETE] Deletando ${todosIds.length} itens por ID...`)
-        console.log('   IDs:', todosIds)
+      if (produtosSelecionados.length === 0) {
+        alert('Adicione pelo menos um produto!')
+        return
+      }
 
-        // TENTATIVA 1: Delete por array de IDs
-        const { error: errorDelete1, data: dataDelete1 } = await supabase
-          .from(TABELA_ITENS)
-          .delete()
-          .in('id', todosIds)
+      const produtoIncompleto = produtosSelecionados.find(
+        p => !p.produto || !p.classe || !p.mpa
+      )
+      if (produtoIncompleto) {
+        alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
+        return
+      }
 
-        if (errorDelete1) {
-          console.error('❌ [DELETE 1] Erro:', errorDelete1)
-        } else {
-          console.log('✅ [DELETE 1] Executado')
-        }
+      setLoading(true)
 
-        // Aguardar 1 segundo
-        console.log('⏳ Aguardando 1 segundo...')
-        await new Promise(resolve => setTimeout(resolve, 1000))
+      const subtotal = calcularSubtotal()
+      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+      const subtotalComDesconto = subtotal - desconto
+      const frete = dadosFrete?.valor_total_frete || 0
+      const total = subtotalComDesconto + frete
 
-        // TENTATIVA 2: Delete por orcamento_id (garantia)
-        console.log('🗑️ [DELETE 2] Deletando por orcamento_id (garantia)...')
-        const { error: errorDelete2 } = await supabase
+      const dadosOrcamento = {
+        numero: formData.numero,
+        cliente_nome: formData.cliente_nome,
+        cliente_empresa: formData.cliente_empresa,
+        cliente_email: formData.cliente_email,
+        cliente_telefone: formData.cliente_telefone,
+        cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
+        endereco_entrega: formData.endereco_entrega,
+        vendedor: formData.vendedor,
+        vendedor_telefone: formData.vendedor_telefone,
+        data_orcamento: formData.data_orcamento,
+        validade_dias: parseInt(formData.validade_dias),
+        data_validade: formData.data_validade,
+        condicoes_pagamento: formData.condicoes_pagamento,
+        prazo_entrega: formData.prazo_entrega,
+        desconto_geral: parseFloat(formData.desconto_geral),
+        subtotal: subtotalComDesconto,
+        frete: frete,
+        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+        total,
+        observacoes: formData.observacoes,
+        status: formData.status
+      }
+
+      let orcamentoId = id
+
+      if (id) {
+        // EDITANDO
+        console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
+        
+        const { error } = await supabase
+          .from('orcamentos')
+          .update(dadosOrcamento)
+          .eq('id', id)
+
+        if (error) throw error
+        console.log('✅ [EDITAR] Orçamento atualizado')
+
+        // Deletar itens antigos
+        console.log('🗑️ [EDITAR] Deletando itens antigos...')
+        const { error: errorDelete } = await supabase
           .from(TABELA_ITENS)
           .delete()
           .eq('orcamento_id', id)
 
-        if (errorDelete2) {
-          console.error('❌ [DELETE 2] Erro:', errorDelete2)
-        } else {
-          console.log('✅ [DELETE 2] Executado')
+        if (errorDelete) {
+          console.error('❌ [EDITAR] Erro ao deletar:', errorDelete)
+          throw errorDelete
         }
+        console.log('✅ [EDITAR] Itens deletados')
 
-        // Aguardar mais 1 segundo
-        console.log('⏳ Aguardando mais 1 segundo...')
-        await new Promise(resolve => setTimeout(resolve, 1000))
+      } else {
+        // CRIANDO NOVO
+        console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
+        
+        const { data, error } = await supabase
+          .from('orcamentos')
+          .insert([dadosOrcamento])
+          .select()
+          .single()
 
-        // VERIFICAR se deletou
-        const { count: countDepois } = await supabase
-          .from(TABELA_ITENS)
-          .select('*', { count: 'exact', head: true })
-          .eq('orcamento_id', id)
-
-        console.log(`🔍 [DEPOIS] ${countDepois} itens restantes`)
-
-        if (countDepois > 0) {
-          console.error('═══════════════════════════════════════════════')
-          console.error('💀 DELETE FALHOU COMPLETAMENTE!')
-          console.error(`   Antes: ${countAntes}`)
-          console.error(`   Depois: ${countDepois}`)
-          console.error('═══════════════════════════════════════════════')
-          
-          // TENTATIVA 3: DELETE DIRETO NO POSTGRES VIA RPC
-          console.log('🔥 [DELETE 3] Tentando via SQL direto...')
-          
-          const { data: sqlResult, error: errorSql } = await supabase.rpc('executar_sql', {
-            query: `DELETE FROM orcamentos_itens WHERE orcamento_id = '${id}'`
-          })
-          
-          if (errorSql) {
-            console.error('❌ [DELETE 3] Erro:', errorSql)
-            throw new Error(`DELETE FALHOU! Ainda existem ${countDepois} itens. Não é possível continuar.`)
-          }
-          
-          console.log('✅ [DELETE 3] SQL direto executado')
-          
-          // Aguardar
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          
-          // Verificar novamente
-          const { count: countFinal } = await supabase
-            .from(TABELA_ITENS)
-            .select('*', { count: 'exact', head: true })
-            .eq('orcamento_id', id)
-          
-          console.log(`🔍 [FINAL] ${countFinal} itens restantes`)
-          
-          if (countFinal > 0) {
-            throw new Error(`IMPOSSÍVEL DELETAR! Ainda existem ${countFinal} itens mesmo após 3 tentativas!`)
-          }
-        }
-
-        console.log('✅ [VERIFICADO] Todos os itens foram deletados (0 restantes)')
+        if (error) throw error
+        
+        orcamentoId = data.id
+        console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
       }
 
-      // PASSO 3: Atualizar orçamento
-      console.log('📝 [UPDATE] Atualizando dados do orçamento...')
-      const { error: errorUpdate } = await supabase
-        .from('orcamentos')
-        .update(dadosOrcamento)
-        .eq('id', id)
-
-      if (errorUpdate) {
-        console.error('❌ [UPDATE] Erro:', errorUpdate)
-        throw errorUpdate
-      }
-
-      console.log('✅ [UPDATE] Orçamento atualizado')
-
-    } else {
-      // CRIANDO NOVO
-      console.log('═══════════════════════════════════════════════')
-      console.log('✨ [CRIAR] Novo orçamento:', formData.numero)
-      console.log('═══════════════════════════════════════════════')
-      
-      const { data, error } = await supabase
-        .from('orcamentos')
-        .insert([dadosOrcamento])
-        .select()
-        .single()
-
-      if (error) {
-        console.error('❌ [CRIAR] Erro:', error)
-        throw error
-      }
-      
-      orcamentoId = data.id
-      console.log('✅ [CRIAR] ID:', orcamentoId)
-    }
-
-    // 🔥 INSERIR NOVOS ITENS
-    console.log('═══════════════════════════════════════════════')
-    console.log(`💾 [INSERT] Inserindo ${produtosSelecionados.length} novos itens`)
-    console.log('═══════════════════════════════════════════════')
-
-    const itens = produtosSelecionados.map((item, index) => ({
-      orcamento_id: orcamentoId,
-      produto_id: item.produto_id,
-      produto_codigo: item.codigo,
-      produto: item.produto,
-      classe: item.classe,
-      mpa: item.mpa,
-      quantidade: parseInt(item.quantidade),
-      preco_unitario: parseFloat(item.preco),
-      peso_unitario: parseFloat(item.peso_unitario),
-      qtd_por_pallet: parseInt(item.qtd_por_pallet),
-      subtotal: item.quantidade * item.preco,
-      ordem: index
-    }))
-
-    console.table(itens.map(i => ({
-      produto: i.produto,
-      classe: i.classe,
-      qtd: i.quantidade,
-      ordem: i.ordem
-    })))
-
-    const { data: itensInseridos, error: errorItens } = await supabase
-      .from(TABELA_ITENS)
-      .insert(itens)
-      .select()
-
-    if (errorItens) {
-      console.error('❌ [INSERT] Erro:', errorItens)
-      throw errorItens
-    }
-
-    console.log(`✅ [INSERT] ${itensInseridos.length} itens inseridos`)
-
-    // VERIFICAÇÃO FINAL
-    console.log('═══════════════════════════════════════════════')
-    console.log('🔍 [VERIFICAÇÃO FINAL]')
-    console.log('═══════════════════════════════════════════════')
-
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    const { data: verificacao, count: countFinal } = await supabase
-      .from(TABELA_ITENS)
-      .select('produto, classe, quantidade, ordem', { count: 'exact' })
-      .eq('orcamento_id', orcamentoId)
-      .order('ordem')
-
-    console.log(`📊 Total no banco: ${countFinal}`)
-    console.log(`📊 Esperado: ${produtosSelecionados.length}`)
-
-    if (countFinal !== produtosSelecionados.length) {
-      console.error('═══════════════════════════════════════════════')
-      console.error('⚠️⚠️⚠️ QUANTIDADE DIVERGENTE! ⚠️⚠️⚠️')
-      console.error('═══════════════════════════════════════════════')
-      console.error(`Esperado: ${produtosSelecionados.length}`)
-      console.error(`No banco: ${countFinal}`)
-      console.error('Itens no banco:')
-      console.table(verificacao)
-      alert(`ERRO! Quantidade divergente!\n\nEsperado: ${produtosSelecionados.length}\nNo banco: ${countFinal}\n\nVeja o console!`)
-    } else {
-      console.log('✅ QUANTIDADE CORRETA!')
-      console.log('✅ Itens:')
-      console.table(verificacao)
-    }
-
-    console.log('═══════════════════════════════════════════════')
-    console.log('🎉 CONCLUÍDO')
-    console.log('═══════════════════════════════════════════════')
-
-    alert('Orçamento salvo com sucesso!')
-    navigate('/orcamentos')
-  } catch (error) {
-    console.error('═══════════════════════════════════════════════')
-    console.error('❌ ERRO FATAL')
-    console.error('═══════════════════════════════════════════════')
-    console.error(error)
-    alert('Erro ao salvar: ' + error.message)
-  } finally {
-    setLoading(false)
-  }
-}
-  
-      // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
- // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
-   // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
-   // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
-   // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
+      // Inserir novos itens
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcamentoId,
         produto_id: item.produto_id,
@@ -678,47 +476,24 @@ const salvar = async () => {
         ordem: index
       }))
 
-      console.log(`💾 [SALVAR] Inserindo ${itens.length} novos itens para orcamento_id: ${orcamentoId}`)
-      console.table(itens.map(i => ({
-        produto: i.produto,
-        classe: i.classe,
-        mpa: i.mpa,
-        qtd: i.quantidade,
-        ordem: i.ordem
-      })))
+      console.log(`💾 [INSERT] Inserindo ${itens.length} itens...`)
 
-      const { data: itensInseridos, error: errorItens } = await supabase
+      const { error: errorItens } = await supabase
         .from(TABELA_ITENS)
         .insert(itens)
-        .select()
 
       if (errorItens) {
-        console.error('❌ [SALVAR] Erro ao inserir itens:', errorItens)
+        console.error('❌ [INSERT] Erro:', errorItens)
         throw errorItens
       }
 
-      console.log('✅ [SALVAR] Itens inseridos:', itensInseridos.length)
-
-      // 🔥 VERIFICAÇÃO FINAL: Confirmar quantos itens tem no banco
-      const { data: verificacao, count: countVerif } = await supabase
-        .from(TABELA_ITENS)
-        .select('*', { count: 'exact' })
-        .eq('orcamento_id', orcamentoId)
-
-      console.log('🔍 [VERIFICAÇÃO] Total de itens no banco para este orçamento:', countVerif)
-      
-      if (countVerif !== produtosSelecionados.length) {
-        console.error('⚠️ [VERIFICAÇÃO] ATENÇÃO! Quantidade divergente!')
-        console.error(`   Esperado: ${produtosSelecionados.length}`)
-        console.error(`   No banco: ${countVerif}`)
-      } else {
-        console.log('✅ [VERIFICAÇÃO] Quantidade correta!')
-      }
+      console.log('✅ [INSERT] Itens inseridos')
+      console.log('🎉 Salvamento concluído!')
 
       alert('Orçamento salvo com sucesso!')
       navigate('/orcamentos')
     } catch (error) {
-      console.error('❌ [SALVAR] Erro ao salvar:', error)
+      console.error('❌ Erro ao salvar:', error)
       alert('Erro ao salvar orçamento: ' + error.message)
     } finally {
       setLoading(false)
