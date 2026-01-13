@@ -6,9 +6,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
+import { useAuth } from '../contexts/AuthContext'
+import Header from '../components/Header'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user, isVendedor } = useAuth()
   const [loading, setLoading] = useState(true)
   const [ultimosOrcamentos, setUltimosOrcamentos] = useState([])
   const [estatisticas, setEstatisticas] = useState({
@@ -22,17 +25,31 @@ export default function Dashboard() {
 
   useEffect(() => {
     carregarDados()
-  }, [])
+  }, [user])
 
   const carregarDados = async () => {
     try {
       setLoading(true)
 
-      // Buscar últimos 5 orçamentos
-      const { data: ultimos, error: errorUltimos } = await supabase
+      // Query base
+      let queryUltimos = supabase
         .from('orcamentos')
         .select('id, numero, cliente_nome, data_orcamento, status, total')
         .eq('excluido', false)
+
+      let queryTodos = supabase
+        .from('orcamentos')
+        .select('status')
+        .eq('excluido', false)
+
+      // Se for vendedor, filtrar apenas seus orçamentos
+      if (isVendedor()) {
+        queryUltimos = queryUltimos.eq('usuario_id', user.id)
+        queryTodos = queryTodos.eq('usuario_id', user.id)
+      }
+
+      // Buscar últimos 5 orçamentos
+      const { data: ultimos, error: errorUltimos } = await queryUltimos
         .order('created_at', { ascending: false })
         .limit(5)
 
@@ -40,10 +57,7 @@ export default function Dashboard() {
       setUltimosOrcamentos(ultimos || [])
 
       // Buscar estatísticas por status
-      const { data: todos, error: errorTodos } = await supabase
-        .from('orcamentos')
-        .select('status')
-        .eq('excluido', false)
+      const { data: todos, error: errorTodos } = await queryTodos
 
       if (errorTodos) throw errorTodos
 
@@ -125,22 +139,27 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Carregando...</div>
-      </div>
+      <>
+        <Header />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-gray-500">Carregando...</div>
+        </div>
+      </>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      <Header />
+
+      {/* Content */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Visão geral dos orçamentos
+                {isVendedor() ? 'Seus orçamentos' : 'Visão geral dos orçamentos'}
               </p>
             </div>
             <button
