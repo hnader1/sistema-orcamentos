@@ -330,20 +330,22 @@ export default function PropostaComercial({
             </div>
 
             {/* Footer */}
-            <div style={styles.footer}>
+            <<div style={styles.footer}>
               <div style={styles.assinatura}>
-                <div style={{ fontStyle: 'italic', color: '#666', marginBottom: '5px' }}>Atenciosamente,</div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4c7f8a' }}>CONSTRUCOM</div>
-                <div style={{ fontSize: '11px', marginTop: '8px' }}>
-                  <strong>{dadosOrcamento.vendedor || 'Vendedor'}</strong><br/>
-                  {dadosOrcamento.vendedor_telefone && <span>📞 {dadosOrcamento.vendedor_telefone}</span>}
-                </div>
+                  <div style={{ fontStyle: 'italic', color: '#666', marginBottom: '5px' }}>Atenciosamente,</div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4c7f8a' }}>CONSTRUCOM</div>
+                    <div style={{ fontSize: '11px', marginTop: '8px' }}>
+                    <strong>{dadosOrcamento.vendedor || 'Vendedor'}</strong><br/>
+                    {dadosOrcamento.vendedor_telefone && <span>📞 {dadosOrcamento.vendedor_telefone}</span>}
+                    {dadosOrcamento.vendedor_telefone && dadosOrcamento.vendedor_email && <br/>}
+                    {dadosOrcamento.vendedor_email && <span>📧 {dadosOrcamento.vendedor_email}</span>}
               </div>
-              <div style={styles.validadeBox}>
-                <div style={styles.validadeDias}>{dadosOrcamento.validade_dias || 15}</div>
-                <div style={styles.validadeTexto}>dias de validade</div>
-              </div>
-            </div>
+          </div>
+  <div style={styles.validadeBox}>
+    <div style={styles.validadeDias}>{dadosOrcamento.validade_dias || 15}</div>
+    <div style={styles.validadeTexto}>dias de validade</div>
+  </div>
+</div>
 
           </div>
         </div>
