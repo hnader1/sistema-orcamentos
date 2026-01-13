@@ -8,14 +8,13 @@
     "preview": "vite preview"
   },
 
-{  
-"dependencies": 
-  "@supabase/supabase-js": "^2.39.0",
-  "date-fns": "^2.30.0",
-  "lucide-react": "^0.263.1",
-  "react": "^18.2.0",
-  "react-dom": "^18.2.0",
-  "react-router-dom": "^6.20.0"
+"dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "date-fns": "^3.6.0",           ✅ TEM!
+    "lucide-react": "^0.263.1",     ✅ TEM!
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0"
 }
 
    
