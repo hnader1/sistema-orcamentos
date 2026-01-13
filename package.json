@@ -8,8 +8,8 @@
     "preview": "vite preview"
   },
 
-  
-"dependencies": {
+{  
+"dependencies": 
   "@supabase/supabase-js": "^2.39.0",
   "date-fns": "^2.30.0",
   "lucide-react": "^0.263.1",
