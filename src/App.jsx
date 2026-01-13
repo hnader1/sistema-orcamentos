@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import OrcamentosStatus from './pages/OrcamentosStatus'
 import Orcamentos from './pages/Orcamentos'
@@ -26,3 +27,4 @@ function App() {
   )
 }
 
+export default App
