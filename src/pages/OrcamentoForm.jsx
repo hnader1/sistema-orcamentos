@@ -419,11 +419,17 @@ export default function OrcamentoForm() {
         frete_cidade: dadosFrete?.localidade || null,
         frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
         total,
-        observacoes: formData.observacoes,
-        status: formData.status
-      }
+       observacoes: formData.observacoes,
+        status: formData.status,
+        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null
+}
 
-      let orcamentoId = id
+// Se mudou para lançado, registrar data
+if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
+  dadosOrcamento.data_lancamento = new Date().toISOString()
+}
+
+let orcamentoId = id
 
       if (id) {
         // EDITANDO
