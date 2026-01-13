@@ -134,7 +134,7 @@ export default function OrcamentoForm() {
 
       console.log('✅ [CARREGAR] Orçamento carregado:', orc.numero)
 
-      setFormData({
+       setFormData({
         numero: orc.numero,
         cliente_nome: orc.cliente_nome || '',
         cliente_empresa: orc.cliente_empresa || '',
@@ -152,7 +152,8 @@ export default function OrcamentoForm() {
         desconto_geral: orc.desconto_geral || 0,
         observacoes: orc.observacoes || '',
         status: orc.status || 'rascunho',
-        numero_lancamento_erp: orc.numero_lancamento_erp || ''
+        numero_lancamento_erp: orc.numero_lancamento_erp || '',
+        usuario_id_original: orc.usuario_id  // ADICIONE ESTA LINHA!
       })
 
       if (orc.desconto_geral > LIMITE_DESCONTO) {
@@ -542,16 +543,22 @@ export default function OrcamentoForm() {
         numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null
       }
 
-      // NOVO: Só adiciona usuario_id se for criação (não edição)
-      if (!id) {
-        dadosOrcamento.usuario_id = user?.id || null
-      }
+ // 1️⃣ Define usuario_id
+if (!id) {
+  // Novo orçamento → usa o usuário logado
+  dadosOrcamento.usuario_id = user?.id || null
+} else {
+  // Edição → mantém o vendedor original
+  dadosOrcamento.usuario_id = formData.usuario_id_original
+}
 
-      if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
-        dadosOrcamento.data_lancamento = new Date().toISOString()
-      }
+// 2️⃣ Se mudou para lançado, registra data
+if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
+  dadosOrcamento.data_lancamento = new Date().toISOString()
+}
 
-      let orcamentoId = id
+// 3️⃣ Prepara para usar o ID na inserção de itens
+let orcamentoId = id
 
       if (id) {
         console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
