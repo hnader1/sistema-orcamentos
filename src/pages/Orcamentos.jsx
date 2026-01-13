@@ -6,9 +6,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
+import { useAuth } from '../contexts/AuthContext'
+import Header from '../components/Header'
 
 export default function Orcamentos() {
   const navigate = useNavigate()
+  const { user, isVendedor } = useAuth()
   const [orcamentos, setOrcamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
@@ -23,7 +26,7 @@ export default function Orcamentos() {
 
   useEffect(() => {
     carregarOrcamentos()
-  }, [])
+  }, [user])
 
   const carregarOrcamentos = async () => {
     try {
@@ -31,10 +34,17 @@ export default function Orcamentos() {
       
       console.log('🔍 Carregando orçamentos (excluido = false)')
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('orcamentos')
         .select('*')
         .eq('excluido', false)
+      
+      // Se for vendedor, filtrar apenas seus orçamentos
+      if (isVendedor()) {
+        query = query.eq('usuario_id', user.id)
+      }
+      
+      const { data, error } = await query
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -146,6 +156,7 @@ export default function Orcamentos() {
         numero_lancamento_erp: null,
         data_lancamento: null,
         lancado_por: null,
+        usuario_id: user?.id || null,
         created_at: undefined,
         updated_at: undefined
       }
@@ -253,7 +264,9 @@ export default function Orcamentos() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      <Header />
+
+      {/* Header da Página */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -270,7 +283,9 @@ export default function Orcamentos() {
                 </div>
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Orçamentos</h1>
-                  <p className="text-xs sm:text-sm text-gray-500">{orcamentos.length} orçamentos</p>
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    {isVendedor() ? 'Seus orçamentos' : `${orcamentos.length} orçamentos`}
+                  </p>
                 </div>
               </div>
             </div>
