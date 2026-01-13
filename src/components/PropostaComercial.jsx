@@ -330,7 +330,7 @@ export default function PropostaComercial({
             </div>
 
             {/* Footer */}
-            <<div style={styles.footer}>
+            <div style={styles.footer}>
               <div style={styles.assinatura}>
                   <div style={{ fontStyle: 'italic', color: '#666', marginBottom: '5px' }}>Atenciosamente,</div>
                     <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4c7f8a' }}>CONSTRUCOM</div>
