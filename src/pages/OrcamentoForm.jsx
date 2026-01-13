@@ -40,7 +40,8 @@ export default function OrcamentoForm() {
     prazo_entrega: '',
     desconto_geral: 0,
     observacoes: '',
-    status: 'rascunho'
+    status: 'rascunho',
+    numero_lancamento_erp: '' 
   })
 
   useEffect(() => {
@@ -139,7 +140,8 @@ export default function OrcamentoForm() {
         prazo_entrega: orc.prazo_entrega || '',
         desconto_geral: orc.desconto_geral || 0,
         observacoes: orc.observacoes || '',
-        status: orc.status || 'rascunho'
+        status: orc.status || 'rascunho',
+        numero_lancamento_erp: orc.numero_lancamento_erp || ''
       })
 
       if (orc.desconto_geral > LIMITE_DESCONTO) {
@@ -380,6 +382,10 @@ export default function OrcamentoForm() {
         alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
         return
       }
+      if (formData.status === 'lancado' && !formData.numero_lancamento_erp) {
+  alert('Informe o Número de Lançamento no ERP!')
+  return
+}
 
       setLoading(true)
 
@@ -669,10 +675,26 @@ export default function OrcamentoForm() {
                 <option value="rascunho">Rascunho</option>
                 <option value="enviado">Enviado</option>
                 <option value="aprovado">Aprovado</option>
+                <option value="lancado">Lançado</option>
                 <option value="rejeitado">Rejeitado</option>
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
+            {/* Campo condicional: Número Lançamento ERP */}
+{formData.status === 'lancado' && (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Nº Lançamento ERP *
+    </label>
+    <input
+      type="text"
+      value={formData.numero_lancamento_erp}
+      onChange={(e) => setFormData({ ...formData, numero_lancamento_erp: e.target.value })}
+      placeholder="Ex: PED-12345"
+      className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50"
+    />
+  </div>
+)}
           </div>
         </div>
 
