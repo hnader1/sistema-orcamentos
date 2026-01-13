@@ -4,12 +4,15 @@ import { ArrowLeft, Save, Plus, Trash2, Lock, FileText } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
+import { useAuth } from '../contexts/AuthContext'
+import Header from '../components/Header'
 
 const TABELA_ITENS = 'orcamentos_itens'
 
 export default function OrcamentoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const { user, podeAcessarLancamento } = useAuth()
   const [loading, setLoading] = useState(false)
   const [produtos, setProdutos] = useState([])
   const [produtosSelecionados, setProdutosSelecionados] = useState([])
@@ -51,8 +54,16 @@ export default function OrcamentoForm() {
       carregarOrcamento()
     } else {
       gerarNumero()
+      // Auto-preencher vendedor
+      if (user) {
+        setFormData(prev => ({
+          ...prev,
+          vendedor: user.nome,
+          vendedor_telefone: user.telefone
+        }))
+      }
     }
-  }, [id])
+  }, [id, user])
 
   useEffect(() => {
     calcularDataValidade()
@@ -382,10 +393,11 @@ export default function OrcamentoForm() {
         alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
         return
       }
+
       if (formData.status === 'lancado' && !formData.numero_lancamento_erp) {
-  alert('Informe o Número de Lançamento no ERP!')
-  return
-}
+        alert('Informe o Número de Lançamento no ERP!')
+        return
+      }
 
       setLoading(true)
 
@@ -419,17 +431,18 @@ export default function OrcamentoForm() {
         frete_cidade: dadosFrete?.localidade || null,
         frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
         total,
-       observacoes: formData.observacoes,
+        observacoes: formData.observacoes,
         status: formData.status,
-        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null
-}
+        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
+        usuario_id: user?.id || null
+      }
 
-// Se mudou para lançado, registrar data
-if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
-  dadosOrcamento.data_lancamento = new Date().toISOString()
-}
+      // Se mudou para lançado, registrar data
+      if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
+        dadosOrcamento.data_lancamento = new Date().toISOString()
+      }
 
-let orcamentoId = id
+      let orcamentoId = id
 
       if (id) {
         // EDITANDO
@@ -514,14 +527,19 @@ let orcamentoId = id
 
   if (loading && id) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Carregando...</div>
-      </div>
+      <>
+        <Header />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-gray-500">Carregando...</div>
+        </div>
+      </>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Header />
+
       {/* Modal de Senha */}
       {mostrarModalSenha && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -573,7 +591,7 @@ let orcamentoId = id
         </div>
       )}
 
-      {/* Header */}
+      {/* Header - Botões de Ação */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -681,26 +699,28 @@ let orcamentoId = id
                 <option value="rascunho">Rascunho</option>
                 <option value="enviado">Enviado</option>
                 <option value="aprovado">Aprovado</option>
-                <option value="lancado">Lançado</option>
+                {podeAcessarLancamento() && (
+                  <option value="lancado">Lançado</option>
+                )}
                 <option value="rejeitado">Rejeitado</option>
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
             {/* Campo condicional: Número Lançamento ERP */}
-{formData.status === 'lancado' && (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Nº Lançamento ERP *
-    </label>
-    <input
-      type="text"
-      value={formData.numero_lancamento_erp}
-      onChange={(e) => setFormData({ ...formData, numero_lancamento_erp: e.target.value })}
-      placeholder="Ex: PED-12345"
-      className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50"
-    />
-  </div>
-)}
+            {formData.status === 'lancado' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nº Lançamento ERP *
+                </label>
+                <input
+                  type="text"
+                  value={formData.numero_lancamento_erp}
+                  onChange={(e) => setFormData({ ...formData, numero_lancamento_erp: e.target.value })}
+                  placeholder="Ex: PED-12345"
+                  className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50"
+                />
+              </div>
+            )}
           </div>
         </div>
 
