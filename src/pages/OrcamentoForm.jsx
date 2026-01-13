@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
@@ -19,6 +19,7 @@ export default function OrcamentoForm() {
   const [dadosFrete, setDadosFrete] = useState(null)
   const [mostrarProposta, setMostrarProposta] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(false)
+  
   const [descontoLiberado, setDescontoLiberado] = useState(false)
   const [mostrarModalSenha, setMostrarModalSenha] = useState(false)
   const [senhaDigitada, setSenhaDigitada] = useState('')
@@ -54,7 +55,6 @@ export default function OrcamentoForm() {
       carregarOrcamento()
     } else {
       gerarNumero()
-      // Auto-preencher vendedor
       if (user) {
         setFormData(prev => ({
           ...prev,
@@ -202,18 +202,17 @@ export default function OrcamentoForm() {
         
         console.log('✅ [CARREGAR] Produtos carregados com sucesso')
         setProdutosSelecionados(produtosCarregados)
-      } } else {
+      } else {
         console.log('⚠️ [CARREGAR] Nenhum item encontrado')
         setProdutosSelecionados([])
       }
 
-      // Verificar se vendedor está vendo orçamento lançado
+      // Verificar se deve ser modo leitura (vendedor vendo orçamento lançado)
       if (isVendedor() && orc.status === 'lancado') {
         setIsReadOnly(true)
-        console.log('🔒 Modo leitura ativado')
+        console.log('🔒 [MODO LEITURA] Vendedor visualizando orçamento lançado')
       }
     } catch (error) {
-      
       console.error('❌ [CARREGAR] Erro ao carregar orçamento:', error)
       alert('Erro ao carregar orçamento: ' + error.message)
     } finally {
@@ -381,6 +380,106 @@ export default function OrcamentoForm() {
     return subtotalComDesconto + frete
   }
 
+  const duplicar = async () => {
+    if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.')) return
+
+    try {
+      setLoading(true)
+      console.log('📋 Duplicando orçamento:', formData.numero)
+
+      const { data: ultimoOrc, error: errorUltimo } = await supabase
+        .from('orcamentos')
+        .select('numero')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (errorUltimo) throw errorUltimo
+
+      let novoNumero = 'ORC-0001'
+      if (ultimoOrc && ultimoOrc.length > 0) {
+        const ultimoNumero = ultimoOrc[0].numero
+        const numero = parseInt(ultimoNumero.split('-')[1]) + 1
+        novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
+      }
+
+      const subtotal = calcularSubtotal()
+      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+      const subtotalComDesconto = subtotal - desconto
+      const frete = dadosFrete?.valor_total_frete || 0
+      const total = subtotalComDesconto + frete
+
+      const novoOrcamento = {
+        numero: novoNumero,
+        cliente_nome: formData.cliente_nome,
+        cliente_empresa: formData.cliente_empresa,
+        cliente_email: formData.cliente_email,
+        cliente_telefone: formData.cliente_telefone,
+        cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
+        endereco_entrega: formData.endereco_entrega,
+        vendedor: user?.nome || formData.vendedor,
+        vendedor_telefone: user?.telefone || formData.vendedor_telefone,
+        data_orcamento: new Date().toISOString().split('T')[0],
+        validade_dias: parseInt(formData.validade_dias),
+        data_validade: formData.data_validade,
+        condicoes_pagamento: formData.condicoes_pagamento,
+        prazo_entrega: formData.prazo_entrega,
+        desconto_geral: parseFloat(formData.desconto_geral),
+        subtotal: subtotalComDesconto,
+        frete: frete,
+        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+        total,
+        observacoes: formData.observacoes,
+        status: 'rascunho',
+        numero_lancamento_erp: null,
+        usuario_id: user?.id || null,
+        excluido: false
+      }
+
+      const { data: orcCriado, error: errorCriar } = await supabase
+        .from('orcamentos')
+        .insert([novoOrcamento])
+        .select()
+        .single()
+
+      if (errorCriar) throw errorCriar
+
+      console.log('✅ Orçamento duplicado:', novoNumero)
+
+      const itens = produtosSelecionados.map((item, index) => ({
+        orcamento_id: orcCriado.id,
+        produto_id: item.produto_id,
+        produto_codigo: item.codigo,
+        produto: item.produto,
+        classe: item.classe,
+        mpa: item.mpa,
+        quantidade: parseInt(item.quantidade),
+        preco_unitario: parseFloat(item.preco),
+        peso_unitario: parseFloat(item.peso_unitario),
+        qtd_por_pallet: parseInt(item.qtd_por_pallet),
+        subtotal: item.quantidade * item.preco,
+        ordem: index
+      }))
+
+      const { error: errorItens } = await supabase
+        .from(TABELA_ITENS)
+        .insert(itens)
+
+      if (errorItens) throw errorItens
+
+      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}`)
+      navigate(`/orcamentos/editar/${orcCriado.id}`)
+    } catch (error) {
+      console.error('❌ Erro ao duplicar:', error)
+      alert('Erro ao duplicar orçamento: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const salvar = async () => {
     try {
       if (!formData.numero || !formData.cliente_nome) {
@@ -444,7 +543,6 @@ export default function OrcamentoForm() {
         usuario_id: user?.id || null
       }
 
-      // Se mudou para lançado, registrar data
       if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
         dadosOrcamento.data_lancamento = new Date().toISOString()
       }
@@ -452,7 +550,6 @@ export default function OrcamentoForm() {
       let orcamentoId = id
 
       if (id) {
-        // EDITANDO
         console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
         
         const { error } = await supabase
@@ -463,7 +560,6 @@ export default function OrcamentoForm() {
         if (error) throw error
         console.log('✅ [EDITAR] Orçamento atualizado')
 
-        // Deletar itens antigos
         console.log('🗑️ [EDITAR] Deletando itens antigos...')
         const { error: errorDelete } = await supabase
           .from(TABELA_ITENS)
@@ -477,7 +573,6 @@ export default function OrcamentoForm() {
         console.log('✅ [EDITAR] Itens deletados')
 
       } else {
-        // CRIANDO NOVO
         console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
         
         const { data, error } = await supabase
@@ -492,7 +587,6 @@ export default function OrcamentoForm() {
         console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
       }
 
-      // Inserir novos itens
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcamentoId,
         produto_id: item.produto_id,
@@ -547,7 +641,6 @@ export default function OrcamentoForm() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      {/* Modal de Senha */}
       {mostrarModalSenha && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
@@ -598,9 +691,23 @@ export default function OrcamentoForm() {
         </div>
       )}
 
-      {/* Header - Botões de Ação */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          {isReadOnly && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <Lock className="text-blue-600" size={24} />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-blue-900">Modo Visualização</h3>
+                  <p className="text-sm text-blue-700">
+                    Este orçamento está lançado no ERP. Você pode visualizar mas não editar.
+                    Use "Duplicar" para criar uma nova proposta baseada neste orçamento.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -610,10 +717,20 @@ export default function OrcamentoForm() {
                 <ArrowLeft size={24} className="text-gray-600" />
               </button>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                {id ? 'Editar Orçamento' : 'Novo Orçamento'}
+                {isReadOnly ? 'Visualizar Orçamento' : (id ? 'Editar Orçamento' : 'Novo Orçamento')}
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              {isReadOnly && (
+                <button
+                  onClick={duplicar}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  <Copy size={20} />
+                  Duplicar
+                </button>
+              )}
               <button
                 onClick={() => setMostrarProposta(true)}
                 disabled={produtosSelecionados.length === 0}
@@ -622,40 +739,34 @@ export default function OrcamentoForm() {
                 <FileText size={20} />
                 <span className="hidden sm:inline">Gerar Proposta</span>
               </button>
-              <button
-                onClick={salvar}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                <Save size={20} />
-                Salvar
-              </button>
+              {!isReadOnly && (
+                <button
+                  onClick={salvar}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <Save size={20} />
+                  Salvar
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Dados do Orçamento */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Dados do Orçamento</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Número *</label>
-              
-              
-              
-              
               <input
                 type="text"
                 value={formData.numero}
                 onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={!!id}
+                disabled={!!id || isReadOnly}
               />
-
-
-              
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
@@ -664,16 +775,17 @@ export default function OrcamentoForm() {
                 value={formData.data_orcamento}
                 onChange={(e) => setFormData({ ...formData, data_orcamento: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
-              
               <input
                 type="text"
                 value={formData.vendedor}
                 onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div>
@@ -684,6 +796,7 @@ export default function OrcamentoForm() {
                 onChange={(e) => setFormData({ ...formData, vendedor_telefone: e.target.value })}
                 placeholder="(XX) XXXXX-XXXX"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div>
@@ -693,6 +806,7 @@ export default function OrcamentoForm() {
                 value={formData.validade_dias}
                 onChange={(e) => setFormData({ ...formData, validade_dias: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div>
@@ -710,6 +824,7 @@ export default function OrcamentoForm() {
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               >
                 <option value="rascunho">Rascunho</option>
                 <option value="enviado">Enviado</option>
@@ -721,7 +836,6 @@ export default function OrcamentoForm() {
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
-            {/* Campo condicional: Número Lançamento ERP */}
             {formData.status === 'lancado' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -733,13 +847,13 @@ export default function OrcamentoForm() {
                   onChange={(e) => setFormData({ ...formData, numero_lancamento_erp: e.target.value })}
                   placeholder="Ex: PED-12345"
                   className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50"
+                  disabled={isReadOnly}
                 />
               </div>
             )}
           </div>
         </div>
 
-        {/* Dados do Cliente */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Dados do Cliente</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -750,6 +864,7 @@ export default function OrcamentoForm() {
                 value={formData.cliente_nome}
                 onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div>
@@ -759,6 +874,7 @@ export default function OrcamentoForm() {
                 value={formData.cliente_empresa}
                 onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div>
@@ -768,6 +884,7 @@ export default function OrcamentoForm() {
                 value={formData.cliente_cpf_cnpj}
                 onChange={(e) => setFormData({ ...formData, cliente_cpf_cnpj: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div>
@@ -777,6 +894,7 @@ export default function OrcamentoForm() {
                 value={formData.cliente_telefone}
                 onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div className="md:col-span-2">
@@ -786,6 +904,7 @@ export default function OrcamentoForm() {
                 value={formData.cliente_email}
                 onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
             <div className="md:col-span-2">
@@ -796,18 +915,19 @@ export default function OrcamentoForm() {
                 onChange={(e) => setFormData({ ...formData, endereco_entrega: e.target.value })}
                 placeholder="Rua, número, bairro, cidade - UF, CEP"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
               />
             </div>
           </div>
         </div>
 
-        {/* PRODUTOS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Produtos</h2>
             <button
               onClick={adicionarProduto}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+              disabled={isReadOnly}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={18} />
               Adicionar Produto
@@ -842,6 +962,7 @@ export default function OrcamentoForm() {
                         <select
                           value={item.produto}
                           onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
+                          disabled={isReadOnly}
                           className="w-full px-2 py-1 border rounded text-sm"
                         >
                           <option value="">Selecione...</option>
@@ -854,7 +975,7 @@ export default function OrcamentoForm() {
                         <select
                           value={item.classe}
                           onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
-                          disabled={!item.produto}
+                          disabled={!item.produto || isReadOnly}
                           className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
                         >
                           <option value="">-</option>
@@ -867,7 +988,7 @@ export default function OrcamentoForm() {
                         <select
                           value={item.mpa}
                           onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
-                          disabled={!item.classe}
+                          disabled={!item.classe || isReadOnly}
                           className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
                         >
                           <option value="">-</option>
@@ -881,6 +1002,7 @@ export default function OrcamentoForm() {
                           type="number"
                           value={item.quantidade}
                           onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
+                          disabled={isReadOnly}
                           className="w-16 px-2 py-1 border rounded text-sm text-center"
                           min="1"
                         />
@@ -911,7 +1033,8 @@ export default function OrcamentoForm() {
                       <td className="px-2 py-1">
                         <button
                           onClick={() => removerProduto(index)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          disabled={isReadOnly}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -924,7 +1047,6 @@ export default function OrcamentoForm() {
           )}
         </div>
 
-        {/* FRETE */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <FreteSelector 
             pesoTotal={calcularPesoTotal()}
@@ -934,7 +1056,6 @@ export default function OrcamentoForm() {
           />
         </div>
 
-        {/* TOTAIS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="max-w-md ml-auto space-y-2">
             <div className="flex justify-between text-sm">
@@ -962,6 +1083,7 @@ export default function OrcamentoForm() {
                 max={descontoLiberado ? 100 : LIMITE_DESCONTO}
                 value={formData.desconto_geral}
                 onChange={(e) => handleDescontoChange(e.target.value)}
+                disabled={isReadOnly}
                 className={`w-20 px-2 py-1 border rounded text-center text-sm ${
                   formData.desconto_geral > LIMITE_DESCONTO 
                     ? 'border-yellow-400 bg-yellow-50' 
@@ -993,7 +1115,6 @@ export default function OrcamentoForm() {
           </div>
         </div>
 
-        {/* Condições de Pagamento */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Condições de Pagamento</h2>
           <input
@@ -1001,24 +1122,24 @@ export default function OrcamentoForm() {
             value={formData.condicoes_pagamento}
             onChange={(e) => setFormData({ ...formData, condicoes_pagamento: e.target.value })}
             placeholder="Ex: 28 DIAS, À VISTA, 30/60/90..."
+            disabled={isReadOnly}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
-        {/* Observações */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold mb-4">Observações</h2>
           <textarea
             value={formData.observacoes}
             onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
             rows="3"
+            disabled={isReadOnly}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             placeholder="Observações adicionais que aparecerão na proposta comercial..."
           />
         </div>
       </div>
 
-      {/* Modal da Proposta Comercial */}
       <PropostaComercial
         isOpen={mostrarProposta}
         onClose={() => setMostrarProposta(false)}
