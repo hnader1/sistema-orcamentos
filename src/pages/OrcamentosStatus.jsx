@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { 
   ArrowLeft, Search, Edit2, Copy, FileText, Calendar, User, DollarSign,
-  Edit, Send, CheckCircle, XCircle
+  Edit, Send, CheckCircle, XCircle, Briefcase
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -97,6 +97,9 @@ export default function OrcamentosStatus() {
         status: 'rascunho',
         excluido: false,
         data_exclusao: null,
+        numero_lancamento_erp: null,
+        data_lancamento: null,
+        lancado_por: null,
         created_at: undefined,
         updated_at: undefined
       }
@@ -158,6 +161,12 @@ export default function OrcamentosStatus() {
         cor: 'text-green-600',
         corFundo: 'bg-green-100'
       },
+      'lancado': {
+        titulo: 'Lançados',
+        icone: Briefcase,
+        cor: 'text-purple-600',
+        corFundo: 'bg-purple-100'
+      },
       'cancelado': {
         titulo: 'Cancelados',
         icone: XCircle,
@@ -173,6 +182,7 @@ export default function OrcamentosStatus() {
       'rascunho': 'bg-gray-100 text-gray-800',
       'enviado': 'bg-blue-100 text-blue-800',
       'aprovado': 'bg-green-100 text-green-800',
+      'lancado': 'bg-purple-100 text-purple-800',
       'cancelado': 'bg-red-100 text-red-800'
     }
     return (
@@ -193,7 +203,7 @@ export default function OrcamentosStatus() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/orcamentos')}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ArrowLeft size={24} className="text-gray-600" />
@@ -267,6 +277,11 @@ export default function OrcamentosStatus() {
                         Orçamento #{orc.numero}
                       </h3>
                       {getStatusBadge(orc.status)}
+                      {orc.numero_lancamento_erp && (
+                        <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs font-medium">
+                          ERP: {orc.numero_lancamento_erp}
+                        </span>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                       <div className="flex items-center gap-2">
