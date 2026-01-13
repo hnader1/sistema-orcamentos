@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
-  ArrowLeft, FileText, Plus, Search, Edit2, Copy, Ban, Calendar, User, DollarSign 
+  ArrowLeft, FileText, Plus, Search, Edit2, Copy, Ban, Calendar, User, DollarSign,
+  Edit, Send, CheckCircle, XCircle, Briefcase, TrendingUp
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -12,6 +13,13 @@ export default function Orcamentos() {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [estatisticas, setEstatisticas] = useState({
+    rascunho: 0,
+    enviado: 0,
+    aprovado: 0,
+    lancado: 0,
+    cancelado: 0
+  })
 
   useEffect(() => {
     carregarOrcamentos()
@@ -34,6 +42,16 @@ export default function Orcamentos() {
       console.log('✅ Orçamentos carregados:', data?.length || 0)
       
       setOrcamentos(data || [])
+
+      // Calcular estatísticas
+      const stats = {
+        rascunho: data?.filter(o => o.status === 'rascunho').length || 0,
+        enviado: data?.filter(o => o.status === 'enviado').length || 0,
+        aprovado: data?.filter(o => o.status === 'aprovado').length || 0,
+        lancado: data?.filter(o => o.status === 'lancado').length || 0,
+        cancelado: data?.filter(o => o.status === 'cancelado').length || 0
+      }
+      setEstatisticas(stats)
     } catch (error) {
       console.error('❌ Erro ao carregar orçamentos:', error)
       alert('Erro ao carregar orçamentos')
@@ -53,18 +71,17 @@ export default function Orcamentos() {
     return matchBusca && matchStatus
   })
 
+  const ultimos5 = orcamentos.slice(0, 5)
+
   const cancelar = async (id, numero) => {
     if (!confirm(`Tem certeza que deseja CANCELAR o orçamento ${numero}?\n\nO orçamento será marcado como CANCELADO.`)) return
 
     try {
       console.log('🚫 Cancelando orçamento:', numero, 'ID:', id)
       
-      // Marcar como cancelado
       const { error } = await supabase
         .from('orcamentos')
-        .update({ 
-          status: 'cancelado'
-        })
+        .update({ status: 'cancelado' })
         .eq('id', id)
 
       if (error) {
@@ -126,6 +143,9 @@ export default function Orcamentos() {
         status: 'rascunho',
         excluido: false,
         data_exclusao: null,
+        numero_lancamento_erp: null,
+        data_lancamento: null,
+        lancado_por: null,
         created_at: undefined,
         updated_at: undefined
       }
@@ -172,6 +192,7 @@ export default function Orcamentos() {
       'rascunho': 'bg-gray-100 text-gray-800',
       'enviado': 'bg-blue-100 text-blue-800',
       'aprovado': 'bg-green-100 text-green-800',
+      'lancado': 'bg-purple-100 text-purple-800',
       'rejeitado': 'bg-red-100 text-red-800',
       'cancelado': 'bg-red-100 text-red-800'
     }
@@ -181,6 +202,54 @@ export default function Orcamentos() {
       </span>
     )
   }
+
+  const statusCards = [
+    {
+      status: 'rascunho',
+      titulo: 'Rascunhos',
+      icone: Edit,
+      cor: 'from-gray-500 to-gray-600',
+      corFundo: 'bg-gray-50',
+      corBorda: 'border-gray-200',
+      quantidade: estatisticas.rascunho
+    },
+    {
+      status: 'enviado',
+      titulo: 'Enviados',
+      icone: Send,
+      cor: 'from-blue-500 to-blue-600',
+      corFundo: 'bg-blue-50',
+      corBorda: 'border-blue-200',
+      quantidade: estatisticas.enviado
+    },
+    {
+      status: 'aprovado',
+      titulo: 'Aprovados',
+      icone: CheckCircle,
+      cor: 'from-green-500 to-green-600',
+      corFundo: 'bg-green-50',
+      corBorda: 'border-green-200',
+      quantidade: estatisticas.aprovado
+    },
+    {
+      status: 'lancado',
+      titulo: 'Lançados',
+      icone: Briefcase,
+      cor: 'from-purple-500 to-purple-600',
+      corFundo: 'bg-purple-50',
+      corBorda: 'border-purple-200',
+      quantidade: estatisticas.lancado
+    },
+    {
+      status: 'cancelado',
+      titulo: 'Cancelados',
+      icone: XCircle,
+      cor: 'from-red-500 to-red-600',
+      corFundo: 'bg-red-50',
+      corBorda: 'border-red-200',
+      quantidade: estatisticas.cancelado
+    }
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -217,6 +286,113 @@ export default function Orcamentos() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Cards de Status */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="text-gray-600" size={20} />
+            <h2 className="text-lg font-semibold text-gray-900">Por Status</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {statusCards.map((card) => {
+              const IconComponent = card.icone
+              return (
+                <button
+                  key={card.status}
+                  onClick={() => navigate(`/orcamentos/status/${card.status}`)}
+                  className={`${card.corFundo} border-2 ${card.corBorda} rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer group`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`p-2 bg-gradient-to-br ${card.cor} rounded-lg shadow-md`}>
+                      <IconComponent className="text-white" size={20} />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {card.quantidade}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs font-medium text-gray-600 group-hover:text-gray-900">
+                    {card.titulo}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Últimos 5 Orçamentos */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="text-gray-600" size={20} />
+            <h2 className="text-lg font-semibold text-gray-900">Últimos 5 Orçamentos</h2>
+          </div>
+
+          {ultimos5.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+              <FileText className="mx-auto text-gray-400 mb-3" size={48} />
+              <p className="text-gray-500">Nenhum orçamento criado ainda</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {ultimos5.map((orc) => (
+                <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-base font-semibold text-gray-900">
+                          #{orc.numero}
+                        </h3>
+                        {getStatusBadge(orc.status)}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <User size={14} className="text-gray-400" />
+                          <span>{orc.cliente_nome || 'Sem cliente'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar size={14} className="text-gray-400" />
+                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign size={14} className="text-gray-400" />
+                          <span className="font-semibold text-gray-900">
+                            R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => duplicar(orc.id)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Duplicar"
+                      >
+                        <Copy size={18} />
+                      </button>
+                      {orc.status !== 'cancelado' && (
+                        <button
+                          onClick={() => cancelar(orc.id, orc.numero)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Cancelar"
+                        >
+                          <Ban size={18} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Filtros */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
@@ -238,85 +414,90 @@ export default function Orcamentos() {
             <option value="rascunho">Rascunho</option>
             <option value="enviado">Enviado</option>
             <option value="aprovado">Aprovado</option>
+            <option value="lancado">Lançado</option>
             <option value="rejeitado">Rejeitado</option>
             <option value="cancelado">Cancelado</option>
           </select>
         </div>
 
-        {/* Lista de Orçamentos */}
-        {loading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-            Carregando...
-          </div>
-        ) : orcamentosFiltrados.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-            {busca || filtroStatus !== 'todos' ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento cadastrado'}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {orcamentosFiltrados.map((orc) => (
-              <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Orçamento #{orc.numero}
-                      </h3>
-                      {getStatusBadge(orc.status)}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <User size={16} className="text-gray-400" />
-                        <span>{orc.cliente_nome || 'Sem cliente'}</span>
+        {/* Lista Completa de Orçamentos */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Todos os Orçamentos</h2>
+          
+          {loading ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+              Carregando...
+            </div>
+          ) : orcamentosFiltrados.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+              {busca || filtroStatus !== 'todos' ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento cadastrado'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {orcamentosFiltrados.map((orc) => (
+                <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Orçamento #{orc.numero}
+                        </h3>
+                        {getStatusBadge(orc.status)}
                       </div>
-                      {orc.cliente_empresa && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-400">•</span>
-                          <span>{orc.cliente_empresa}</span>
+                          <User size={16} className="text-gray-400" />
+                          <span>{orc.cliente_nome || 'Sem cliente'}</span>
                         </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Calendar size={16} className="text-gray-400" />
-                        <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign size={16} className="text-gray-400" />
-                        <span className="font-semibold text-gray-900">
-                          R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
+                        {orc.cliente_empresa && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400">•</span>
+                            <span>{orc.cliente_empresa}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Calendar size={16} className="text-gray-400" />
+                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign size={16} className="text-gray-400" />
+                          <span className="font-semibold text-gray-900">
+                            R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Editar"
-                    >
-                      <Edit2 size={20} />
-                    </button>
-                    <button
-                      onClick={() => duplicar(orc.id)}
-                      className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                      title="Duplicar"
-                    >
-                      <Copy size={20} />
-                    </button>
-                    {orc.status !== 'cancelado' && (
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => cancelar(orc.id, orc.numero)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Cancelar"
+                        onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Editar"
                       >
-                        <Ban size={20} />
+                        <Edit2 size={20} />
                       </button>
-                    )}
+                      <button
+                        onClick={() => duplicar(orc.id)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Duplicar"
+                      >
+                        <Copy size={20} />
+                      </button>
+                      {orc.status !== 'cancelado' && (
+                        <button
+                          onClick={() => cancelar(orc.id, orc.numero)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Cancelar"
+                        >
+                          <Ban size={20} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
