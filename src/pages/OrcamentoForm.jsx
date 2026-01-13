@@ -15,6 +15,7 @@ export default function OrcamentoForm() {
   const { user, podeAcessarLancamento, isVendedor } = useAuth()
   const [loading, setLoading] = useState(false)
   const [produtos, setProdutos] = useState([])
+  const [vendedores, setVendedores] = useState([])
   const [produtosSelecionados, setProdutosSelecionados] = useState([])
   const [dadosFrete, setDadosFrete] = useState(null)
   const [mostrarProposta, setMostrarProposta] = useState(false)
@@ -37,6 +38,7 @@ export default function OrcamentoForm() {
     endereco_entrega: '',
     vendedor: '',
     vendedor_telefone: '',
+    vendedor_email: '',
     data_orcamento: new Date().toISOString().split('T')[0],
     validade_dias: 15,
     data_validade: '',
@@ -45,11 +47,51 @@ export default function OrcamentoForm() {
     desconto_geral: 0,
     observacoes: '',
     status: 'rascunho',
-    numero_lancamento_erp: '' 
+    numero_lancamento_erp: '',
+    usuario_id_original: null
   })
+
+  const carregarVendedores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, nome, telefone, email')
+        .eq('ativo', true)
+        .order('nome')
+
+      if (error) throw error
+      
+      console.log('📋 Vendedores carregados:', data?.length || 0)
+      setVendedores(data || [])
+    } catch (error) {
+      console.error('❌ Erro ao carregar vendedores:', error)
+    }
+  }
+
+  const handleVendedorChange = (nomeVendedor) => {
+    const vendedorSelecionado = vendedores.find(v => v.nome === nomeVendedor)
+    
+    if (vendedorSelecionado) {
+      setFormData(prev => ({
+        ...prev,
+        vendedor: vendedorSelecionado.nome,
+        vendedor_telefone: vendedorSelecionado.telefone || '',
+        vendedor_email: vendedorSelecionado.email || ''
+      }))
+      console.log('✅ Vendedor selecionado:', vendedorSelecionado.nome)
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        vendedor: nomeVendedor,
+        vendedor_telefone: '',
+        vendedor_email: ''
+      }))
+    }
+  }
 
   useEffect(() => {
     carregarProdutos()
+    carregarVendedores()
     calcularDataValidade()
     if (id) {
       carregarOrcamento()
@@ -59,7 +101,8 @@ export default function OrcamentoForm() {
         setFormData(prev => ({
           ...prev,
           vendedor: user.nome,
-          vendedor_telefone: user.telefone
+          vendedor_telefone: user.telefone,
+          vendedor_email: user.email
         }))
       }
     }
@@ -134,7 +177,7 @@ export default function OrcamentoForm() {
 
       console.log('✅ [CARREGAR] Orçamento carregado:', orc.numero)
 
-       setFormData({
+      setFormData({
         numero: orc.numero,
         cliente_nome: orc.cliente_nome || '',
         cliente_empresa: orc.cliente_empresa || '',
@@ -144,6 +187,7 @@ export default function OrcamentoForm() {
         endereco_entrega: orc.endereco_entrega || '',
         vendedor: orc.vendedor || '',
         vendedor_telefone: orc.vendedor_telefone || '',
+        vendedor_email: orc.vendedor_email || '',
         data_orcamento: orc.data_orcamento || '',
         validade_dias: orc.validade_dias || 15,
         data_validade: orc.data_validade || '',
@@ -153,7 +197,7 @@ export default function OrcamentoForm() {
         observacoes: orc.observacoes || '',
         status: orc.status || 'rascunho',
         numero_lancamento_erp: orc.numero_lancamento_erp || '',
-        usuario_id_original: orc.usuario_id  // ADICIONE ESTA LINHA!
+        usuario_id_original: orc.usuario_id
       })
 
       if (orc.desconto_geral > LIMITE_DESCONTO) {
@@ -208,7 +252,6 @@ export default function OrcamentoForm() {
         setProdutosSelecionados([])
       }
 
-      // Verificar se deve ser modo leitura (vendedor vendo orçamento lançado)
       if (isVendedor() && orc.status === 'lancado') {
         setIsReadOnly(true)
         console.log('🔒 [MODO LEITURA] Vendedor visualizando orçamento lançado')
@@ -419,6 +462,7 @@ export default function OrcamentoForm() {
         endereco_entrega: formData.endereco_entrega,
         vendedor: user?.nome || formData.vendedor,
         vendedor_telefone: user?.telefone || formData.vendedor_telefone,
+        vendedor_email: user?.email || formData.vendedor_email,
         data_orcamento: new Date().toISOString().split('T')[0],
         validade_dias: parseInt(formData.validade_dias),
         data_validade: formData.data_validade,
@@ -514,7 +558,7 @@ export default function OrcamentoForm() {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
-     const dadosOrcamento = {
+      const dadosOrcamento = {
         numero: formData.numero,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
@@ -524,6 +568,7 @@ export default function OrcamentoForm() {
         endereco_entrega: formData.endereco_entrega,
         vendedor: formData.vendedor,
         vendedor_telefone: formData.vendedor_telefone,
+        vendedor_email: formData.vendedor_email,
         data_orcamento: formData.data_orcamento,
         validade_dias: parseInt(formData.validade_dias),
         data_validade: formData.data_validade,
@@ -543,22 +588,17 @@ export default function OrcamentoForm() {
         numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null
       }
 
- // 1️⃣ Define usuario_id
-if (!id) {
-  // Novo orçamento → usa o usuário logado
-  dadosOrcamento.usuario_id = user?.id || null
-} else {
-  // Edição → mantém o vendedor original
-  dadosOrcamento.usuario_id = formData.usuario_id_original
-}
+      if (!id) {
+        dadosOrcamento.usuario_id = user?.id || null
+      } else {
+        dadosOrcamento.usuario_id = formData.usuario_id_original
+      }
 
-// 2️⃣ Se mudou para lançado, registra data
-if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
-  dadosOrcamento.data_lancamento = new Date().toISOString()
-}
+      if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
+        dadosOrcamento.data_lancamento = new Date().toISOString()
+      }
 
-// 3️⃣ Prepara para usar o ID na inserção de itens
-let orcamentoId = id
+      let orcamentoId = id
 
       if (id) {
         console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
@@ -790,14 +830,18 @@ let orcamentoId = id
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
-              <input
-                type="text"
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor *</label>
+              <select
                 value={formData.vendedor}
-                onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })}
+                onChange={(e) => handleVendedorChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 disabled={isReadOnly}
-              />
+              >
+                <option value="">Selecione...</option>
+                {vendedores.map(v => (
+                  <option key={v.id} value={v.nome}>{v.nome}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">📞 Tel. Vendedor</label>
@@ -806,8 +850,18 @@ let orcamentoId = id
                 value={formData.vendedor_telefone}
                 onChange={(e) => setFormData({ ...formData, vendedor_telefone: e.target.value })}
                 placeholder="(XX) XXXXX-XXXX"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                disabled
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">📧 Email Vendedor</label>
+              <input
+                type="email"
+                value={formData.vendedor_email}
+                placeholder="vendedor@email.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                disabled
               />
             </div>
             <div>
