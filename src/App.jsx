@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import OrcamentosStatus from './pages/OrcamentosStatus'
 import Orcamentos from './pages/Orcamentos'
 import OrcamentoForm from './pages/OrcamentoForm'
+import Admin from './pages/Admin'
 
 function App() {
   return (
@@ -45,6 +46,8 @@ function App() {
               <OrcamentoForm />
             </ProtectedRoute>
           } />
+
+<Route path="/admin" element={<Admin />} />
           
           {/* Redirecionar qualquer rota não encontrada para login */}
           <Route path="*" element={<Navigate to="/login" />} />
