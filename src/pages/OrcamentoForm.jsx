@@ -12,13 +12,13 @@ const TABELA_ITENS = 'orcamentos_itens'
 export default function OrcamentoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const { user, podeAcessarLancamento } = useAuth()
+  const { user, podeAcessarLancamento, isVendedor } = useAuth()
   const [loading, setLoading] = useState(false)
   const [produtos, setProdutos] = useState([])
   const [produtosSelecionados, setProdutosSelecionados] = useState([])
   const [dadosFrete, setDadosFrete] = useState(null)
   const [mostrarProposta, setMostrarProposta] = useState(false)
-  
+  const [isReadOnly, setIsReadOnly] = useState(false)
   const [descontoLiberado, setDescontoLiberado] = useState(false)
   const [mostrarModalSenha, setMostrarModalSenha] = useState(false)
   const [senhaDigitada, setSenhaDigitada] = useState('')
@@ -202,11 +202,18 @@ export default function OrcamentoForm() {
         
         console.log('✅ [CARREGAR] Produtos carregados com sucesso')
         setProdutosSelecionados(produtosCarregados)
-      } else {
+      } } else {
         console.log('⚠️ [CARREGAR] Nenhum item encontrado')
         setProdutosSelecionados([])
       }
+
+      // Verificar se vendedor está vendo orçamento lançado
+      if (isVendedor() && orc.status === 'lancado') {
+        setIsReadOnly(true)
+        console.log('🔒 Modo leitura ativado')
+      }
     } catch (error) {
+      
       console.error('❌ [CARREGAR] Erro ao carregar orçamento:', error)
       alert('Erro ao carregar orçamento: ' + error.message)
     } finally {
@@ -635,6 +642,10 @@ export default function OrcamentoForm() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Número *</label>
+              
+              
+              
+              
               <input
                 type="text"
                 value={formData.numero}
@@ -642,6 +653,9 @@ export default function OrcamentoForm() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 disabled={!!id}
               />
+
+
+              
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
@@ -654,6 +668,7 @@ export default function OrcamentoForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
+              
               <input
                 type="text"
                 value={formData.vendedor}
