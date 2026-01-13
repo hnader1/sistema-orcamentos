@@ -32,6 +32,7 @@ export default function OrcamentosStatus() {
         .eq('excluido', false)
         .eq('status', status)
       
+      // Se for vendedor, filtrar apenas seus orçamentos
       if (isVendedor()) {
         query = query.eq('usuario_id', user.id)
       }
@@ -81,6 +82,7 @@ export default function OrcamentosStatus() {
 
       if (errorItens) throw errorItens
 
+      // Gerar novo número
       const { data: ultimoOrc, error: errorUltimo } = await supabase
         .from('orcamentos')
         .select('numero')
@@ -208,6 +210,7 @@ export default function OrcamentosStatus() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
+      {/* Header da Página */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -244,6 +247,7 @@ export default function OrcamentosStatus() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Busca */}
         <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -257,6 +261,7 @@ export default function OrcamentosStatus() {
           </div>
         </div>
 
+        {/* Lista de Orçamentos */}
         {loading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
             Carregando...
