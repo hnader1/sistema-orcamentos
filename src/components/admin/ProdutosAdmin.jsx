@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Power, Search, X, Save, AlertCircle } from 'lucide-react'
 import { supabase } from '../../services/supabase'
