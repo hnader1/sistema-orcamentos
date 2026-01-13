@@ -39,7 +39,6 @@ export default function Orcamentos() {
         .select('*')
         .eq('excluido', false)
       
-      // Se for vendedor, filtrar apenas seus orçamentos
       if (isVendedor()) {
         query = query.eq('usuario_id', user.id)
       }
@@ -53,7 +52,6 @@ export default function Orcamentos() {
       
       setOrcamentos(data || [])
 
-      // Calcular estatísticas
       const stats = {
         rascunho: data?.filter(o => o.status === 'rascunho').length || 0,
         enviado: data?.filter(o => o.status === 'enviado').length || 0,
@@ -128,7 +126,6 @@ export default function Orcamentos() {
 
       if (errorItens) throw errorItens
 
-      // Gerar novo número
       const { data: ultimoOrc, error: errorUltimo } = await supabase
         .from('orcamentos')
         .select('numero')
@@ -266,7 +263,6 @@ export default function Orcamentos() {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      {/* Header da Página */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -301,7 +297,6 @@ export default function Orcamentos() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Cards de Status */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="text-gray-600" size={20} />
@@ -335,7 +330,6 @@ export default function Orcamentos() {
           </div>
         </div>
 
-        {/* Últimos 5 Orçamentos */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="text-gray-600" size={20} />
@@ -375,6 +369,11 @@ export default function Orcamentos() {
                           </span>
                         </div>
                       </div>
+                      {orc.vendedor && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          👤 {orc.vendedor}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -408,7 +407,6 @@ export default function Orcamentos() {
           )}
         </div>
 
-        {/* Filtros */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -435,7 +433,6 @@ export default function Orcamentos() {
           </select>
         </div>
 
-        {/* Lista Completa de Orçamentos */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Todos os Orçamentos</h2>
           
@@ -481,6 +478,11 @@ export default function Orcamentos() {
                           </span>
                         </div>
                       </div>
+                      {orc.vendedor && (
+                        <div className="text-xs text-gray-500 mt-2">
+                          👤 Vendedor: {orc.vendedor}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
