@@ -513,7 +513,7 @@ export default function OrcamentoForm() {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
-      const dadosOrcamento = {
+     const dadosOrcamento = {
         numero: formData.numero,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
@@ -539,8 +539,12 @@ export default function OrcamentoForm() {
         total,
         observacoes: formData.observacoes,
         status: formData.status,
-        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
-        usuario_id: user?.id || null
+        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null
+      }
+
+      // NOVO: Só adiciona usuario_id se for criação (não edição)
+      if (!id) {
+        dadosOrcamento.usuario_id = user?.id || null
       }
 
       if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
