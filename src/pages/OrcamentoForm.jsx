@@ -658,7 +658,11 @@ const salvar = async () => {
   }
 }
   
-      // 🔥 INSERIR NOVOS ITENS
+      // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
+ // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
+   // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
+   // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
+   // 🔥 INSERIR NOVOS ITENS----------------------------------------------------------FIM SALVER ----------------
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcamentoId,
         produto_id: item.produto_id,
