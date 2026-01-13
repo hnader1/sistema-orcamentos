@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
-  FileText, Plus, Edit, Send, CheckCircle, XCircle,
+  FileText, Plus, Edit, Send, CheckCircle, XCircle, Briefcase,
   TrendingUp, Calendar, User
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
@@ -15,6 +15,7 @@ export default function Dashboard() {
     rascunho: 0,
     enviado: 0,
     aprovado: 0,
+    lancado: 0,
     cancelado: 0,
     total: 0
   })
@@ -50,6 +51,7 @@ export default function Dashboard() {
         rascunho: todos.filter(o => o.status === 'rascunho').length,
         enviado: todos.filter(o => o.status === 'enviado').length,
         aprovado: todos.filter(o => o.status === 'aprovado').length,
+        lancado: todos.filter(o => o.status === 'lancado').length,
         cancelado: todos.filter(o => o.status === 'cancelado').length,
         total: todos.length
       }
@@ -67,6 +69,7 @@ export default function Dashboard() {
       'rascunho': 'bg-gray-100 text-gray-700',
       'enviado': 'bg-blue-100 text-blue-700',
       'aprovado': 'bg-green-100 text-green-700',
+      'lancado': 'bg-purple-100 text-purple-700',
       'cancelado': 'bg-red-100 text-red-700'
     }
     return colors[status] || colors.rascunho
@@ -99,6 +102,15 @@ export default function Dashboard() {
       corFundo: 'bg-green-50',
       corBorda: 'border-green-200',
       quantidade: estatisticas.aprovado
+    },
+    {
+      status: 'lancado',
+      titulo: 'Lançados',
+      icone: Briefcase,
+      cor: 'from-purple-500 to-purple-600',
+      corFundo: 'bg-purple-50',
+      corBorda: 'border-purple-200',
+      quantidade: estatisticas.lancado
     },
     {
       status: 'cancelado',
@@ -149,7 +161,7 @@ export default function Dashboard() {
             <TrendingUp className="text-gray-600" size={20} />
             <h2 className="text-lg font-semibold text-gray-900">Estatísticas</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {statusCards.map((card) => {
               const IconComponent = card.icone
               return (
