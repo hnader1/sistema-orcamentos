@@ -1,16 +1,11 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Package, Users, Truck, Settings } from 'lucide-react'
+import { Package, Users, Truck, BarChart3, ArrowLeft, Settings } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
-import ProdutosAdmin from '../components/admin/ProdutosAdmin.jsx'
-import UsuariosAdmin from '../components/admin/UsuariosAdmin.jsx'
-import FreteAdmin from '../components/admin/FreteAdmin.jsx'
 
 export default function Admin() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
-  const [abaAtiva, setAbaAtiva] = useState('produtos')
 
   // Proteger rota - só admin pode acessar
   if (!isAdmin()) {
@@ -33,57 +28,68 @@ export default function Admin() {
     )
   }
 
-  const abas = [
+  const cards = [
+    {
+      id: 'dashboard',
+      titulo: 'Dashboard',
+      descricao: 'Relatórios e análises',
+      icone: BarChart3,
+      cor: 'from-purple-500 to-purple-600',
+      rota: '/admin/dashboard',
+      stats: 'Visualizar gráficos'
+    },
     {
       id: 'produtos',
-      nome: 'Produtos',
+      titulo: 'Produtos',
+      descricao: 'Gerenciar catálogo',
       icone: Package,
-      cor: 'blue',
-      corAtiva: 'from-blue-500 to-blue-600',
-      corBorda: 'border-blue-500'
+      cor: 'from-blue-500 to-blue-600',
+      rota: '/admin/produtos',
+      stats: 'CRUD completo'
     },
     {
       id: 'usuarios',
-      nome: 'Usuários',
+      titulo: 'Usuários',
+      descricao: 'Gerenciar acessos',
       icone: Users,
-      cor: 'green',
-      corAtiva: 'from-green-500 to-green-600',
-      corBorda: 'border-green-500'
+      cor: 'from-green-500 to-green-600',
+      rota: '/admin/usuarios',
+      stats: 'Vendedores e comerciais'
     },
     {
       id: 'frete',
-      nome: 'Frete',
+      titulo: 'Frete',
+      descricao: 'Rotas e valores',
       icone: Truck,
-      cor: 'purple',
-      corAtiva: 'from-purple-500 to-purple-600',
-      corBorda: 'border-purple-500'
+      cor: 'from-orange-500 to-orange-600',
+      rota: '/admin/frete',
+      stats: 'Tabela de preços'
     }
   ]
-
-  const abaAtual = abas.find(a => a.id === abaAtiva)
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
 
       {/* Header da Página */}
-      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/')}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Voltar ao Dashboard"
               >
                 <ArrowLeft size={24} className="text-gray-600" />
               </button>
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 bg-gradient-to-br ${abaAtual.corAtiva} rounded-lg flex items-center justify-center`}>
-                  <Settings className="text-white" size={24} />
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Settings className="text-white" size={28} />
                 </div>
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Administração</h1>
-                  <p className="text-xs sm:text-sm text-gray-500">Gerenciar sistema</p>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Administração</h1>
+                  <p className="text-sm text-gray-600">Gerenciar sistema e visualizar relatórios</p>
                 </div>
               </div>
             </div>
@@ -91,35 +97,53 @@ export default function Admin() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Abas */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-          <div className="flex border-b border-gray-200">
-            {abas.map((aba) => {
-              const IconeAba = aba.icone
-              const ativo = abaAtiva === aba.id
-              return (
-                <button
-                  key={aba.id}
-                  onClick={() => setAbaAtiva(aba.id)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-sm font-medium transition-colors border-b-2 ${
-                    ativo
-                      ? `${aba.corBorda} text-${aba.cor}-600`
-                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-                  }`}
-                >
-                  <IconeAba size={20} />
-                  <span className="hidden sm:inline">{aba.nome}</span>
-                </button>
-              )
-            })}
-          </div>
+      {/* Cards Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {cards.map((card) => {
+            const Icone = card.icone
+            return (
+              <button
+                key={card.id}
+                onClick={() => navigate(card.rota)}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:scale-105 transition-all duration-200 text-left group"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`w-14 h-14 bg-gradient-to-br ${card.cor} rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform`}>
+                    <Icone className="text-white" size={28} />
+                  </div>
+                </div>
+                
+                <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">
+                  {card.titulo}
+                </h3>
+                
+                <p className="text-sm text-gray-600 mb-3">
+                  {card.descricao}
+                </p>
+                
+                <div className="pt-3 border-t border-gray-100">
+                  <span className="text-xs font-medium text-gray-500">
+                    {card.stats}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
 
-          {/* Conteúdo das Abas */}
-          <div className="p-6">
-            {abaAtiva === 'produtos' && <ProdutosAdmin />}
-            {abaAtiva === 'usuarios' && <UsuariosAdmin />}
-            {abaAtiva === 'frete' && <FreteAdmin />}
+        {/* Info Box */}
+        <div className="mt-8 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Settings className="text-white" size={20} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-purple-900 mb-1">Painel Administrativo</h3>
+              <p className="text-sm text-purple-700">
+                Acesso exclusivo para administradores. Gerencie produtos, usuários, tabela de frete e visualize relatórios completos do sistema.
+              </p>
+            </div>
           </div>
         </div>
       </div>
