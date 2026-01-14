@@ -8,6 +8,15 @@ import Orcamentos from './pages/Orcamentos'
 import OrcamentoForm from './pages/OrcamentoForm'
 import Admin from './pages/Admin'
 
+import AdminDashboard from './pages/AdminDashboard'
+
+// Rotas (dentro de <Routes>)
+<Route path="/admin" element={<Admin />} />
+<Route path="/admin/produtos" element={<AdminProdutos />} />
+<Route path="/admin/usuarios" element={<AdminUsuarios />} />
+<Route path="/admin/frete" element={<AdminFrete />} />
+<Route path="/admin/dashboard" element={<AdminDashboard />} />
+
 function App() {
   return (
     <BrowserRouter>
