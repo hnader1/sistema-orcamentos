@@ -7,15 +7,10 @@ import OrcamentosStatus from './pages/OrcamentosStatus'
 import Orcamentos from './pages/Orcamentos'
 import OrcamentoForm from './pages/OrcamentoForm'
 import Admin from './pages/Admin'
-
+import AdminProdutos from './pages/AdminProdutos'
+import AdminUsuarios from './pages/AdminUsuarios'
+import AdminFrete from './pages/AdminFrete'
 import AdminDashboard from './pages/AdminDashboard'
-
-// Rotas (dentro de <Routes>)
-<Route path="/admin" element={<Admin />} />
-<Route path="/admin/produtos" element={<AdminProdutos />} />
-<Route path="/admin/usuarios" element={<AdminUsuarios />} />
-<Route path="/admin/frete" element={<AdminFrete />} />
-<Route path="/admin/dashboard" element={<AdminDashboard />} />
 
 function App() {
   return (
@@ -25,7 +20,7 @@ function App() {
           {/* Rota pública - Login */}
           <Route path="/login" element={<Login />} />
           
-          {/* Rotas protegidas */}
+          {/* Rotas protegidas - Dashboard */}
           <Route path="/" element={
             <ProtectedRoute>
               <Dashboard />
@@ -56,7 +51,36 @@ function App() {
             </ProtectedRoute>
           } />
 
-<Route path="/admin" element={<Admin />} />
+          {/* Rotas protegidas - Admin */}
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <Admin />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/admin/dashboard" element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/admin/produtos" element={
+            <ProtectedRoute>
+              <AdminProdutos />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/admin/usuarios" element={
+            <ProtectedRoute>
+              <AdminUsuarios />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/admin/frete" element={
+            <ProtectedRoute>
+              <AdminFrete />
+            </ProtectedRoute>
+          } />
           
           {/* Redirecionar qualquer rota não encontrada para login */}
           <Route path="*" element={<Navigate to="/login" />} />
