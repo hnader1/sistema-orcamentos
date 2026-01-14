@@ -18,6 +18,7 @@ export default function ProdutosAdmin() {
     preco: '',
     peso_unitario: '',
     qtd_por_pallet: '',
+    peso_pallet: '',
     ativo: true
   })
 
@@ -71,6 +72,7 @@ export default function ProdutosAdmin() {
         preco: produto.preco || '',
         peso_unitario: produto.peso_unitario || '',
         qtd_por_pallet: produto.qtd_por_pallet || '',
+        peso_pallet: produto.peso_pallet || '',
         ativo: produto.ativo !== false
       })
     } else {
@@ -83,6 +85,7 @@ export default function ProdutosAdmin() {
         preco: '',
         peso_unitario: '',
         qtd_por_pallet: '',
+        peso_pallet: '',
         ativo: true
       })
     }
@@ -124,14 +127,20 @@ export default function ProdutosAdmin() {
     try {
       setSalvando(true)
 
+      // Calcular peso_pallet automaticamente
+      const pesoUnitario = parseFloat(formData.peso_unitario)
+      const qtdPorPallet = parseInt(formData.qtd_por_pallet)
+      const pesoPallet = pesoUnitario * qtdPorPallet
+
       const dados = {
         produto: formData.produto.trim(),
         classe: formData.classe.trim(),
         mpa: formData.mpa.trim(),
         codigo_sistema: formData.codigo_sistema.trim(),
         preco: parseFloat(formData.preco),
-        peso_unitario: parseFloat(formData.peso_unitario),
-        qtd_por_pallet: parseInt(formData.qtd_por_pallet),
+        peso_unitario: pesoUnitario,
+        qtd_por_pallet: qtdPorPallet,
+        peso_pallet: pesoPallet,
         ativo: formData.ativo
       }
 
@@ -468,6 +477,15 @@ export default function ProdutosAdmin() {
                   )}
                 </div>
               </div>
+
+              {/* Preview Peso do Pallet */}
+              {formData.peso_unitario && formData.qtd_por_pallet && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-900">
+                    <strong>Peso do Pallet (calculado):</strong> {(parseFloat(formData.peso_unitario) * parseInt(formData.qtd_por_pallet)).toFixed(2)} kg
+                  </p>
+                </div>
+              )}
 
               {/* Ativo */}
               <div className="flex items-center gap-2">
