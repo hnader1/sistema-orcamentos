@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Package, Users, Truck, Settings } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
-import ProdutosAdmin from '../components/admin/ProdutosAdmin'
-import UsuariosAdmin from '../components/admin/UsuariosAdmin'
-import FreteAdmin from '../components/admin/FreteAdmin'
+import ProdutosAdmin from '../components/admin/ProdutosAdmin.jsx'
+import UsuariosAdmin from '../components/admin/UsuariosAdmin.jsx'
+import FreteAdmin from '../components/admin/FreteAdmin.jsx'
 
 export default function Admin() {
   const navigate = useNavigate()
