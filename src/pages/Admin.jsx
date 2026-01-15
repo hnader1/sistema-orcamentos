@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Package, Users, Truck, BarChart3, ArrowLeft, Settings } from 'lucide-react'
+import { Package, Users, Truck, BarChart3, ArrowLeft, Settings, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
 
@@ -64,6 +64,15 @@ export default function Admin() {
       cor: 'from-orange-500 to-orange-600',
       rota: '/admin/frete',
       stats: 'Tabela de preços'
+    },
+    {
+      id: 'concorrencia',
+      titulo: 'Concorrência Interna',
+      descricao: 'Análise de conflitos',
+      icone: AlertTriangle,
+      cor: 'from-yellow-500 to-orange-600',
+      rota: '/relatorios/orcamentos',
+      stats: 'Orçamentos sem CNPJ/CPF'
     }
   ]
 
