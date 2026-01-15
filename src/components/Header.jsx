@@ -50,7 +50,7 @@ export default function Header() {
             {/* Link de Painel Gerencial (só para Admin e Comercial Interno) */}
             {podeAcessarLancamento() && (
               <button
-                onClick={() => navigate('/admin/dashboard')}
+                onClick={() => navigate('/admin')}
                 className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Painel Gerencial"
               >
