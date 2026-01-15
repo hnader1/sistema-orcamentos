@@ -187,7 +187,7 @@ export const buscarCidadesMG = async (termoBusca = '') => {
       query = query.ilike('nome', `%${termoBusca}%`);
     }
 
-    const { data, error } = await query.limit(50);
+    const { data, error } = await query;
 
     if (error) throw error;
 
