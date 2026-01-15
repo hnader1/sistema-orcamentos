@@ -1,20 +1,16 @@
 // src/utils/concorrenciaUtils.js
-// Última atualização: 15/01/2026 13:15 - Fix verificação concorrência
+// VERSÃO COM LOGS DETALHADOS PARA DEBUG
 
 import { supabase } from '../services/supabase';
 
-/**
- * Verifica se existe concorrência interna para um orçamento
- * @param {object} dadosOrcamento - Dados do orçamento (cnpj_cpf, obra_cidade, obra_bairro)
- * @param {string} vendedorAtualId - ID do vendedor que está criando o orçamento
- * @param {string} orcamentoIdAtual - ID do orçamento atual (para edição, opcional)
- * @returns {object} Resultado da verificação
- */
 export const verificarConcorrenciaInterna = async (
   dadosOrcamento, 
   vendedorAtualId,
   orcamentoIdAtual = null
 ) => {
+  console.log('🔵 [INICIO] verificarConcorrenciaInterna chamada');
+  console.log('📥 Dados recebidos:', { dadosOrcamento, vendedorAtualId, orcamentoIdAtual });
+  
   try {
     const conflitos = [];
     const data180DiasAtras = new Date();
@@ -44,20 +40,30 @@ export const verificarConcorrenciaInterna = async (
         .gte('created_at', data180DiasAtras.toISOString())
         .in('status', ['rascunho', 'enviado', 'aprovado']);
 
-      // Se estiver editando, ignora o próprio orçamento
       if (orcamentoIdAtual) {
         queryCNPJ = queryCNPJ.neq('id', orcamentoIdAtual);
       }
 
+      console.log('📤 Executando query CNPJ...');
       const { data: conflitosCNPJ, error: erroCNPJ } = await queryCNPJ;
+
+      console.log('📥 Resposta da query CNPJ:', { 
+        sucesso: !erroCNPJ, 
+        erro: erroCNPJ, 
+        resultados: conflitosCNPJ?.length || 0,
+        dados: conflitosCNPJ
+      });
 
       if (erroCNPJ) {
         console.error('❌ Erro ao verificar CNPJ/CPF:', erroCNPJ);
+        console.error('❌ Detalhes do erro:', JSON.stringify(erroCNPJ, null, 2));
       } else {
         console.log('✅ Query CNPJ executada. Resultados:', conflitosCNPJ?.length || 0);
       }
 
       if (conflitosCNPJ && conflitosCNPJ.length > 0) {
+        console.log('⚠️ CONFLITOS ENCONTRADOS POR CNPJ:', conflitosCNPJ);
+        
         conflitos.push({
           tipo: 'CRITICO',
           nivel: '🔴',
@@ -72,6 +78,8 @@ export const verificarConcorrenciaInterna = async (
           prioridade: 1
         });
       }
+    } else {
+      console.log('⏭️ Pulando verificação de CNPJ (não informado ou checkbox marcado)');
     }
 
     // 2. VERIFICAÇÃO ATENÇÃO: Mesma Localização (Cidade + Bairro)
@@ -100,18 +108,24 @@ export const verificarConcorrenciaInterna = async (
         .gte('created_at', data180DiasAtras.toISOString())
         .in('status', ['rascunho', 'enviado', 'aprovado']);
 
-      // Se estiver editando, ignora o próprio orçamento
       if (orcamentoIdAtual) {
         queryLocal = queryLocal.neq('id', orcamentoIdAtual);
       }
 
-      // Exclui orçamentos que já foram detectados na verificação de CNPJ/CPF
       const idsJaDetectados = conflitos.flatMap(c => c.orcamentos.map(o => o.id));
       if (idsJaDetectados.length > 0) {
         queryLocal = queryLocal.not('id', 'in', `(${idsJaDetectados.join(',')})`);
       }
 
+      console.log('📤 Executando query localização...');
       const { data: conflitosLocal, error: erroLocal } = await queryLocal;
+
+      console.log('📥 Resposta da query localização:', {
+        sucesso: !erroLocal,
+        erro: erroLocal,
+        resultados: conflitosLocal?.length || 0,
+        dados: conflitosLocal
+      });
 
       if (erroLocal) {
         console.error('❌ Erro ao verificar localização:', erroLocal);
@@ -120,6 +134,8 @@ export const verificarConcorrenciaInterna = async (
       }
 
       if (conflitosLocal && conflitosLocal.length > 0) {
+        console.log('⚠️ CONFLITOS ENCONTRADOS POR LOCALIZAÇÃO:', conflitosLocal);
+        
         conflitos.push({
           tipo: 'ATENCAO',
           nivel: '🟡',
@@ -135,9 +151,10 @@ export const verificarConcorrenciaInterna = async (
           prioridade: 2
         });
       }
+    } else {
+      console.log('⏭️ Pulando verificação de localização (cidade ou bairro não informados)');
     }
 
-    // Ordena conflitos por prioridade (críticos primeiro)
     conflitos.sort((a, b) => a.prioridade - b.prioridade);
 
     const resultado = {
@@ -146,11 +163,19 @@ export const verificarConcorrenciaInterna = async (
       totalConflitos: conflitos.reduce((acc, c) => acc + c.orcamentos.length, 0)
     };
 
-    console.log('🎯 Resultado da verificação:', resultado);
+    console.log('🎯 [FIM] Resultado da verificação:', resultado);
+    
+    if (resultado.temConflito) {
+      console.log('⚠️⚠️⚠️ CONFLITOS DETECTADOS:', resultado.totalConflitos);
+    } else {
+      console.log('✅✅✅ Nenhum conflito detectado');
+    }
+    
     return resultado;
 
   } catch (error) {
-    console.error('❌ Erro ao verificar concorrência:', error);
+    console.error('❌❌❌ ERRO FATAL ao verificar concorrência:', error);
+    console.error('Stack trace:', error.stack);
     return {
       temConflito: false,
       conflitos: [],
@@ -159,31 +184,19 @@ export const verificarConcorrenciaInterna = async (
   }
 };
 
-/**
- * Formata CNPJ/CPF para exibição
- */
 export const formatarCNPJCPFExibicao = (cnpjCpf) => {
   if (!cnpjCpf) return 'Não informado';
-  
   const apenasNumeros = cnpjCpf.replace(/\D/g, '');
-  
   if (apenasNumeros.length === 11) {
-    // CPF: 000.000.000-00
     return apenasNumeros.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   } else if (apenasNumeros.length === 14) {
-    // CNPJ: 00.000.000/0000-00
     return apenasNumeros.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
   }
-  
   return cnpjCpf;
 };
 
-/**
- * Formata data para exibição
- */
 export const formatarDataExibicao = (dataISO) => {
   if (!dataISO) return '-';
-  
   const data = new Date(dataISO);
   return data.toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -192,12 +205,8 @@ export const formatarDataExibicao = (dataISO) => {
   });
 };
 
-/**
- * Formata valor monetário para exibição
- */
 export const formatarValorExibicao = (valor) => {
   if (!valor) return 'R$ 0,00';
-  
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
