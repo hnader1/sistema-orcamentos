@@ -6,6 +6,10 @@ import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
+import CNPJCPFForm from '../components/CNPJCPFForm'
+import EnderecoObraForm from '../components/EnderecoObraForm'
+import { verificarConcorrenciaInterna } from '../utils/concorrenciaUtils'
+import ModalAlertaConcorrencia from '../components/ModalAlertaConcorrencia'
 
 const TABELA_ITENS = 'orcamentos_itens'
 
@@ -20,7 +24,11 @@ export default function OrcamentoForm() {
   const [dadosFrete, setDadosFrete] = useState(null)
   const [mostrarProposta, setMostrarProposta] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(false)
-  
+  const [dadosCNPJCPF, setDadosCNPJCPF] = useState(null)
+  const [dadosEndereco, setDadosEndereco] = useState(null)
+  const [cnpjCpfValido, setCnpjCpfValido] = useState(false)
+  const [conflitosDetectados, setConflitosDetectados] = useState(null)
+  const [mostrarAlertaConcorrencia, setMostrarAlertaConcorrencia] = useState(false)
   const [descontoLiberado, setDescontoLiberado] = useState(false)
   const [mostrarModalSenha, setMostrarModalSenha] = useState(false)
   const [senhaDigitada, setSenhaDigitada] = useState('')
@@ -49,6 +57,18 @@ export default function OrcamentoForm() {
     status: 'rascunho',
     numero_lancamento_erp: '',
     usuario_id_original: null
+    cnpj_cpf: null,
+    cnpj_cpf_nao_informado: false,
+    cnpj_cpf_nao_informado_aceite_data: null,
+    cnpj_cpf_nao_informado_aceite_ip: null,
+    obra_cep: '',
+    obra_cidade: '',
+    obra_bairro: '',
+    obra_logradouro: '',
+    obra_numero: '',
+    obra_complemento: '',
+    obra_endereco_validado: false
+
   })
 
   const carregarVendedores = async () => {
@@ -112,6 +132,16 @@ export default function OrcamentoForm() {
     calcularDataValidade()
   }, [formData.data_orcamento, formData.validade_dias])
 
+  useEffect(() => {
+  // Verifica concorrência quando CNPJ/CPF ou endereço mudam
+  if (dadosCNPJCPF || dadosEndereco) {
+    const timer = setTimeout(() => {
+      verificarConcorrencia()
+    }, 1000) // Aguarda 1 segundo após última mudança
+
+    return () => clearTimeout(timer)
+  }
+}, [dadosCNPJCPF, dadosEndereco])
   const calcularDataValidade = () => {
     if (formData.data_orcamento && formData.validade_dias) {
       const dataOrc = new Date(formData.data_orcamento)
@@ -198,6 +228,16 @@ export default function OrcamentoForm() {
         status: orc.status || 'rascunho',
         numero_lancamento_erp: orc.numero_lancamento_erp || '',
         usuario_id_original: orc.usuario_id
+        cnpj_cpf: orc.cnpj_cpf || null,
+        cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null,
+        obra_cep: orc.obra_cep || '',
+        obra_cidade: orc.obra_cidade || '',
+        obra_bairro: orc.obra_bairro || '',
+        obra_logradouro: orc.obra_logradouro || '',
+        obra_numero: orc.obra_numero || '',
+        obra_complemento: orc.obra_complemento || '',
+        obra_endereco_validado: orc.obra_endereco_validado || false
       })
 
       if (orc.desconto_geral > LIMITE_DESCONTO) {
@@ -586,6 +626,17 @@ export default function OrcamentoForm() {
         observacoes: formData.observacoes,
         status: formData.status,
         numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null
+       cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
+  cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
+  cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
+  cnpj_cpf_nao_informado_aceite_ip: null, // Pode adicionar lógica para capturar IP
+  obra_cep: dadosEndereco?.obra_cep || null,
+  obra_cidade: dadosEndereco?.obra_cidade || null,
+  obra_bairro: dadosEndereco?.obra_bairro || null,
+  obra_logradouro: dadosEndereco?.obra_logradouro || null,
+  obra_numero: dadosEndereco?.obra_numero || null,
+  obra_complemento: dadosEndereco?.obra_complemento || null,
+  obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
       }
 
       if (!id) {
@@ -637,7 +688,34 @@ export default function OrcamentoForm() {
         orcamentoId = data.id
         console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
       }
+const verificarConcorrencia = async () => {
+  if (!dadosCNPJCPF?.cnpj_cpf && !dadosEndereco?.obra_cidade) {
+    return // Sem dados suficientes para verificar
+  }
 
+  try {
+    const resultado = await verificarConcorrenciaInterna(
+      {
+        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
+        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado,
+        obra_cidade: dadosEndereco?.obra_cidade,
+        obra_bairro: dadosEndereco?.obra_bairro
+      },
+      user?.id,
+      id // ID do orçamento atual (para edição)
+    )
+
+    if (resultado.temConflito) {
+      setConflitosDetectados(resultado)
+      setMostrarAlertaConcorrencia(true)
+      console.log('⚠️ Conflitos detectados:', resultado.totalConflitos)
+    } else {
+      console.log('✅ Nenhum conflito detectado')
+    }
+  } catch (error) {
+    console.error('Erro ao verificar concorrência:', error)
+  }
+}
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcamentoId,
         produto_id: item.produto_id,
@@ -919,72 +997,75 @@ export default function OrcamentoForm() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Dados do Cliente</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-              <input
-                type="text"
-                value={formData.cliente_nome}
-                onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
-              <input
-                type="text"
-                value={formData.cliente_empresa}
-                onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CPF/CNPJ</label>
-              <input
-                type="text"
-                value={formData.cliente_cpf_cnpj}
-                onChange={(e) => setFormData({ ...formData, cliente_cpf_cnpj: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-              <input
-                type="text"
-                value={formData.cliente_telefone}
-                onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={formData.cliente_email}
-                onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">📍 Endereço de Entrega</label>
-              <input
-                type="text"
-                value={formData.endereco_entrega}
-                onChange={(e) => setFormData({ ...formData, endereco_entrega: e.target.value })}
-                placeholder="Rua, número, bairro, cidade - UF, CEP"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-        </div>
+        // ENCONTRE A SEÇÃO "Dados do Cliente" (linha ~850)
+// SUBSTITUA O CONTEÚDO DESSA SEÇÃO POR:
+
+<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+  <CNPJCPFForm
+    valores={formData}
+    onChange={(dados) => {
+      setDadosCNPJCPF(dados)
+      setFormData(prev => ({ ...prev, ...dados }))
+    }}
+    onValidacao={setCnpjCpfValido}
+  />
+</div>
+
+<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+  <h2 className="text-lg font-semibold mb-4">Dados do Cliente</h2>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+      <input
+        type="text"
+        value={formData.cliente_nome}
+        onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        disabled={isReadOnly}
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+      <input
+        type="text"
+        value={formData.cliente_empresa}
+        onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        disabled={isReadOnly}
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+      <input
+        type="text"
+        value={formData.cliente_telefone}
+        onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        disabled={isReadOnly}
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <input
+        type="email"
+        value={formData.cliente_email}
+        onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        disabled={isReadOnly}
+      />
+    </div>
+  </div>
+</div>
+
+<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+  <EnderecoObraForm
+    valores={formData}
+    onChange={(dados) => {
+      setDadosEndereco(dados)
+      setFormData(prev => ({ ...prev, ...dados }))
+    }}
+  />
+</div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -1211,6 +1292,11 @@ export default function OrcamentoForm() {
         dadosOrcamento={formData}
         produtos={produtosSelecionados}
         dadosFrete={dadosFrete}
+      />
+       <ModalAlertaConcorrencia
+        isOpen={mostrarAlertaConcorrencia}
+        onClose={() => setMostrarAlertaConcorrencia(false)}
+        conflitos={conflitosDetectados}
       />
     </div>
   )

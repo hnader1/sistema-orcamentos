@@ -11,6 +11,7 @@ import AdminProdutos from './pages/AdminProdutos'
 import AdminUsuarios from './pages/AdminUsuarios'
 import AdminFrete from './pages/AdminFrete'
 import AdminDashboard from './pages/AdminDashboard'
+import RelatorioOrcamentos from './pages/RelatorioOrcamentos' // ✨ NOVO
 
 function App() {
   return (
@@ -48,6 +49,13 @@ function App() {
           <Route path="/orcamentos/editar/:id" element={
             <ProtectedRoute>
               <OrcamentoForm />
+            </ProtectedRoute>
+          } />
+
+          {/* ✨ NOVA ROTA - Relatório de Concorrência */}
+          <Route path="/relatorios/orcamentos" element={
+            <ProtectedRoute>
+              <RelatorioOrcamentos />
             </ProtectedRoute>
           } />
 

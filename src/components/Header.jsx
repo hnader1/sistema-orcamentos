@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { LogOut, User, Shield, Briefcase } from 'lucide-react'
+import { LogOut, User, Shield, Briefcase, BarChart3 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Header() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, podeAcessarLancamento } = useAuth()
 
   const handleLogout = () => {
     if (confirm('Deseja realmente sair?')) {
@@ -45,8 +45,20 @@ export default function Header() {
             </h1>
           </div>
 
-          {/* User Info + Logout */}
+          {/* User Info + Relatórios + Logout */}
           <div className="flex items-center gap-4">
+            {/* Link de Relatórios (só para Admin e Comercial Interno) */}
+            {podeAcessarLancamento() && (
+              <button
+                onClick={() => navigate('/relatorios/orcamentos')}
+                className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Relatórios de Concorrência"
+              >
+                <BarChart3 size={18} />
+                <span className="hidden sm:inline text-sm font-medium">Relatórios</span>
+              </button>
+            )}
+
             {/* User Info */}
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
