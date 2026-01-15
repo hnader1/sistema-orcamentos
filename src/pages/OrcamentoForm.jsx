@@ -625,18 +625,18 @@ export default function OrcamentoForm() {
         total,
         observacoes: formData.observacoes,
         status: formData.status,
-        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null
-       cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
-  cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
-  cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
-  cnpj_cpf_nao_informado_aceite_ip: null, // Pode adicionar lógica para capturar IP
-  obra_cep: dadosEndereco?.obra_cep || null,
-  obra_cidade: dadosEndereco?.obra_cidade || null,
-  obra_bairro: dadosEndereco?.obra_bairro || null,
-  obra_logradouro: dadosEndereco?.obra_logradouro || null,
-  obra_numero: dadosEndereco?.obra_numero || null,
-  obra_complemento: dadosEndereco?.obra_complemento || null,
-  obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
+        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
+        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
+        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
+        cnpj_cpf_nao_informado_aceite_ip: null, // Pode adicionar lógica para capturar IP
+        obra_cep: dadosEndereco?.obra_cep || null,
+        obra_cidade: dadosEndereco?.obra_cidade || null,
+        obra_bairro: dadosEndereco?.obra_bairro || null,
+        obra_logradouro: dadosEndereco?.obra_logradouro || null,
+        obra_numero: dadosEndereco?.obra_numero || null,
+        obra_complemento: dadosEndereco?.obra_complemento || null,
+        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
       }
 
       if (!id) {
