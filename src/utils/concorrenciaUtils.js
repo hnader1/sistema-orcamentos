@@ -1,4 +1,5 @@
 // src/utils/concorrenciaUtils.js
+// Última atualização: 15/01/2026 13:15 - Fix verificação concorrência
 
 import { supabase } from '../services/supabase';
 
