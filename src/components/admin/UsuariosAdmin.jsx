@@ -149,7 +149,7 @@ export default function UsuariosAdmin() {
 
       // Incluir senha apenas se foi preenchida
       if (formData.senha) {
-        dados.senha = formData.senha
+      dados.senha_hash = formData.senha
       }
 
       if (editando) {
