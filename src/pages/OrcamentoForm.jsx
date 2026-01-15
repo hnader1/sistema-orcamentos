@@ -56,7 +56,7 @@ export default function OrcamentoForm() {
     observacoes: '',
     status: 'rascunho',
     numero_lancamento_erp: '',
-    usuario_id_original: null
+    usuario_id_original: null,
     cnpj_cpf: null,
     cnpj_cpf_nao_informado: false,
     cnpj_cpf_nao_informado_aceite_data: null,
@@ -227,7 +227,7 @@ export default function OrcamentoForm() {
         observacoes: orc.observacoes || '',
         status: orc.status || 'rascunho',
         numero_lancamento_erp: orc.numero_lancamento_erp || '',
-        usuario_id_original: orc.usuario_id
+        usuario_id_original: orc.usuario_id,
         cnpj_cpf: orc.cnpj_cpf || null,
         cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
         cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null,
