@@ -108,7 +108,35 @@ export default function OrcamentoForm() {
       }))
     }
   }
+// ADICIONAR ESTA FUNÇÃO (por volta da linha 400-450, antes dos useEffects)
+const verificarConcorrencia = async () => {
+  if (!dadosCNPJCPF?.cnpj_cpf && !dadosEndereco?.obra_cidade) {
+    return // Sem dados suficientes para verificar
+  }
 
+  try {
+    const resultado = await verificarConcorrenciaInterna(
+      {
+        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
+        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado,
+        obra_cidade: dadosEndereco?.obra_cidade,
+        obra_bairro: dadosEndereco?.obra_bairro
+      },
+      user?.id,
+      id // ID do orçamento atual (para edição)
+    )
+
+    if (resultado.temConflito) {
+      setConflitosDetectados(resultado)
+      setMostrarAlertaConcorrencia(true)
+      console.log('⚠️ Conflitos detectados:', resultado.totalConflitos)
+    } else {
+      console.log('✅ Nenhum conflito detectado')
+    }
+  } catch (error) {
+    console.error('Erro ao verificar concorrência:', error)
+  }
+}
   useEffect(() => {
     carregarProdutos()
     carregarVendedores()

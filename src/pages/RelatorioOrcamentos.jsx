@@ -46,28 +46,18 @@ export default function RelatorioOrcamentos() {
       const dataInicio = new Date();
       dataInicio.setDate(dataInicio.getDate() - parseInt(periodo));
 
-      // 1. Busca todos os orçamentos do período
+      // Busca todos os orçamentos do período
       const { data: orcamentos, error: errorOrc } = await supabase
-        .from('orcamentos')
-        .select(`
-          id,
-          numero_orcamento,
-          cliente_nome,
-          cnpj_cpf,
-          cnpj_cpf_nao_informado,
-          obra_cidade,
-          obra_bairro,
-          status,
-          valor_total,
-          created_at,
-          vendedor_id,
-          vendedores!inner(nome)
-        `)
-        .gte('created_at', dataInicio.toISOString())
-        .neq('status', 'cancelado')
-        .order('created_at', { ascending: false });
+      .from('orcamentos')
+      .select('*')  // ← MUDEI PARA SELECT * (simples)
+      .gte('created_at', dataInicio.toISOString())
+      .neq('status', 'cancelado')
+      .order('created_at', { ascending: false });
 
-      if (errorOrc) throw errorOrc;
+  if (errorOrc) {
+      console.error('Erro ao carregar orçamentos:', errorOrc);
+  throw errorOrc;
+  }
 
       // 2. Calcula estatísticas
       const total = orcamentos?.length || 0;
@@ -77,7 +67,7 @@ export default function RelatorioOrcamentos() {
       // 3. Agrupa por vendedor
       const porVendedor = {};
       orcamentos?.forEach(orc => {
-        const vendedor = orc.vendedores?.nome || 'Não informado';
+        const vendedor = orc.vendedor || 'Não informado';
         if (!porVendedor[vendedor]) {
           porVendedor[vendedor] = {
             nome: vendedor,
@@ -121,7 +111,7 @@ export default function RelatorioOrcamentos() {
       ...orcamentosSemCNPJ.map(orc => [
         orc.numero_orcamento,
         orc.cliente_nome || 'Não informado',
-        orc.vendedores?.nome || 'Não informado',
+        orc.vendedor || 'Não informado',
         orc.status,
         orc.obra_cidade || '-',
         orc.obra_bairro || '-',
@@ -360,7 +350,7 @@ export default function RelatorioOrcamentos() {
                             {orc.cliente_nome || 'Não informado'}
                           </td>
                           <td className="px-4 py-3 text-gray-600">
-                            {orc.vendedores?.nome || 'Não informado'}
+                            {orc.vendedor || 'Não informado'}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
