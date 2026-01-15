@@ -1,6 +1,6 @@
 // src/utils/concorrenciaUtils.js
 
-import { supabase } from '..//services/supabase';
+import { supabase } from '../services/supabase';
 
 /**
  * Verifica se existe concorrência interna para um orçamento
@@ -27,19 +27,19 @@ export const verificarConcorrenciaInterna = async (
         .from('orcamentos')
         .select(`
           id,
-          numero_orcamento,
+          numero,
           cliente_nome,
           cnpj_cpf,
           obra_cidade,
           obra_bairro,
           status,
-          valor_total,
+          total,
           created_at,
-          vendedor_id,
-          vendedores!inner(nome)
+          usuario_id,
+          usuarios!inner(nome)
         `)
         .eq('cnpj_cpf', dadosOrcamento.cnpj_cpf)
-        .neq('vendedor_id', vendedorAtualId)
+        .neq('usuario_id', vendedorAtualId)
         .gte('created_at', data180DiasAtras.toISOString())
         .in('status', ['rascunho', 'enviado', 'aprovado']);
 
@@ -51,7 +51,9 @@ export const verificarConcorrenciaInterna = async (
       const { data: conflitosCNPJ, error: erroCNPJ } = await queryCNPJ;
 
       if (erroCNPJ) {
-        console.error('Erro ao verificar CNPJ/CPF:', erroCNPJ);
+        console.error('❌ Erro ao verificar CNPJ/CPF:', erroCNPJ);
+      } else {
+        console.log('✅ Query CNPJ executada. Resultados:', conflitosCNPJ?.length || 0);
       }
 
       if (conflitosCNPJ && conflitosCNPJ.length > 0) {
@@ -60,7 +62,12 @@ export const verificarConcorrenciaInterna = async (
           nivel: '🔴',
           titulo: 'CONCORRÊNCIA CRÍTICA - Mesmo CNPJ/CPF',
           mensagem: `Este cliente (CNPJ/CPF: ${dadosOrcamento.cnpj_cpf}) já possui ${conflitosCNPJ.length} orçamento(s) ativo(s) com outro(s) vendedor(es).`,
-          orcamentos: conflitosCNPJ,
+          orcamentos: conflitosCNPJ.map(orc => ({
+            ...orc,
+            numero_orcamento: orc.numero,
+            valor_total: orc.total,
+            vendedores: orc.usuarios
+          })),
           prioridade: 1
         });
       }
@@ -74,21 +81,21 @@ export const verificarConcorrenciaInterna = async (
         .from('orcamentos')
         .select(`
           id,
-          numero_orcamento,
+          numero,
           cliente_nome,
           cnpj_cpf,
           obra_cidade,
           obra_bairro,
           obra_logradouro,
           status,
-          valor_total,
+          total,
           created_at,
-          vendedor_id,
-          vendedores!inner(nome)
+          usuario_id,
+          usuarios!inner(nome)
         `)
         .eq('obra_cidade', dadosOrcamento.obra_cidade)
         .eq('obra_bairro', dadosOrcamento.obra_bairro)
-        .neq('vendedor_id', vendedorAtualId)
+        .neq('usuario_id', vendedorAtualId)
         .gte('created_at', data180DiasAtras.toISOString())
         .in('status', ['rascunho', 'enviado', 'aprovado']);
 
@@ -106,7 +113,9 @@ export const verificarConcorrenciaInterna = async (
       const { data: conflitosLocal, error: erroLocal } = await queryLocal;
 
       if (erroLocal) {
-        console.error('Erro ao verificar localização:', erroLocal);
+        console.error('❌ Erro ao verificar localização:', erroLocal);
+      } else {
+        console.log('✅ Query localização executada. Resultados:', conflitosLocal?.length || 0);
       }
 
       if (conflitosLocal && conflitosLocal.length > 0) {
@@ -116,7 +125,12 @@ export const verificarConcorrenciaInterna = async (
           titulo: 'ATENÇÃO - Mesma Localização',
           mensagem: `Encontrado(s) ${conflitosLocal.length} orçamento(s) para o mesmo local (${dadosOrcamento.obra_cidade} - ${dadosOrcamento.obra_bairro}) com outro(s) vendedor(es).`,
           detalhes: 'Pode ser a mesma obra com cliente diferente (obra por administração).',
-          orcamentos: conflitosLocal,
+          orcamentos: conflitosLocal.map(orc => ({
+            ...orc,
+            numero_orcamento: orc.numero,
+            valor_total: orc.total,
+            vendedores: orc.usuarios
+          })),
           prioridade: 2
         });
       }
@@ -125,14 +139,17 @@ export const verificarConcorrenciaInterna = async (
     // Ordena conflitos por prioridade (críticos primeiro)
     conflitos.sort((a, b) => a.prioridade - b.prioridade);
 
-    return {
+    const resultado = {
       temConflito: conflitos.length > 0,
       conflitos: conflitos,
       totalConflitos: conflitos.reduce((acc, c) => acc + c.orcamentos.length, 0)
     };
 
+    console.log('🎯 Resultado da verificação:', resultado);
+    return resultado;
+
   } catch (error) {
-    console.error('Erro ao verificar concorrência:', error);
+    console.error('❌ Erro ao verificar concorrência:', error);
     return {
       temConflito: false,
       conflitos: [],

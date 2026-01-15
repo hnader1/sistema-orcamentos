@@ -183,16 +183,8 @@ useEffect(() => {
     calcularDataValidade()
   }, [formData.data_orcamento, formData.validade_dias])
 
-  useEffect(() => {
-  // Verifica concorrência quando CNPJ/CPF ou endereço mudam
-  if (dadosCNPJCPF || dadosEndereco) {
-    const timer = setTimeout(() => {
-      verificarConcorrencia()
-    }, 1000) // Aguarda 1 segundo após última mudança
 
-    return () => clearTimeout(timer)
-  }
-}, [dadosCNPJCPF, dadosEndereco])
+
   const calcularDataValidade = () => {
     if (formData.data_orcamento && formData.validade_dias) {
       const dataOrc = new Date(formData.data_orcamento)
@@ -739,10 +731,6 @@ useEffect(() => {
         orcamentoId = data.id
         console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
       }
-const verificarConcorrencia = async () => {
-  if (!dadosCNPJCPF?.cnpj_cpf && !dadosEndereco?.obra_cidade) {
-    return // Sem dados suficientes para verificar
-  }
 
   try {
     const resultado = await verificarConcorrenciaInterna(
