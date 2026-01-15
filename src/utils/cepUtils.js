@@ -1,6 +1,6 @@
 // src/utils/cepUtils.js
 
-import { supabase } from '../supabaseClient';
+import { supabase } from '../services/supabase';
 
 /**
  * Busca CEP na API e atualiza banco de dados

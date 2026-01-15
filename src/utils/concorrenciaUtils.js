@@ -1,6 +1,6 @@
 // src/utils/concorrenciaUtils.js
 
-import { supabase } from '../supabaseClient';
+import { supabase } from '..//services/supabase';
 
 /**
  * Verifica se existe concorrência interna para um orçamento
