@@ -1,5 +1,5 @@
 // src/utils/concorrenciaUtils.js
-// VERSÃO COM LOGS DETALHADOS PARA DEBUG
+// VERSÃO FINAL CORRIGIDA - Especifica qual FK usar
 
 import { supabase } from '../services/supabase';
 
@@ -8,9 +8,6 @@ export const verificarConcorrenciaInterna = async (
   vendedorAtualId,
   orcamentoIdAtual = null
 ) => {
-  console.log('🔵 [INICIO] verificarConcorrenciaInterna chamada');
-  console.log('📥 Dados recebidos:', { dadosOrcamento, vendedorAtualId, orcamentoIdAtual });
-  
   try {
     const conflitos = [];
     const data180DiasAtras = new Date();
@@ -20,6 +17,7 @@ export const verificarConcorrenciaInterna = async (
     if (dadosOrcamento.cnpj_cpf && !dadosOrcamento.cnpj_cpf_nao_informado) {
       console.log('🔍 Verificando CNPJ/CPF:', dadosOrcamento.cnpj_cpf);
       
+      // ⚠️ MUDANÇA: Especificar qual FK usar com "usuarios:usuario_id"
       let queryCNPJ = supabase
         .from('orcamentos')
         .select(`
@@ -33,7 +31,7 @@ export const verificarConcorrenciaInterna = async (
           total,
           created_at,
           usuario_id,
-          usuarios!inner(nome)
+          usuarios:usuario_id!inner(nome)
         `)
         .eq('cnpj_cpf', dadosOrcamento.cnpj_cpf)
         .neq('usuario_id', vendedorAtualId)
@@ -44,26 +42,15 @@ export const verificarConcorrenciaInterna = async (
         queryCNPJ = queryCNPJ.neq('id', orcamentoIdAtual);
       }
 
-      console.log('📤 Executando query CNPJ...');
       const { data: conflitosCNPJ, error: erroCNPJ } = await queryCNPJ;
-
-      console.log('📥 Resposta da query CNPJ:', { 
-        sucesso: !erroCNPJ, 
-        erro: erroCNPJ, 
-        resultados: conflitosCNPJ?.length || 0,
-        dados: conflitosCNPJ
-      });
 
       if (erroCNPJ) {
         console.error('❌ Erro ao verificar CNPJ/CPF:', erroCNPJ);
-        console.error('❌ Detalhes do erro:', JSON.stringify(erroCNPJ, null, 2));
       } else {
         console.log('✅ Query CNPJ executada. Resultados:', conflitosCNPJ?.length || 0);
       }
 
       if (conflitosCNPJ && conflitosCNPJ.length > 0) {
-        console.log('⚠️ CONFLITOS ENCONTRADOS POR CNPJ:', conflitosCNPJ);
-        
         conflitos.push({
           tipo: 'CRITICO',
           nivel: '🔴',
@@ -78,14 +65,13 @@ export const verificarConcorrenciaInterna = async (
           prioridade: 1
         });
       }
-    } else {
-      console.log('⏭️ Pulando verificação de CNPJ (não informado ou checkbox marcado)');
     }
 
     // 2. VERIFICAÇÃO ATENÇÃO: Mesma Localização (Cidade + Bairro)
     if (dadosOrcamento.obra_cidade && dadosOrcamento.obra_bairro) {
       console.log('📍 Verificando localização:', dadosOrcamento.obra_cidade, '-', dadosOrcamento.obra_bairro);
       
+      // ⚠️ MUDANÇA: Especificar qual FK usar com "usuarios:usuario_id"
       let queryLocal = supabase
         .from('orcamentos')
         .select(`
@@ -100,7 +86,7 @@ export const verificarConcorrenciaInterna = async (
           total,
           created_at,
           usuario_id,
-          usuarios!inner(nome)
+          usuarios:usuario_id!inner(nome)
         `)
         .eq('obra_cidade', dadosOrcamento.obra_cidade)
         .eq('obra_bairro', dadosOrcamento.obra_bairro)
@@ -117,15 +103,7 @@ export const verificarConcorrenciaInterna = async (
         queryLocal = queryLocal.not('id', 'in', `(${idsJaDetectados.join(',')})`);
       }
 
-      console.log('📤 Executando query localização...');
       const { data: conflitosLocal, error: erroLocal } = await queryLocal;
-
-      console.log('📥 Resposta da query localização:', {
-        sucesso: !erroLocal,
-        erro: erroLocal,
-        resultados: conflitosLocal?.length || 0,
-        dados: conflitosLocal
-      });
 
       if (erroLocal) {
         console.error('❌ Erro ao verificar localização:', erroLocal);
@@ -134,8 +112,6 @@ export const verificarConcorrenciaInterna = async (
       }
 
       if (conflitosLocal && conflitosLocal.length > 0) {
-        console.log('⚠️ CONFLITOS ENCONTRADOS POR LOCALIZAÇÃO:', conflitosLocal);
-        
         conflitos.push({
           tipo: 'ATENCAO',
           nivel: '🟡',
@@ -151,8 +127,6 @@ export const verificarConcorrenciaInterna = async (
           prioridade: 2
         });
       }
-    } else {
-      console.log('⏭️ Pulando verificação de localização (cidade ou bairro não informados)');
     }
 
     conflitos.sort((a, b) => a.prioridade - b.prioridade);
@@ -163,19 +137,11 @@ export const verificarConcorrenciaInterna = async (
       totalConflitos: conflitos.reduce((acc, c) => acc + c.orcamentos.length, 0)
     };
 
-    console.log('🎯 [FIM] Resultado da verificação:', resultado);
-    
-    if (resultado.temConflito) {
-      console.log('⚠️⚠️⚠️ CONFLITOS DETECTADOS:', resultado.totalConflitos);
-    } else {
-      console.log('✅✅✅ Nenhum conflito detectado');
-    }
-    
+    console.log('🎯 Resultado da verificação:', resultado);
     return resultado;
 
   } catch (error) {
-    console.error('❌❌❌ ERRO FATAL ao verificar concorrência:', error);
-    console.error('Stack trace:', error.stack);
+    console.error('❌ Erro ao verificar concorrência:', error);
     return {
       temConflito: false,
       conflitos: [],
