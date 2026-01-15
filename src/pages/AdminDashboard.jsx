@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, BarChart3, TrendingUp, Package, DollarSign, Calendar, Download } from 'lucide-react'
+import { ArrowLeft, BarChart3, TrendingUp, Package, DollarSign, Calendar, Download, AlertTriangle } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import Header from '../components/Header'
 import { useAuth } from '../contexts/AuthContext'
@@ -213,6 +213,31 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* ✨ NOVO CARD - Concorrência Interna */}
+            <div 
+              onClick={() => navigate('/relatorios/orcamentos')}
+              className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-4 bg-orange-500 rounded-xl shadow-md">
+                    <AlertTriangle className="text-white" size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Concorrência Interna</h3>
+                    <p className="text-gray-700 mt-1">
+                      Análise de conflitos entre vendedores • Orçamentos sem CNPJ/CPF
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <button className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md">
+                    Ver Relatório →
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Cards de Resumo */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">

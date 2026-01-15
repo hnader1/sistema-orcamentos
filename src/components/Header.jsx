@@ -45,17 +45,17 @@ export default function Header() {
             </h1>
           </div>
 
-          {/* User Info + Relatórios + Logout */}
+          {/* User Info + Painel Gerencial + Logout */}
           <div className="flex items-center gap-4">
-            {/* Link de Relatórios (só para Admin e Comercial Interno) */}
+            {/* Link de Painel Gerencial (só para Admin e Comercial Interno) */}
             {podeAcessarLancamento() && (
               <button
-                onClick={() => navigate('/relatorios/orcamentos')}
+                onClick={() => navigate('/admin/dashboard')}
                 className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Relatórios de Concorrência"
+                title="Painel Gerencial"
               >
                 <BarChart3 size={18} />
-                <span className="hidden sm:inline text-sm font-medium">Relatórios</span>
+                <span className="hidden sm:inline text-sm font-medium">Painel Gerencial</span>
               </button>
             )}
 
