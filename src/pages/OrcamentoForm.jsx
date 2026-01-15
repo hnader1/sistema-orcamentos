@@ -1014,6 +1014,9 @@ const salvar = async () => {
 
 
 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+  <h2 className="text-lg font-semibold mb-4">Dados do Cliente</h2>
+  
+  {/* COMPONENTE CNPJ/CPF INTEGRADO */}
   <CNPJCPFForm
     valores={formData}
     onChange={(dados) => {
@@ -1022,11 +1025,9 @@ const salvar = async () => {
     }}
     onValidacao={setCnpjCpfValido}
   />
-</div>
 
-<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-  <h2 className="text-lg font-semibold mb-4">Dados do Cliente</h2>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {/* CAMPOS DE DADOS DO CLIENTE */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
       <input
@@ -1216,92 +1217,102 @@ const salvar = async () => {
           />
         </div>
 
+        {/* ✨ OBSERVAÇÕES E TOTAIS LADO A LADO */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="max-w-md ml-auto space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal (sem desconto):</span>
-              <span className="font-medium">
-                R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <label className="text-sm text-gray-600 flex items-center gap-1">
-                Desconto (%):
-                {!descontoLiberado && (
-                  <span className="text-xs text-yellow-600 flex items-center gap-0.5">
-                    <Lock size={10} /> máx {LIMITE_DESCONTO}%
-                  </span>
-                )}
-                {descontoLiberado && (
-                  <span className="text-xs text-green-600">✓ liberado</span>
-                )}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                max={descontoLiberado ? 100 : LIMITE_DESCONTO}
-                value={formData.desconto_geral}
-                onChange={(e) => handleDescontoChange(e.target.value)}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* COLUNA ESQUERDA - OBSERVAÇÕES */}
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Observações</h2>
+              <textarea
+                value={formData.observacoes}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                rows="10"
                 disabled={isReadOnly}
-                className={`w-20 px-2 py-1 border rounded text-center text-sm ${
-                  formData.desconto_geral > LIMITE_DESCONTO 
-                    ? 'border-yellow-400 bg-yellow-50' 
-                    : 'border-gray-300'
-                }`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Observações adicionais que aparecerão na proposta comercial..."
               />
             </div>
 
-            <div className="flex justify-between text-sm border-t pt-2">
-              <span className="text-gray-700 font-medium">Subtotal de Produtos:</span>
-              <span className="font-semibold">
-                R$ {(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+            {/* COLUNA DIREITA - TOTAIS */}
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Resumo Financeiro</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Subtotal (sem desconto):</span>
+                  <span className="font-medium">
+                    R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
 
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Total Frete:</span>
-              <span className="font-medium">
-                R$ {(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+                <div className="flex justify-between items-center">
+                  <label className="text-sm text-gray-600 flex items-center gap-1">
+                    Desconto (%):
+                    {!descontoLiberado && (
+                      <span className="text-xs text-yellow-600 flex items-center gap-0.5">
+                        <Lock size={10} /> máx {LIMITE_DESCONTO}%
+                      </span>
+                    )}
+                    {descontoLiberado && (
+                      <span className="text-xs text-green-600">✓ liberado</span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    max={descontoLiberado ? 100 : LIMITE_DESCONTO}
+                    value={formData.desconto_geral}
+                    onChange={(e) => handleDescontoChange(e.target.value)}
+                    disabled={isReadOnly}
+                    className={`w-20 px-2 py-1 border rounded text-center text-sm ${
+                      formData.desconto_geral > LIMITE_DESCONTO 
+                        ? 'border-yellow-400 bg-yellow-50' 
+                        : 'border-gray-300'
+                    }`}
+                  />
+                </div>
 
-            <div className="flex justify-between items-center border-t-2 border-blue-200 pt-3 mt-2">
-              <span className="text-lg font-bold text-gray-900">Total Geral:</span>
-              <span className="text-2xl font-bold text-blue-600">
-                R$ {calcularTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+                <div className="flex justify-between text-sm border-t pt-2">
+                  <span className="text-gray-700 font-medium">Subtotal de Produtos:</span>
+                  <span className="font-semibold">
+                    R$ {(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
 
-            {/* ✨ CONDIÇÕES DE PAGAMENTO - LABEL E INPUT NA MESMA LINHA */}
-            <div className="border-t pt-3 mt-3">
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                  Condições de Pagamento <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.condicoes_pagamento}
-                  onChange={(e) => setFormData({ ...formData, condicoes_pagamento: e.target.value })}
-                  placeholder="Ex: 28 DIAS, À VISTA, 30/60/90..."
-                  disabled={isReadOnly}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total Frete:</span>
+                  <span className="font-medium">
+                    R$ {(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center border-t-2 border-blue-200 pt-3 mt-2">
+                  <span className="text-lg font-bold text-gray-900">Total Geral:</span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    R$ {calcularTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {/* CONDIÇÕES DE PAGAMENTO */}
+                <div className="border-t pt-3 mt-3">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                      Condições de Pagamento <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.condicoes_pagamento}
+                      onChange={(e) => setFormData({ ...formData, condicoes_pagamento: e.target.value })}
+                      placeholder="Ex: 28 DIAS, À VISTA, 30/60/90..."
+                      disabled={isReadOnly}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold mb-4">Observações</h2>
-          <textarea
-            value={formData.observacoes}
-            onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-            rows="3"
-            disabled={isReadOnly}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="Observações adicionais que aparecerão na proposta comercial..."
-          />
+          </div>
         </div>
       </div>
 

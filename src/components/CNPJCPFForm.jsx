@@ -152,19 +152,13 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
   };
 
   return (
-    <div className="space-y-3">
-      {/* Título */}
-      <h3 className="text-lg font-semibold text-gray-700">
-        Dados do Cliente
-      </h3>
-
-      {/* ✨ CAMPO CNPJ/CPF + CHECKBOX NA MESMA LINHA */}
+    <div className="space-y-3 w-full">
+      {/* CAMPO CNPJ/CPF + CHECKBOX NA MESMA LINHA */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           CNPJ/CPF do Cliente <span className="text-red-500">*</span>
         </label>
-        
-        <div className="flex gap-2 items-start">
+        <div className="flex gap-2 items-start w-full">
           {/* Input CNPJ/CPF */}
           <div className="flex-1">
             <input
@@ -183,7 +177,7 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
             )}
           </div>
 
-          {/* Checkbox "Não informar" - ALINHADO À DIREITA */}
+          {/* Checkbox "Não informar" */}
           <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap">
             <input
               type="checkbox"
