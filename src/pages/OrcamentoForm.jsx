@@ -137,6 +137,29 @@ const verificarConcorrencia = async () => {
     console.error('Erro ao verificar concorrência:', error)
   }
 }
+
+// ✨ useEffect para verificar concorrência automaticamente
+useEffect(() => {
+  // Só verifica se não estiver em modo readonly (visualização)
+  if (isReadOnly) return
+  
+  // Só verifica se tiver dados suficientes
+  const temCNPJ = dadosCNPJCPF?.cnpj_cpf && !dadosCNPJCPF?.cnpj_cpf_nao_informado
+  const temLocalizacao = dadosEndereco?.obra_cidade
+  
+  if (!temCNPJ && !temLocalizacao) {
+    return // Precisa de pelo menos um dos dois
+  }
+
+  // Debounce: espera 1 segundo após o usuário parar de digitar
+  const timer = setTimeout(() => {
+    verificarConcorrencia()
+  }, 1000)
+
+  return () => clearTimeout(timer)
+}, [dadosCNPJCPF, dadosEndereco, isReadOnly])
+
+
   useEffect(() => {
     carregarProdutos()
     carregarVendedores()
