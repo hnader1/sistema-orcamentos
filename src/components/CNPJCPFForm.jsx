@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
+function CNPJCPFForm({ valores, onChange, onValidacao }) {
   const [cnpjCpf, setCnpjCpf] = useState(valores?.cnpj_cpf || '');
   const [naoInformar, setNaoInformar] = useState(valores?.cnpj_cpf_nao_informado || false);
   const [aceiteTermos, setAceiteTermos] = useState(false);
@@ -253,6 +253,6 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
       )}
     </div>
   );
-};
+}
 
 export default CNPJCPFForm;

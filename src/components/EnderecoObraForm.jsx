@@ -8,7 +8,7 @@ import {
   buscarBairrosPorCidade 
 } from '../utils/cepUtils';
 
-const EnderecoObraForm = ({ valores, onChange }) => {
+function EnderecoObraForm({ valores, onChange }) {
   const [cep, setCep] = useState(valores?.obra_cep || '');
   const [cidade, setCidade] = useState(valores?.obra_cidade || '');
   const [bairro, setBairro] = useState(valores?.obra_bairro || '');
@@ -318,6 +318,6 @@ const EnderecoObraForm = ({ valores, onChange }) => {
       </div>
     </div>
   );
-};
+}
 
 export default EnderecoObraForm;
