@@ -608,191 +608,181 @@ useEffect(() => {
     }
   }
 
-  const salvar = async () => {
-    try {
-      if (!formData.numero || !formData.cliente_nome) {
-        alert('Preencha os campos obrigatórios!')
-        return
-      }
+ // ESTRUTURA CORRETA DA FUNÇÃO salvar()
 
-      if (produtosSelecionados.length === 0) {
-        alert('Adicione pelo menos um produto!')
-        return
-      }
-
-      const produtoIncompleto = produtosSelecionados.find(
-        p => !p.produto || !p.classe || !p.mpa
-      )
-      if (produtoIncompleto) {
-        alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
-        return
-      }
-
-      if (formData.status === 'lancado' && !formData.numero_lancamento_erp) {
-        alert('Informe o Número de Lançamento no ERP!')
-        return
-      }
-
-      setLoading(true)
-
-      const subtotal = calcularSubtotal()
-      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-      const subtotalComDesconto = subtotal - desconto
-      const frete = dadosFrete?.valor_total_frete || 0
-      const total = subtotalComDesconto + frete
-
-      const dadosOrcamento = {
-        numero: formData.numero,
-        cliente_nome: formData.cliente_nome,
-        cliente_empresa: formData.cliente_empresa,
-        cliente_email: formData.cliente_email,
-        cliente_telefone: formData.cliente_telefone,
-        cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
-        endereco_entrega: formData.endereco_entrega,
-        vendedor: formData.vendedor,
-        vendedor_telefone: formData.vendedor_telefone,
-        vendedor_email: formData.vendedor_email,
-        data_orcamento: formData.data_orcamento,
-        validade_dias: parseInt(formData.validade_dias),
-        data_validade: formData.data_validade,
-        condicoes_pagamento: formData.condicoes_pagamento,
-        prazo_entrega: formData.prazo_entrega,
-        desconto_geral: parseFloat(formData.desconto_geral),
-        subtotal: subtotalComDesconto,
-        frete: frete,
-        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
-        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-        frete_cidade: dadosFrete?.localidade || null,
-        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
-        total,
-        observacoes: formData.observacoes,
-        status: formData.status,
-        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
-        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
-        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
-        cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
-        cnpj_cpf_nao_informado_aceite_ip: null, // Pode adicionar lógica para capturar IP
-        obra_cep: dadosEndereco?.obra_cep || null,
-        obra_cidade: dadosEndereco?.obra_cidade || null,
-        obra_bairro: dadosEndereco?.obra_bairro || null,
-        obra_logradouro: dadosEndereco?.obra_logradouro || null,
-        obra_numero: dadosEndereco?.obra_numero || null,
-        obra_complemento: dadosEndereco?.obra_complemento || null,
-        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
-      }
-
-      if (!id) {
-        dadosOrcamento.usuario_id = user?.id || null
-      } else {
-        dadosOrcamento.usuario_id = formData.usuario_id_original
-      }
-
-      if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
-        dadosOrcamento.data_lancamento = new Date().toISOString()
-      }
-
-      let orcamentoId = id
-
-      if (id) {
-        console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
-        
-        const { error } = await supabase
-          .from('orcamentos')
-          .update(dadosOrcamento)
-          .eq('id', id)
-
-        if (error) throw error
-        console.log('✅ [EDITAR] Orçamento atualizado')
-
-        console.log('🗑️ [EDITAR] Deletando itens antigos...')
-        const { error: errorDelete } = await supabase
-          .from(TABELA_ITENS)
-          .delete()
-          .eq('orcamento_id', id)
-
-        if (errorDelete) {
-          console.error('❌ [EDITAR] Erro ao deletar:', errorDelete)
-          throw errorDelete
-        }
-        console.log('✅ [EDITAR] Itens deletados')
-
-      } else {
-        console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
-        
-        const { data, error } = await supabase
-          .from('orcamentos')
-          .insert([dadosOrcamento])
-          .select()
-          .single()
-
-        if (error) throw error
-        
-        orcamentoId = data.id
-        console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
-      }
-
+const salvar = async () => {
   try {
-    const resultado = await verificarConcorrenciaInterna(
-      {
-        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
-        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado,
-        obra_cidade: dadosEndereco?.obra_cidade,
-        obra_bairro: dadosEndereco?.obra_bairro
-      },
-      user?.id,
-      id // ID do orçamento atual (para edição)
-    )
-
-    if (resultado.temConflito) {
-      setConflitosDetectados(resultado)
-      setMostrarAlertaConcorrencia(true)
-      console.log('⚠️ Conflitos detectados:', resultado.totalConflitos)
-    } else {
-      console.log('✅ Nenhum conflito detectado')
+    // Validações iniciais
+    if (!formData.numero || !formData.cliente_nome) {
+      alert('Preencha os campos obrigatórios!')
+      return
     }
+
+    if (produtosSelecionados.length === 0) {
+      alert('Adicione pelo menos um produto!')
+      return
+    }
+
+    const produtoIncompleto = produtosSelecionados.find(
+      p => !p.produto || !p.classe || !p.mpa
+    )
+    if (produtoIncompleto) {
+      alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
+      return
+    }
+
+    if (formData.status === 'lancado' && !formData.numero_lancamento_erp) {
+      alert('Informe o Número de Lançamento no ERP!')
+      return
+    }
+
+    setLoading(true)
+
+    // Cálculos
+    const subtotal = calcularSubtotal()
+    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+    const subtotalComDesconto = subtotal - desconto
+    const frete = dadosFrete?.valor_total_frete || 0
+    const total = subtotalComDesconto + frete
+
+    // Preparar dados do orçamento
+    const dadosOrcamento = {
+      numero: formData.numero,
+      cliente_nome: formData.cliente_nome,
+      cliente_empresa: formData.cliente_empresa,
+      cliente_email: formData.cliente_email,
+      cliente_telefone: formData.cliente_telefone,
+      cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
+      endereco_entrega: formData.endereco_entrega,
+      vendedor: formData.vendedor,
+      vendedor_telefone: formData.vendedor_telefone,
+      vendedor_email: formData.vendedor_email,
+      data_orcamento: formData.data_orcamento,
+      validade_dias: parseInt(formData.validade_dias),
+      data_validade: formData.data_validade,
+      condicoes_pagamento: formData.condicoes_pagamento,
+      prazo_entrega: formData.prazo_entrega,
+      desconto_geral: parseFloat(formData.desconto_geral),
+      subtotal: subtotalComDesconto,
+      frete: frete,
+      frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+      frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+      frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+      frete_cidade: dadosFrete?.localidade || null,
+      frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+      total,
+      observacoes: formData.observacoes,
+      status: formData.status,
+      numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
+      cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
+      cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
+      cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
+      cnpj_cpf_nao_informado_aceite_ip: null,
+      obra_cep: dadosEndereco?.obra_cep || null,
+      obra_cidade: dadosEndereco?.obra_cidade || null,
+      obra_bairro: dadosEndereco?.obra_bairro || null,
+      obra_logradouro: dadosEndereco?.obra_logradouro || null,
+      obra_numero: dadosEndereco?.obra_numero || null,
+      obra_complemento: dadosEndereco?.obra_complemento || null,
+      obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
+    }
+
+    if (!id) {
+      dadosOrcamento.usuario_id = user?.id || null
+    } else {
+      dadosOrcamento.usuario_id = formData.usuario_id_original
+    }
+
+    if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
+      dadosOrcamento.data_lancamento = new Date().toISOString()
+    }
+
+    let orcamentoId = id
+
+    // Criar ou atualizar orçamento
+    if (id) {
+      console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
+      
+      const { error } = await supabase
+        .from('orcamentos')
+        .update(dadosOrcamento)
+        .eq('id', id)
+
+      if (error) throw error
+      console.log('✅ [EDITAR] Orçamento atualizado')
+
+      console.log('🗑️ [EDITAR] Deletando itens antigos...')
+      const { error: errorDelete } = await supabase
+        .from(TABELA_ITENS)
+        .delete()
+        .eq('orcamento_id', id)
+
+      if (errorDelete) {
+        console.error('❌ [EDITAR] Erro ao deletar:', errorDelete)
+        throw errorDelete
+      }
+      console.log('✅ [EDITAR] Itens deletados')
+
+    } else {
+      console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
+      
+      const { data, error } = await supabase
+        .from('orcamentos')
+        .insert([dadosOrcamento])
+        .select()
+        .single()
+
+      if (error) throw error
+      
+      orcamentoId = data.id
+      console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
+    }
+
+    // ⚠️ AQUI É ONDE DEVE ESTAR o código dos itens - DENTRO do try, DEPOIS do if/else acima
+    const itens = produtosSelecionados.map((item, index) => ({
+      orcamento_id: orcamentoId,
+      produto_id: item.produto_id,
+      produto_codigo: item.codigo,
+      produto: item.produto,
+      classe: item.classe,
+      mpa: item.mpa,
+      quantidade: parseInt(item.quantidade),
+      preco_unitario: parseFloat(item.preco),
+      peso_unitario: parseFloat(item.peso_unitario),
+      qtd_por_pallet: parseInt(item.qtd_por_pallet),
+      subtotal: item.quantidade * item.preco,
+      ordem: index
+    }))
+
+    console.log(`💾 [INSERT] Inserindo ${itens.length} itens...`)
+
+    const { error: errorItens } = await supabase
+      .from(TABELA_ITENS)
+      .insert(itens)
+
+    if (errorItens) {
+      console.error('❌ [INSERT] Erro:', errorItens)
+      throw errorItens
+    }
+
+    console.log('✅ [INSERT] Itens inseridos')
+    console.log('🎉 Salvamento concluído!')
+
+    alert('Orçamento salvo com sucesso!')
+    navigate('/orcamentos')
+
   } catch (error) {
-    console.error('Erro ao verificar concorrência:', error)
+    console.error('❌ Erro ao salvar:', error)
+    alert('Erro ao salvar orçamento: ' + error.message)
+  } finally {
+    setLoading(false)
   }
 }
-      const itens = produtosSelecionados.map((item, index) => ({
-        orcamento_id: orcamentoId,
-        produto_id: item.produto_id,
-        produto_codigo: item.codigo,
-        produto: item.produto,
-        classe: item.classe,
-        mpa: item.mpa,
-        quantidade: parseInt(item.quantidade),
-        preco_unitario: parseFloat(item.preco),
-        peso_unitario: parseFloat(item.peso_unitario),
-        qtd_por_pallet: parseInt(item.qtd_por_pallet),
-        subtotal: item.quantidade * item.preco,
-        ordem: index
-      }))
 
-      console.log(`💾 [INSERT] Inserindo ${itens.length} itens...`)
-
-      const { error: errorItens } = await supabase
-        .from(TABELA_ITENS)
-        .insert(itens)
-
-      if (errorItens) {
-        console.error('❌ [INSERT] Erro:', errorItens)
-        throw errorItens
-      }
-
-      console.log('✅ [INSERT] Itens inseridos')
-      console.log('🎉 Salvamento concluído!')
-
-      alert('Orçamento salvo com sucesso!')
-      navigate('/orcamentos')
-    } catch (error) {
-      console.error('❌ Erro ao salvar:', error)
-      alert('Erro ao salvar orçamento: ' + error.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+// ✅ ESTA É A ESTRUTURA CORRETA!
+// O bloco "const itens = ..." deve estar DENTRO do try
+// DEPOIS do if/else que cria ou atualiza o orçamento
+// ANTES do catch
 
   if (loading && id) {
     return (
@@ -1036,8 +1026,6 @@ useEffect(() => {
           </div>
         </div>
 
-        // ENCONTRE A SEÇÃO "Dados do Cliente" (linha ~850)
-// SUBSTITUA O CONTEÚDO DESSA SEÇÃO POR:
 
 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
   <CNPJCPFForm
