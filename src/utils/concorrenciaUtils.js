@@ -1,5 +1,5 @@
 // src/utils/concorrenciaUtils.js
-// VERSÃO FINAL CORRIGIDA - Especifica qual FK usar
+// TENTATIVA FINAL: Usar nome da constraint
 
 import { supabase } from '../services/supabase';
 
@@ -13,11 +13,11 @@ export const verificarConcorrenciaInterna = async (
     const data180DiasAtras = new Date();
     data180DiasAtras.setDate(data180DiasAtras.getDate() - 180);
 
-    // 1. VERIFICAÇÃO CRÍTICA: Mesmo CNPJ/CPF
+    // VERIFICAÇÃO CRÍTICA: Mesmo CNPJ/CPF
     if (dadosOrcamento.cnpj_cpf && !dadosOrcamento.cnpj_cpf_nao_informado) {
       console.log('🔍 Verificando CNPJ/CPF:', dadosOrcamento.cnpj_cpf);
       
-      // ⚠️ MUDANÇA: Especificar qual FK usar com "usuarios:usuario_id"
+      // TENTATIVA: Usar nome da constraint FK
       let queryCNPJ = supabase
         .from('orcamentos')
         .select(`
@@ -31,7 +31,7 @@ export const verificarConcorrenciaInterna = async (
           total,
           created_at,
           usuario_id,
-          usuarios:usuario_id!inner(nome)
+          usuarios!orcamentos_usuario_id_fkey!inner(nome)
         `)
         .eq('cnpj_cpf', dadosOrcamento.cnpj_cpf)
         .neq('usuario_id', vendedorAtualId)
@@ -67,11 +67,10 @@ export const verificarConcorrenciaInterna = async (
       }
     }
 
-    // 2. VERIFICAÇÃO ATENÇÃO: Mesma Localização (Cidade + Bairro)
+    // VERIFICAÇÃO ATENÇÃO: Mesma Localização
     if (dadosOrcamento.obra_cidade && dadosOrcamento.obra_bairro) {
       console.log('📍 Verificando localização:', dadosOrcamento.obra_cidade, '-', dadosOrcamento.obra_bairro);
       
-      // ⚠️ MUDANÇA: Especificar qual FK usar com "usuarios:usuario_id"
       let queryLocal = supabase
         .from('orcamentos')
         .select(`
@@ -86,7 +85,7 @@ export const verificarConcorrenciaInterna = async (
           total,
           created_at,
           usuario_id,
-          usuarios:usuario_id!inner(nome)
+          usuarios!orcamentos_usuario_id_fkey!inner(nome)
         `)
         .eq('obra_cidade', dadosOrcamento.obra_cidade)
         .eq('obra_bairro', dadosOrcamento.obra_bairro)
