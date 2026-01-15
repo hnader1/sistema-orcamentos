@@ -27,19 +27,16 @@ const EnderecoObraForm = ({ valores, onChange }) => {
   
   const [cepObrigatorio, setCepObrigatorio] = useState(false);
 
-  // Carrega cidades disponíveis ao montar
   useEffect(() => {
     carregarCidades();
   }, []);
 
-  // Atualiza bairros quando cidade muda
   useEffect(() => {
     if (cidade && !cepValidado) {
       carregarBairros(cidade);
     }
   }, [cidade, cepValidado]);
 
-  // Notifica componente pai sobre mudanças
   useEffect(() => {
     onChange({
       obra_cep: cep,
@@ -92,13 +89,11 @@ const EnderecoObraForm = ({ valores, onChange }) => {
     setCidade(novaCidade);
     setMostrarSugestoesCidade(false);
 
-    // Verifica se cidade existe no banco
     const cidadeExiste = cidadesDisponiveis.some(
       c => c.nome.toLowerCase() === novaCidade.toLowerCase()
     );
 
     if (!cidadeExiste && novaCidade.trim() !== '') {
-      // Cidade não existe! CEP obrigatório
       setCepObrigatorio(true);
       setErroCEP('⚠️ Cidade não encontrada. Informe o CEP para adicionar ao sistema.');
     } else {
@@ -114,24 +109,19 @@ const EnderecoObraForm = ({ valores, onChange }) => {
   };
 
   return (
-    <div className="spaco-y-4">
+    <div className="space-y-3">
       {/* Título */}
       <h3 className="text-lg font-semibold text-gray-700">
         Endereço da Obra
       </h3>
 
-      {/* Dica */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-        💡 <strong>Dica:</strong> Informe o CEP para preencher automaticamente e melhorar a detecção de concorrência interna!
-      </div>
-
-      {/* CEP */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          CEP {cepObrigatorio && <span className="text-red-500">*</span>}
-          {!cepObrigatorio && <span className="text-gray-500 text-xs">(opcional, mas recomendado)</span>}
-        </label>
-        <div className="flex gap-2">
+      {/* ✨ CEP + BUSCAR + CIDADE NA MESMA LINHA */}
+      <div className="grid grid-cols-1 lg:grid-cols-[180px_auto_1fr] gap-2">
+        {/* CEP */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            CEP {cepObrigatorio && <span className="text-red-500">*</span>}
+          </label>
           <input
             type="text"
             value={cep}
@@ -144,24 +134,28 @@ const EnderecoObraForm = ({ valores, onChange }) => {
             placeholder="00000-000"
             maxLength={9}
             disabled={cepValidado}
-            className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
               cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
             } ${erroCEP ? 'border-red-500' : 'border-gray-300'}`}
           />
+        </div>
+
+        {/* Botão Buscar */}
+        <div className="flex items-end gap-2">
           <button
             type="button"
             onClick={handleBuscarCEP}
             disabled={buscandoCEP || cepValidado || !cep}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
           >
             {buscandoCEP ? (
               <>
                 <span className="animate-spin">⏳</span>
-                Buscando...
+                <span className="hidden sm:inline">Buscando...</span>
               </>
             ) : (
               <>
-                🔍 Buscar
+                🔍 <span className="hidden sm:inline">Buscar</span>
               </>
             )}
           </button>
@@ -181,117 +175,122 @@ const EnderecoObraForm = ({ valores, onChange }) => {
             </button>
           )}
         </div>
-        {erroCEP && (
-          <p className="text-sm text-red-600 mt-1">{erroCEP}</p>
-        )}
-        {cepValidado && (
-          <p className="text-sm text-green-600 mt-1">✓ CEP validado</p>
-        )}
+
+        {/* Cidade */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Cidade <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={cidade}
+            onChange={(e) => {
+              handleCidadeChange(e.target.value);
+              setMostrarSugestoesCidade(true);
+            }}
+            onFocus={() => setMostrarSugestoesCidade(true)}
+            onBlur={() => setTimeout(() => setMostrarSugestoesCidade(false), 200)}
+            placeholder="Digite ou selecione a cidade"
+            disabled={cepValidado}
+            required
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
+            } ${cepObrigatorio && cidade ? 'border-orange-500' : 'border-gray-300'}`}
+          />
+          
+          {/* Sugestões de Cidade */}
+          {mostrarSugestoesCidade && !cepValidado && cidadesDisponiveis.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {cidadesDisponiveis
+                .filter(c => c.nome.toLowerCase().includes(cidade.toLowerCase()))
+                .slice(0, 10)
+                .map((c, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleCidadeChange(c.nome)}
+                    className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
+                  >
+                    {c.nome}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Cidade */}
-      <div className="relative">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Cidade <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={cidade}
-          onChange={(e) => {
-            handleCidadeChange(e.target.value);
-            setMostrarSugestoesCidade(true);
-          }}
-          onFocus={() => setMostrarSugestoesCidade(true)}
-          onBlur={() => setTimeout(() => setMostrarSugestoesCidade(false), 200)}
-          placeholder="Digite ou selecione a cidade"
-          disabled={cepValidado}
-          required
-          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
-          } ${cepObrigatorio && cidade ? 'border-orange-500' : 'border-gray-300'}`}
-        />
-        
-        {/* Sugestões de Cidade */}
-        {mostrarSugestoesCidade && !cepValidado && cidadesDisponiveis.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-            {cidadesDisponiveis
-              .filter(c => c.nome.toLowerCase().includes(cidade.toLowerCase()))
-              .slice(0, 10)
-              .map((c, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => handleCidadeChange(c.nome)}
-                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
-                >
-                  {c.nome}
-                </div>
-              ))}
-          </div>
-        )}
-      </div>
+      {/* Mensagens de erro/sucesso */}
+      {erroCEP && (
+        <p className="text-sm text-red-600">{erroCEP}</p>
+      )}
+      {cepValidado && (
+        <p className="text-sm text-green-600">✓ CEP validado</p>
+      )}
 
-      {/* Bairro */}
-      <div className="relative">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Bairro {cepValidado && <span className="text-gray-500 text-xs">(validado pelo CEP)</span>}
-        </label>
-        <input
-          type="text"
-          value={bairro}
-          onChange={(e) => {
-            setBairro(e.target.value);
-            setMostrarSugestoesBairro(true);
-          }}
-          onFocus={() => setMostrarSugestoesBairro(true)}
-          onBlur={() => setTimeout(() => setMostrarSugestoesBairro(false), 200)}
-          placeholder="Digite ou selecione o bairro"
-          disabled={cepValidado}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
-          }`}
-        />
-        
-        {/* Sugestões de Bairro */}
-        {mostrarSugestoesBairro && !cepValidado && bairrosDisponiveis.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-            {bairrosDisponiveis
-              .filter(b => b.toLowerCase().includes(bairro.toLowerCase()))
-              .slice(0, 10)
-              .map((b, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    setBairro(b);
-                    setMostrarSugestoesBairro(false);
-                  }}
-                  className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
-                >
-                  {b}
-                </div>
-              ))}
-          </div>
-        )}
-      </div>
+      {/* ✨ BAIRRO + LOGRADOURO NA MESMA LINHA */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Bairro */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Bairro
+          </label>
+          <input
+            type="text"
+            value={bairro}
+            onChange={(e) => {
+              setBairro(e.target.value);
+              setMostrarSugestoesBairro(true);
+            }}
+            onFocus={() => setMostrarSugestoesBairro(true)}
+            onBlur={() => setTimeout(() => setMostrarSugestoesBairro(false), 200)}
+            placeholder="Digite ou selecione o bairro"
+            disabled={cepValidado}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
+            }`}
+          />
+          
+          {/* Sugestões de Bairro */}
+          {mostrarSugestoesBairro && !cepValidado && bairrosDisponiveis.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {bairrosDisponiveis
+                .filter(b => b.toLowerCase().includes(bairro.toLowerCase()))
+                .slice(0, 10)
+                .map((b, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setBairro(b);
+                      setMostrarSugestoesBairro(false);
+                    }}
+                    className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
+                  >
+                    {b}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
 
-      {/* Logradouro */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Logradouro (Rua/Avenida)
-        </label>
-        <input
-          type="text"
-          value={logradouro}
-          onChange={(e) => setLogradouro(e.target.value)}
-          placeholder="Ex: Rua das Flores"
-          disabled={cepValidado}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
-          }`}
-        />
+        {/* Logradouro */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Logradouro (Rua/Avenida)
+          </label>
+          <input
+            type="text"
+            value={logradouro}
+            onChange={(e) => setLogradouro(e.target.value)}
+            placeholder="Ex: Rua das Flores"
+            disabled={cepValidado}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
+            }`}
+          />
+        </div>
       </div>
 
       {/* Número e Complemento */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Número

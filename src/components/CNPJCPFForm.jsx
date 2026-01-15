@@ -8,7 +8,6 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
   const [aceiteTermos, setAceiteTermos] = useState(false);
   const [erroValidacao, setErroValidacao] = useState('');
 
-  // Notifica componente pai sobre mudanças
   useEffect(() => {
     const dadosValidos = validarDados();
     
@@ -18,19 +17,16 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
       cnpj_cpf_nao_informado_aceite_data: naoInformar && aceiteTermos ? new Date().toISOString() : null
     });
 
-    // Notifica se está válido para salvar
     if (onValidacao) {
       onValidacao(dadosValidos);
     }
   }, [cnpjCpf, naoInformar, aceiteTermos]);
 
   const validarDados = () => {
-    // Se marcou "não informar", precisa aceitar termos
     if (naoInformar) {
       return aceiteTermos;
     }
     
-    // Se não marcou "não informar", precisa ter CNPJ/CPF válido
     return cnpjCpf.trim() !== '' && erroValidacao === '';
   };
 
@@ -38,13 +34,11 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
     const apenasNumeros = valor.replace(/\D/g, '');
     
     if (apenasNumeros.length <= 11) {
-      // CPF: 000.000.000-00
       return apenasNumeros
         .replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
     } else {
-      // CNPJ: 00.000.000/0000-00
       return apenasNumeros
         .replace(/(\d{2})(\d)/, '$1.$2')
         .replace(/(\d{3})(\d)/, '$1.$2')
@@ -61,12 +55,10 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
     }
     
     if (apenasNumeros.length === 11) {
-      // Validação simples de CPF
       if (!validarCPF(apenasNumeros)) {
         return 'CPF inválido';
       }
     } else if (apenasNumeros.length === 14) {
-      // Validação simples de CNPJ
       if (!validarCNPJ(apenasNumeros)) {
         return 'CNPJ inválido';
       }
@@ -78,16 +70,12 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
   };
 
   const validarCPF = (cpf) => {
-    // Remove caracteres não numéricos
     cpf = cpf.replace(/\D/g, '');
     
-    // Verifica se tem 11 dígitos
     if (cpf.length !== 11) return false;
     
-    // Verifica se todos os dígitos são iguais
     if (/^(\d)\1+$/.test(cpf)) return false;
     
-    // Validação do primeiro dígito verificador
     let soma = 0;
     for (let i = 0; i < 9; i++) {
       soma += parseInt(cpf.charAt(i)) * (10 - i);
@@ -97,7 +85,6 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
     
     if (digitoVerificador1 !== parseInt(cpf.charAt(9))) return false;
     
-    // Validação do segundo dígito verificador
     soma = 0;
     for (let i = 0; i < 10; i++) {
       soma += parseInt(cpf.charAt(i)) * (11 - i);
@@ -109,16 +96,12 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
   };
 
   const validarCNPJ = (cnpj) => {
-    // Remove caracteres não numéricos
     cnpj = cnpj.replace(/\D/g, '');
     
-    // Verifica se tem 14 dígitos
     if (cnpj.length !== 14) return false;
     
-    // Verifica se todos os dígitos são iguais
     if (/^(\d)\1+$/.test(cnpj)) return false;
     
-    // Validação do primeiro dígito verificador
     let tamanho = cnpj.length - 2;
     let numeros = cnpj.substring(0, tamanho);
     let digitos = cnpj.substring(tamanho);
@@ -133,7 +116,6 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
     let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
     if (resultado !== parseInt(digitos.charAt(0))) return false;
     
-    // Validação do segundo dígito verificador
     tamanho = tamanho + 1;
     numeros = cnpj.substring(0, tamanho);
     soma = 0;
@@ -161,30 +143,28 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
     setNaoInformar(marcado);
     
     if (marcado) {
-      // Limpa CNPJ/CPF e erros
       setCnpjCpf('');
       setErroValidacao('');
       setAceiteTermos(false);
     } else {
-      // Desmarcou, limpa aceite
       setAceiteTermos(false);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Título */}
       <h3 className="text-lg font-semibold text-gray-700">
         Dados do Cliente
       </h3>
 
-      {/* Campo CNPJ/CPF */}
+      {/* ✨ CAMPO CNPJ/CPF + CHECKBOX NA MESMA LINHA */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           CNPJ/CPF do Cliente <span className="text-red-500">*</span>
         </label>
         
-        <div className="flex items-start gap-4">
+        <div className="flex gap-2 items-start">
           {/* Input CNPJ/CPF */}
           <div className="flex-1">
             <input
@@ -203,8 +183,8 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
             )}
           </div>
 
-          {/* Checkbox "Não informar" */}
-          <label className="flex items-center gap-2 cursor-pointer mt-2 whitespace-nowrap">
+          {/* Checkbox "Não informar" - ALINHADO À DIREITA */}
+          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap">
             <input
               type="checkbox"
               checked={naoInformar}
@@ -215,6 +195,13 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
           </label>
         </div>
       </div>
+
+      {/* Alerta - MAIS COMPACTO */}
+      {!naoInformar && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800">
+          💡 <strong>Importante:</strong> O CNPJ/CPF é usado para detectar se outro vendedor já está atendendo este cliente, evitando concorrência interna.
+        </div>
+      )}
 
       {/* Alerta de Termo de Responsabilidade */}
       {naoInformar && (
@@ -262,13 +249,6 @@ const CNPJCPFForm = ({ valores, onChange, onValidacao }) => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Informação adicional */}
-      {!naoInformar && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-          💡 <strong>Importante:</strong> O CNPJ/CPF é usado para detectar se outro vendedor já está atendendo este cliente, evitando concorrência interna.
         </div>
       )}
     </div>
