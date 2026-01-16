@@ -1,133 +1,137 @@
 import { useState, useRef, useEffect } from 'react'
-import { supabase } from '../services/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+// Criar cliente Supabase diretamente aqui
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Selecione a forma de pagamento..." }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [formasPagamento, setFormasPagamento] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const dropdownRef = useRef(null);
-  const inputRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const [formasPagamento, setFormasPagamento] = useState([])
+  const [loading, setLoading] = useState(true)
+  const dropdownRef = useRef(null)
+  const inputRef = useRef(null)
 
-  // Buscar formas de pagamento do banco
   useEffect(() => {
-    carregarFormasPagamento();
-  }, []);
+    carregarFormasPagamento()
+  }, [])
 
   const carregarFormasPagamento = async () => {
     try {
+      console.log('🔍 Carregando formas de pagamento...')
+      
       const { data, error } = await supabase
         .from('formas_pagamento')
         .select('*')
-        .eq('ativo', true)
-        .order('ordem', { ascending: true });
+        .order('ordem', { ascending: true })
 
-      if (error) throw error;
-      setFormasPagamento(data || []);
+      console.log('Resultado:', { data, error })
+
+      if (error) throw error
+      
+      setFormasPagamento(data || [])
+      console.log(`✅ ${data?.length || 0} formas carregadas`)
     } catch (error) {
-      console.error('Erro ao carregar formas de pagamento:', error);
+      console.error('❌ Erro ao carregar:', error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  // Normaliza texto para busca
   const normalizeText = (text) => {
     return text
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-  };
+      .replace(/[\u0300-\u036f]/g, '')
+  }
 
-  // Filtra opções
   const filteredOptions = formasPagamento.filter(option => {
-    const normalizedDesc = normalizeText(option.descricao);
-    const normalizedSearch = normalizeText(searchTerm);
-    return normalizedDesc.includes(normalizedSearch);
-  });
+    const normalizedDesc = normalizeText(option.descricao)
+    const normalizedSearch = normalizeText(searchTerm)
+    return normalizedDesc.includes(normalizedSearch)
+  })
 
-  const selectedOption = formasPagamento.find(opt => opt.id === value);
+  const selectedOption = formasPagamento.find(opt => opt.id === value)
 
-  // Fecha ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-        setSearchTerm('');
+        setIsOpen(false)
+        setSearchTerm('')
       }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [searchTerm]);
+    setHighlightedIndex(0)
+  }, [searchTerm])
 
-  // Navegação por teclado
   const handleKeyDown = (e) => {
     if (!isOpen) {
       if (e.key === 'Enter' || e.key === 'ArrowDown') {
-        setIsOpen(true);
-        e.preventDefault();
+        setIsOpen(true)
+        e.preventDefault()
       }
-      return;
+      return
     }
 
     switch (e.key) {
       case 'ArrowDown':
-        e.preventDefault();
-        setHighlightedIndex(prev => prev < filteredOptions.length - 1 ? prev + 1 : prev);
-        break;
+        e.preventDefault()
+        setHighlightedIndex(prev => prev < filteredOptions.length - 1 ? prev + 1 : prev)
+        break
       case 'ArrowUp':
-        e.preventDefault();
-        setHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
-        break;
+        e.preventDefault()
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : 0)
+        break
       case 'Enter':
-        e.preventDefault();
+        e.preventDefault()
         if (filteredOptions[highlightedIndex]) {
-          handleSelect(filteredOptions[highlightedIndex]);
+          handleSelect(filteredOptions[highlightedIndex])
         }
-        break;
+        break
       case 'Escape':
-        setIsOpen(false);
-        setSearchTerm('');
-        break;
+        setIsOpen(false)
+        setSearchTerm('')
+        break
     }
-  };
+  }
 
   const handleSelect = (option) => {
-    onChange(option.id);
-    setIsOpen(false);
-    setSearchTerm('');
-  };
+    onChange(option.id)
+    setIsOpen(false)
+    setSearchTerm('')
+  }
 
-  // Scroll automático
   useEffect(() => {
     if (isOpen && highlightedIndex >= 0) {
-      const listElement = dropdownRef.current?.querySelector('.options-list');
-      const highlightedElement = listElement?.children[highlightedIndex];
+      const listElement = dropdownRef.current?.querySelector('.options-list')
+      const highlightedElement = listElement?.children[highlightedIndex]
       
       if (highlightedElement && listElement) {
-        const listRect = listElement.getBoundingClientRect();
-        const itemRect = highlightedElement.getBoundingClientRect();
+        const listRect = listElement.getBoundingClientRect()
+        const itemRect = highlightedElement.getBoundingClientRect()
         
         if (itemRect.bottom > listRect.bottom) {
-          highlightedElement.scrollIntoView({ block: 'end', behavior: 'smooth' });
+          highlightedElement.scrollIntoView({ block: 'end', behavior: 'smooth' })
         } else if (itemRect.top < listRect.top) {
-          highlightedElement.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          highlightedElement.scrollIntoView({ block: 'start', behavior: 'smooth' })
         }
       }
     }
-  }, [highlightedIndex, isOpen]);
+  }, [highlightedIndex, isOpen])
 
   if (loading) {
     return (
       <div className="w-full p-2 border border-gray-300 rounded bg-gray-50 text-gray-500">
         Carregando formas de pagamento...
       </div>
-    );
+    )
   }
 
   return (
@@ -140,8 +144,8 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
           placeholder={selectedOption ? selectedOption.descricao : placeholder}
           value={searchTerm}
           onChange={(e) => {
-            setSearchTerm(e.target.value);
-            if (!isOpen) setIsOpen(true);
+            setSearchTerm(e.target.value)
+            if (!isOpen) setIsOpen(true)
           }}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
@@ -202,7 +206,7 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default SearchableSelectFormaPagamento;
+export default SearchableSelectFormaPagamento
