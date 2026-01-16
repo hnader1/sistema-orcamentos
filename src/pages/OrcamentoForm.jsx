@@ -1338,15 +1338,14 @@ const salvar = async () => {
 
                 {/* CONDIÇÕES DE PAGAMENTO */}
                 <div>
-  <label className="block text-sm font-medium mb-1">
-    Condições de Pagamento *
-  </label>
-  <SearchableSelectFormaPagamento
-    value={formData.forma_pagamento_id}
-    onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
-    placeholder="Digite para buscar (ex: 28, pix, boleto)..."
-  />
-</div>
+                  <label className="block text-sm font-medium mb-1">
+                  Condições de Pagamento *
+                  </label>
+                  <SearchableSelectFormaPagamento
+                  value={formData.forma_pagamento_id}
+                  onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
+                  placeholder="Digite para buscar (ex: 28, pix, boleto)..."
+                  />
                 </div>
               </div>
             </div>
@@ -1356,6 +1355,8 @@ const salvar = async () => {
       </div>
 
       <PropostaComercial
+
+
         isOpen={mostrarProposta}
         onClose={() => setMostrarProposta(false)}
         dadosOrcamento={formData}
