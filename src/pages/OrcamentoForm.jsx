@@ -1241,8 +1241,8 @@ const salvar = async () => {
     </tbody>
   </table>
 </div>
-
-
+          )}
+        </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <FreteSelector 
             pesoTotal={calcularPesoTotal()}
