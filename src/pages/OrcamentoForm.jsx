@@ -1029,7 +1029,7 @@ const salvar = async () => {
   {/* CAMPOS DE DADOS DO CLIENTE */}
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
       <input
         type="text"
         value={formData.cliente_nome}
@@ -1039,7 +1039,7 @@ const salvar = async () => {
       />
     </div>
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Nome Contato</label>
       <input
         type="text"
         value={formData.cliente_empresa}

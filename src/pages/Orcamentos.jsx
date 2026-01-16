@@ -335,8 +335,7 @@ export default function Orcamentos() {
           </div>
         </div>
 
-        {/* Últimos 5 Orçamentos */}
-        <div className="mb-8">
+        {/* <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="text-gray-600" size={20} />
             <h2 className="text-lg font-semibold text-gray-900">Últimos 5 Orçamentos</h2>
@@ -351,36 +350,55 @@ export default function Orcamentos() {
             <div className="grid grid-cols-1 gap-3">
               {ultimos5.map((orc) => (
                 <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-base font-semibold text-gray-900">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Linha 1: Número + Nome do Cliente + Badge Status */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h3 className="text-base font-bold text-gray-900">
                           #{orc.numero}
                         </h3>
+                        <span className="text-blue-600 font-semibold">•</span>
+                        <span className="text-gray-700 font-medium truncate">
+                          {orc.cliente_nome || 'Sem cliente'}
+                        </span>
                         {getStatusBadge(orc.status)}
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <User size={14} className="text-gray-400" />
-                          <span>{orc.cliente_nome || 'Sem cliente'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar size={14} className="text-gray-400" />
-                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <DollarSign size={14} className="text-gray-400" />
+                      
+                      {/* Linha 2: Cidade | Valor | Data | Vendedor */}
+                      <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
+                        {orc.cidade && (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <MapPin size={14} className="text-gray-400" />
+                              <span>{orc.cidade}</span>
+                            </div>
+                            <span className="text-gray-300">|</span>
+                          </>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <DollarSign size={14} className="text-blue-500" />
                           <span className="font-semibold text-gray-900">
                             R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
-                      </div>
-                      {orc.vendedor && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          👤 {orc.vendedor}
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-1">
+                          <Calendar size={14} className="text-gray-400" />
+                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
                         </div>
-                      )}
+                        {orc.vendedor && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                              <User size={14} className="text-gray-400" />
+                              <span className="text-xs">{orc.vendedor}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
+                    
+                    {/* Botões de Ação */}
                     <div className="flex gap-2">
                       <button
                         onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
@@ -403,6 +421,108 @@ export default function Orcamentos() {
                           title="Cancelar"
                         >
                           <Ban size={18} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+// ====================================================================================
+// SEÇÃO 2: TODOS OS ORÇAMENTOS - VERSÃO COMPACTA
+// ====================================================================================
+// Substitua a seção "Todos os Orçamentos" pelo código abaixo:
+
+        {/* Lista Completa de Orçamentos */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Todos os Orçamentos</h2>
+          
+          {loading ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+              Carregando...
+            </div>
+          ) : orcamentosFiltrados.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+              {busca || filtroStatus !== 'todos' ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento cadastrado'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {orcamentosFiltrados.map((orc) => (
+                <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Linha 1: Número + Nome do Cliente + Badge Status */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h3 className="text-base font-bold text-gray-900">
+                          #{orc.numero}
+                        </h3>
+                        <span className="text-blue-600 font-semibold">•</span>
+                        <span className="text-gray-700 font-medium truncate">
+                          {orc.cliente_nome || 'Sem cliente'}
+                        </span>
+                        {getStatusBadge(orc.status)}
+                      </div>
+                      
+                      {/* Linha 2: Cidade | Valor | Data | Vendedor */}
+                      <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
+                        {orc.cidade && (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <MapPin size={14} className="text-gray-400" />
+                              <span>{orc.cidade}</span>
+                            </div>
+                            <span className="text-gray-300">|</span>
+                          </>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <DollarSign size={14} className="text-blue-500" />
+                          <span className="font-semibold text-gray-900">
+                            R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-1">
+                          <Calendar size={14} className="text-gray-400" />
+                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
+                        </div>
+                        {orc.vendedor && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                              <User size={14} className="text-gray-400" />
+                              <span className="text-xs">{orc.vendedor}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Botões de Ação */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 size={20} />
+                      </button>
+                      <button
+                        onClick={() => duplicar(orc.id)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Duplicar"
+                      >
+                        <Copy size={20} />
+                      </button>
+                      {orc.status !== 'cancelado' && (
+                        <button
+                          onClick={() => cancelar(orc.id, orc.numero)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Cancelar"
+                        >
+                          <Ban size={20} />
                         </button>
                       )}
                     </div>
