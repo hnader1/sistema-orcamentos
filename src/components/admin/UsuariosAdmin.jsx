@@ -17,7 +17,8 @@ export default function UsuariosAdmin() {
     senha: '',
     tipo: 'vendedor',
     telefone: '',
-    ativo: true
+    ativo: true,
+    codigo_vendedor: ''
   })
 
   const [erros, setErros] = useState({})
@@ -55,7 +56,8 @@ export default function UsuariosAdmin() {
       u.nome?.toLowerCase().includes(buscaLower) ||
       u.email?.toLowerCase().includes(buscaLower) ||
       u.tipo?.toLowerCase().includes(buscaLower) ||
-      u.telefone?.toLowerCase().includes(buscaLower)
+      u.telefone?.toLowerCase().includes(buscaLower) ||
+      u.codigo_vendedor?.toLowerCase().includes(buscaLower)
     )
   })
 
@@ -68,7 +70,8 @@ export default function UsuariosAdmin() {
         senha: '', // Não preencher senha ao editar
         tipo: usuario.tipo || 'vendedor',
         telefone: usuario.telefone || '',
-        ativo: usuario.ativo !== false
+        ativo: usuario.ativo !== false,
+        codigo_vendedor: usuario.codigo_vendedor || ''
       })
     } else {
       setEditando(null)
@@ -78,7 +81,8 @@ export default function UsuariosAdmin() {
         senha: '',
         tipo: 'vendedor',
         telefone: '',
-        ativo: true
+        ativo: true,
+        codigo_vendedor: ''
       })
     }
     setErros({})
@@ -96,6 +100,20 @@ export default function UsuariosAdmin() {
   const validarEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return regex.test(email)
+  }
+
+  const validarCodigoVendedor = (codigo) => {
+    if (!codigo) return true // Código é opcional
+    
+    const codigoUpper = codigo.toUpperCase()
+    
+    // Deve ter 2 ou 3 caracteres
+    if (codigoUpper.length < 2 || codigoUpper.length > 3) return false
+    
+    // Deve conter apenas letras
+    if (!/^[A-Z]{2,3}$/.test(codigoUpper)) return false
+    
+    return true
   }
 
   const validarForm = () => {
@@ -129,6 +147,11 @@ export default function UsuariosAdmin() {
       novosErros.tipo = 'Campo obrigatório'
     }
 
+    // Validar código do vendedor
+    if (formData.codigo_vendedor && !validarCodigoVendedor(formData.codigo_vendedor)) {
+      novosErros.codigo_vendedor = 'Código deve ter 2 ou 3 letras (apenas A-Z)'
+    }
+
     setErros(novosErros)
     return Object.keys(novosErros).length === 0
   }
@@ -139,17 +162,35 @@ export default function UsuariosAdmin() {
     try {
       setSalvando(true)
 
+      const codigo = formData.codigo_vendedor?.trim().toUpperCase() || null
+
+      // Verificar duplicata de código
+      if (codigo) {
+        const { data: duplicatas } = await supabase
+          .from('usuarios')
+          .select('id, nome')
+          .eq('codigo_vendedor', codigo)
+          .neq('id', editando?.id || '00000000-0000-0000-0000-000000000000')
+
+        if (duplicatas && duplicatas.length > 0) {
+          alert(`Este código já está em uso por: ${duplicatas[0].nome}`)
+          setSalvando(false)
+          return
+        }
+      }
+
       const dados = {
         nome: formData.nome.trim(),
         email: formData.email.trim().toLowerCase(),
         tipo: formData.tipo,
         telefone: formData.telefone?.trim() || null,
-        ativo: formData.ativo
+        ativo: formData.ativo,
+        codigo_vendedor: codigo
       }
 
       // Incluir senha apenas se foi preenchida
       if (formData.senha) {
-      dados.senha_hash = formData.senha
+        dados.senha_hash = formData.senha
       }
 
       if (editando) {
@@ -175,6 +216,7 @@ export default function UsuariosAdmin() {
 
         if (existente) {
           alert('Este email já está cadastrado!')
+          setSalvando(false)
           return
         }
 
@@ -264,7 +306,7 @@ export default function UsuariosAdmin() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Buscar por nome, email, tipo ou telefone..."
+            placeholder="Buscar por nome, email, tipo, telefone ou código..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
@@ -299,6 +341,11 @@ export default function UsuariosAdmin() {
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getTipoColor(usuario.tipo)}`}>
                       {getTipoLabel(usuario.tipo)}
                     </span>
+                    {usuario.codigo_vendedor && (
+                      <span className="px-2 py-1 rounded text-xs font-bold bg-purple-100 text-purple-800">
+                        {usuario.codigo_vendedor}
+                      </span>
+                    )}
                     <span
                       className={`px-2 py-1 rounded text-xs font-medium ${
                         usuario.ativo
@@ -477,6 +524,37 @@ export default function UsuariosAdmin() {
                     placeholder="(31) 99999-9999"
                   />
                 </div>
+              </div>
+
+              {/* ✨ NOVO CAMPO: CÓDIGO DO VENDEDOR */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Código do Vendedor (Propostas)
+                  <span className="text-xs text-gray-500 ml-2">(2 ou 3 letras - opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.codigo_vendedor}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    codigo_vendedor: e.target.value.toUpperCase() 
+                  })}
+                  placeholder="Ex: NP, CF, MSS"
+                  maxLength={3}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 uppercase font-bold text-center ${
+                    erros.codigo_vendedor ? 'border-red-500 bg-red-50' : 'border-purple-300'
+                  }`}
+                />
+                {erros.codigo_vendedor && (
+                  <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle size={14} /> {erros.codigo_vendedor}
+                  </p>
+                )}
+                <p className="text-xs text-gray-600 mt-2">
+                  💡 Usado na numeração automática das propostas
+                  <br />
+                  Exemplo: <strong className="text-purple-700">NP-26-0001</strong> (Nilton Pezini, ano 2026, proposta 1)
+                </p>
               </div>
 
               {/* Ativo */}
