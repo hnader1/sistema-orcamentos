@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../services/supabase';
 
 const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Selecione a forma de pagamento..." }) => {
   const [isOpen, setIsOpen] = useState(false);
