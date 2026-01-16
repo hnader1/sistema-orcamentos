@@ -1,3 +1,27 @@
+// PÁGINA DE ORÇAMENTOS FILTRADOS POR STATUS - CONSTRUCOM
+// ====================================================================================
+// Descrição: Exibe orçamentos filtrados por um status específico
+// Autor: Nader
+// Última atualização: Janeiro 2026
+
+//
+// FUNCIONALIDADES:
+// - Filtragem automática por status (vem da URL: /orcamentos/status/:status)
+// - Busca por número, cliente ou empresa
+// - Ações: Editar e Duplicar
+// - Header personalizado com ícone e cor do status
+// - Permissões: Vendedor vê apenas seus orçamentos, outros veem todos
+//
+// STATUS SUPORTADOS:
+// - rascunho, enviado, aprovado, lancado, cancelado
+//
+// MELHORIAS RECENTES:
+// - Layout compacto (2 linhas por orçamento)
+// - Nome do cliente ao lado do número (#ORC-0010 • Nome Cliente)
+// - Badge de status posicionado ao lado dos botões de ação
+// - Cidade do cadastro incluída nas informações
+// ====================================================================================
+=======
 -- ====================================================================================
 -- ADICIONAR STATUS "FINALIZADO" AO SISTEMA - CONSTRUCOM
 -- ====================================================================================
@@ -9,6 +33,7 @@
 -- - Apenas Comercial e Administrador podem mudar para "Finalizado"
 -- - Similar à restrição do status "Lançado"
 -- ====================================================================================
+>>>>>>> ac64a9ffd7177acb536ca71e784b840e5a1516d4
 
 -- ====================================================================================
 -- 1. VERIFICAR SE O TIPO ENUM JÁ EXISTE
