@@ -1,4 +1,7 @@
 // src/pages/RelatorioOrcamentos.jsx
+// 📋 PÁGINA: Relatório de Concorrência Interna
+// 🎯 FUNÇÃO: Exibir estatísticas de orçamentos com/sem CNPJ e conflitos internos
+// 📅 ÚLTIMA MODIFICAÇÃO: 15/01/2026 - Adicionado card de conflitos internos
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +19,10 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import { formatarCNPJCPFExibicao, formatarDataExibicao } from '../utils/concorrenciaUtils';
+
+// ⚠️ IMPORTANTE: Componente adicionado em 15/01/2026
+// 🎯 Este componente substitui o card "% Sem CNPJ" e mostra conflitos de concorrência interna
+import CardConflitosInternos from '../components/CardConflitosInternos';
 
 export default function RelatorioOrcamentos() {
   const navigate = useNavigate();
@@ -48,23 +55,23 @@ export default function RelatorioOrcamentos() {
 
       // Busca todos os orçamentos do período
       const { data: orcamentos, error: errorOrc } = await supabase
-      .from('orcamentos')
-      .select('*')  // ← MUDEI PARA SELECT * (simples)
-      .gte('created_at', dataInicio.toISOString())
-      .neq('status', 'cancelado')
-      .order('created_at', { ascending: false });
+        .from('orcamentos')
+        .select('*')
+        .gte('created_at', dataInicio.toISOString())
+        .neq('status', 'cancelado')
+        .order('created_at', { ascending: false });
 
-  if (errorOrc) {
-      console.error('Erro ao carregar orçamentos:', errorOrc);
-  throw errorOrc;
-  }
+      if (errorOrc) {
+        console.error('Erro ao carregar orçamentos:', errorOrc);
+        throw errorOrc;
+      }
 
-      // 2. Calcula estatísticas
+      // Calcula estatísticas
       const total = orcamentos?.length || 0;
       const semCNPJ = orcamentos?.filter(o => o.cnpj_cpf_nao_informado === true) || [];
       const comCNPJ = orcamentos?.filter(o => o.cnpj_cpf_nao_informado !== true) || [];
 
-      // 3. Agrupa por vendedor
+      // Agrupa por vendedor
       const porVendedor = {};
       orcamentos?.forEach(orc => {
         const vendedor = orc.vendedor || 'Não informado';
@@ -109,14 +116,14 @@ export default function RelatorioOrcamentos() {
     const csv = [
       ['Número', 'Cliente', 'Vendedor', 'Status', 'Cidade', 'Bairro', 'Data', 'Valor'].join(';'),
       ...orcamentosSemCNPJ.map(orc => [
-        orc.numero_orcamento,
+        orc.numero,
         orc.cliente_nome || 'Não informado',
         orc.vendedor || 'Não informado',
         orc.status,
         orc.obra_cidade || '-',
         orc.obra_bairro || '-',
         formatarDataExibicao(orc.created_at),
-        orc.valor_total || 0
+        orc.total || 0
       ].join(';'))
     ].join('\n');
 
@@ -136,7 +143,9 @@ export default function RelatorioOrcamentos() {
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Header */}
+        {/* ========================================
+            HEADER DA PÁGINA
+            ======================================== */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -175,8 +184,15 @@ export default function RelatorioOrcamentos() {
           <div className="text-center py-12 text-gray-500">Carregando...</div>
         ) : (
           <>
-            {/* Cards de Estatísticas */}
+            {/* ========================================
+                CARDS DE ESTATÍSTICAS (4 CARDS)
+                ⚠️ MODIFICAÇÃO: Card 4 foi substituído
+                ======================================== */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              
+              {/* ==========================================
+                  CARD 1: TOTAL DE ORÇAMENTOS
+                  ========================================== */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -191,6 +207,9 @@ export default function RelatorioOrcamentos() {
                 </div>
               </div>
 
+              {/* ==========================================
+                  CARD 2: COM CNPJ/CPF
+                  ========================================== */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -205,6 +224,9 @@ export default function RelatorioOrcamentos() {
                 </div>
               </div>
 
+              {/* ==========================================
+                  CARD 3: SEM CNPJ/CPF
+                  ========================================== */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -219,6 +241,31 @@ export default function RelatorioOrcamentos() {
                 </div>
               </div>
 
+              {/* ==========================================
+                  CARD 4: CONFLITOS INTERNOS
+                  ⚠️ NOVO COMPONENTE - ADICIONADO EM 15/01/2026
+                  
+                  📝 O QUE FAZ:
+                  - Conta conflitos de concorrência interna
+                  - Mostra número de grupos com múltiplos vendedores
+                  - Clicável: redireciona para /conflitos
+                  - Verde: 0 conflitos / Laranja: tem conflitos
+                  
+                  📂 ARQUIVO: src/components/CardConflitosInternos.jsx
+                  
+                  🔄 SUBSTITUIU:
+                  Antigamente aqui tinha um card com "% Sem CNPJ"
+                  que mostrava estatisticas.percentualSemCNPJ
+                  
+                  💡 PARA REVERTER (se precisar):
+                  Descomente o código abaixo e comente o <CardConflitosInternos />
+                  ========================================== */}
+              
+              <CardConflitosInternos />
+
+              {/* 
+              ⬇️ CÓDIGO ANTIGO - COMENTADO PARA REFERÊNCIA FUTURA
+              
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -232,9 +279,14 @@ export default function RelatorioOrcamentos() {
                   </div>
                 </div>
               </div>
-            </div>
+              */}
 
-            {/* Tabela por Vendedor */}
+            </div>
+            {/* FIM DOS CARDS DE ESTATÍSTICAS */}
+
+            {/* ========================================
+                TABELA POR VENDEDOR
+                ======================================== */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Users size={20} />
@@ -298,7 +350,9 @@ export default function RelatorioOrcamentos() {
               </div>
             </div>
 
-            {/* Lista de Orçamentos sem CNPJ/CPF */}
+            {/* ========================================
+                LISTA DE ORÇAMENTOS SEM CNPJ/CPF
+                ======================================== */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <AlertTriangle size={20} className="text-yellow-600" />
@@ -344,7 +398,7 @@ export default function RelatorioOrcamentos() {
                       {orcamentosSemCNPJ.map((orc) => (
                         <tr key={orc.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-medium text-gray-900">
-                            {orc.numero_orcamento}
+                            {orc.numero}
                           </td>
                           <td className="px-4 py-3 text-gray-600">
                             {orc.cliente_nome || 'Não informado'}
@@ -373,7 +427,7 @@ export default function RelatorioOrcamentos() {
                             {new Intl.NumberFormat('pt-BR', {
                               style: 'currency',
                               currency: 'BRL'
-                            }).format(orc.valor_total || 0)}
+                            }).format(orc.total || 0)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button
@@ -396,3 +450,38 @@ export default function RelatorioOrcamentos() {
     </div>
   );
 }
+
+/*
+================================================================================
+📝 NOTAS IMPORTANTES PARA O FUTURO:
+================================================================================
+
+1. 🔄 MODIFICAÇÃO PRINCIPAL (15/01/2026):
+   - Card 4 foi substituído de "% Sem CNPJ" para "Conflitos Internos"
+   - Componente usado: <CardConflitosInternos />
+   - Localização: Linha ~180 (aproximadamente)
+
+2. 📂 ARQUIVOS RELACIONADOS:
+   - src/components/CardConflitosInternos.jsx (novo componente)
+   - src/pages/Conflitos.jsx (página dedicada de conflitos)
+   - src/utils/concorrenciaUtils.js (funções de verificação)
+
+3. 🗄️ BANCO DE DADOS:
+   - Tabela: conflitos_ignorados (para arquivar conflitos)
+   - Migration: migration_conflitos_ignorados.sql
+
+4. 🔗 NAVEGAÇÃO:
+   - O card é clicável e redireciona para: /conflitos
+   - Rota deve ser adicionada no arquivo de rotas
+
+5. ⚠️ SE PRECISAR REVERTER:
+   - Descomente o código antigo (linha ~183 - comentado)
+   - Comente ou remova a linha: <CardConflitosInternos />
+
+6. 🐛 TROUBLESHOOTING:
+   - Se card não aparecer: verifique se o componente foi criado em src/components/
+   - Se der erro de import: verifique o caminho do import (linha 23)
+   - Se clicar e não navegar: verifique se a rota /conflitos foi adicionada
+
+================================================================================
+*/

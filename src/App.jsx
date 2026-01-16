@@ -12,6 +12,7 @@ import AdminUsuarios from './pages/AdminUsuarios'
 import AdminFrete from './pages/AdminFrete'
 import AdminDashboard from './pages/AdminDashboard'
 import RelatorioOrcamentos from './pages/RelatorioOrcamentos' // ✨ NOVO
+import Conflitos from './pages/Conflitos';
 
 function App() {
   return (
@@ -28,6 +29,8 @@ function App() {
             </ProtectedRoute>
           } />
           
+<Route path="/conflitos" element={<Conflitos />} />
+
           <Route path="/orcamentos/status/:status" element={
             <ProtectedRoute>
               <OrcamentosStatus />
