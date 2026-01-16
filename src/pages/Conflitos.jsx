@@ -9,6 +9,7 @@
 // - Navegar para orçamentos específicos
 //
 // 📅 CRIADO EM: 16/01/2026
+// 📅 ATUALIZADO EM: 16/01/2026 - Adicionada normalização de cidade/bairro
 // 🔗 ROTA: /conflitos
 // 👥 ACESSO: Apenas administradores
 //
@@ -16,9 +17,13 @@
 // 1. Busca todos os orçamentos ativos (últimos 180 dias)
 // 2. Busca itens de cada orçamento (produtos)
 // 3. Agrupa por CNPJ (conflito crítico - vermelho)
-// 4. Agrupa por Localização (conflito atenção - amarelo)
+// 4. Agrupa por Localização NORMALIZADA (conflito atenção - amarelo)
 // 5. Exclui conflitos que foram arquivados
 // 6. Permite arquivar/restaurar conflitos
+//
+// ⚠️ CORREÇÕES APLICADAS:
+// - Normalização de cidade/bairro para minúsculas (evita "Centro" ≠ "centro")
+// - Isso garante que "CENTRO", "Centro" e "centro" sejam considerados iguais
 //
 // 🗄️ TABELAS USADAS:
 // - orcamentos (orçamentos principais)
@@ -78,7 +83,7 @@ const Conflitos = () => {
   // 1. Busca orçamentos dos últimos 180 dias (exceto cancelados)
   // 2. Para cada orçamento, busca os produtos (itens)
   // 3. Busca conflitos que foram arquivados
-  // 4. Agrupa orçamentos por CNPJ e Localização
+  // 4. Agrupa orçamentos por CNPJ e Localização (com normalização!)
   // 5. Identifica quais grupos têm múltiplos vendedores
   // 6. Remove grupos que foram arquivados
   // ==========================================================================
@@ -142,7 +147,7 @@ const Conflitos = () => {
       setConflitosIgnorados(ignorados || []);
 
       // Criar Set de chaves ignoradas para filtrar depois
-      // Formato: "CNPJ:12.345.678/0001-90" ou "LOCALIZACAO:Belo Horizonte|Centro"
+      // Formato: "CNPJ:12.345.678/0001-90" ou "LOCALIZACAO:belo horizonte|centro"
       const chavesIgnoradas = new Set(
         (ignorados || []).map(i => `${i.tipo}:${i.chave_conflito}`)
       );
@@ -162,14 +167,18 @@ const Conflitos = () => {
   };
 
   // ==========================================================================
-  // 📊 FUNÇÃO: Agrupar Conflitos
+  // 📊 FUNÇÃO: Agrupar Conflitos (VERSÃO CORRIGIDA)
   // ==========================================================================
   // Recebe lista de orçamentos e retorna grupos de conflitos
+  //
+  // ⭐ NOVIDADE: Normaliza cidade e bairro para minúsculas
+  // Antes: "Centro" ≠ "centro" ≠ "CENTRO" (gerava 3 grupos diferentes)
+  // Agora: "Centro" = "centro" = "CENTRO" (todos viram "centro")
   //
   // LÓGICA:
   // 1. Agrupa por CNPJ (mesmo cliente)
   // 2. Se 2+ vendedores para mesmo CNPJ = CONFLITO CRÍTICO 🔴
-  // 3. Agrupa por Localização (cidade + bairro)
+  // 3. Agrupa por Localização NORMALIZADA (cidade + bairro em minúsculas)
   // 4. Se 2+ vendedores na mesma localização = CONFLITO ATENÇÃO 🟡
   // 5. Remove conflitos que foram arquivados
   // 6. Ordena: críticos primeiro, depois por qtd de vendedores
@@ -212,6 +221,7 @@ const Conflitos = () => {
 
     // --------------------------------------------------------------------------
     // PARTE 2: CONFLITOS POR LOCALIZAÇÃO (ATENÇÃO - AMARELO)
+    // ⭐ COM NORMALIZAÇÃO DE TEXTO
     // --------------------------------------------------------------------------
     // Primeiro, cria Set de CNPJs que já têm conflito
     // (para não duplicar: se já tem conflito de CNPJ, não precisa alertar por localização)
@@ -229,28 +239,36 @@ const Conflitos = () => {
       .filter(orc => !cnpjsConflitantes.has(orc.cnpj_cpf))
       .forEach(orc => {
         if (orc.obra_cidade && orc.obra_bairro) {
-          const chave = `${orc.obra_cidade}|${orc.obra_bairro}`;
+          // ⭐ NORMALIZAÇÃO: Converte para minúsculas e remove espaços extras
+          // Isso garante que "Centro", "centro" e "CENTRO" sejam tratados como iguais
+          const cidadeNormalizada = orc.obra_cidade.toLowerCase().trim();
+          const bairroNormalizado = orc.obra_bairro.toLowerCase().trim();
+          const chave = `${cidadeNormalizada}|${bairroNormalizado}`;
+          
           if (!porLocalizacao[chave]) {
-            porLocalizacao[chave] = [];
+            porLocalizacao[chave] = {
+              cidade: orc.obra_cidade, // Mantém original para exibição bonita
+              bairro: orc.obra_bairro,  // Mantém original para exibição bonita
+              orcamentos: []
+            };
           }
-          porLocalizacao[chave].push(orc);
+          porLocalizacao[chave].orcamentos.push(orc);
         }
       });
 
     // Para cada localização, verifica se tem múltiplos vendedores
-    Object.entries(porLocalizacao).forEach(([chave, orcs]) => {
-      const vendedoresUnicos = new Set(orcs.map(o => o.usuario_id));
+    Object.entries(porLocalizacao).forEach(([chave, dados]) => {
+      const vendedoresUnicos = new Set(dados.orcamentos.map(o => o.usuario_id));
       
       // Se tem 2 ou mais vendedores = CONFLITO!
       if (vendedoresUnicos.size > 1 && !chavesIgnoradas.has(`LOCALIZACAO:${chave}`)) {
-        const [cidade, bairro] = chave.split('|');
         grupos.push({
           id: `loc-${chave}`,
           tipo: 'LOCALIZACAO',
           nivel: 'ATENCAO',
           chave,
-          titulo: `${cidade} - ${bairro}`,
-          orcamentos: orcs,
+          titulo: `${dados.cidade} - ${dados.bairro}`, // Usa original para exibir
+          orcamentos: dados.orcamentos,
           totalVendedores: vendedoresUnicos.size
         });
       }
@@ -274,6 +292,9 @@ const Conflitos = () => {
   // Quando o admin clica em "Arquivar", este conflito some da lista ativa
   // e vai para a lista de arquivados
   //
+  // ⚠️ IMPORTANTE: A chave salva no banco já está normalizada!
+  // Formato: "belo horizonte|centro" (tudo minúsculo)
+  //
   // PARÂMETROS:
   // - grupo: objeto com informações do conflito (tipo, chave, orcamentos)
   //
@@ -293,7 +314,7 @@ const Conflitos = () => {
         .from('conflitos_ignorados')
         .insert({
           tipo: grupo.tipo,                           // 'CNPJ' ou 'LOCALIZACAO'
-          chave_conflito: grupo.chave,                // CNPJ ou "cidade|bairro"
+          chave_conflito: grupo.chave,                // CNPJ ou "cidade|bairro" (normalizado!)
           orcamento_ids: grupo.orcamentos.map(o => o.id),  // Array de IDs
           ignorado_por: user?.id                      // Quem arquivou
         });
@@ -698,25 +719,32 @@ export default Conflitos;
 // 📝 NOTAS IMPORTANTES PARA O FUTURO
 // ============================================================================
 //
+// ⭐ CORREÇÃO APLICADA EM 16/01/2026:
+// - Normalização de cidade e bairro para minúsculas (linha 241-243)
+// - Problema resolvido: "Centro" ≠ "centro" ≠ "CENTRO"
+// - Solução: Todos viram "centro" antes de comparar
+// - A exibição continua bonita (mantém original - linha 245-246)
+//
 // 🔧 MANUTENÇÃO:
 // - Para mudar o período de análise (180 dias): linha 112
 // - Para adicionar novos status: linha 129 (array de status)
 // - Para mudar cores dos conflitos: procure por "bg-red-" e "bg-yellow-"
+// - Para desativar normalização: remova .toLowerCase().trim() nas linhas 241-242
 //
 // 🐛 TROUBLESHOOTING COMUM:
-// 1. "Nenhum conflito aparece":
-//    - Verificar se há orçamentos nos últimos 180 dias
-//    - Verificar se os orçamentos têm CNPJ ou cidade+bairro preenchidos
-//    - Verificar se os orçamentos têm vendedores diferentes
+// 1. "Nenhum conflito de localização aparece":
+//    - Verificar se cidade E bairro estão preenchidos
+//    - Verificar se são vendedores diferentes (usuario_id)
+//    - Verificar se não estão no mesmo grupo de CNPJ
 //
 // 2. "Erro ao arquivar":
 //    - Verificar se tabela conflitos_ignorados existe
 //    - Verificar RLS policies da tabela
 //    - Verificar se user.id está disponível
 //
-// 3. "Botão Ver Detalhes não funciona":
-//    - Verificar se rota /orcamentos/editar/:id existe
-//    - Verificar permissões do usuário
+// 3. "Conflitos duplicados":
+//    - Verificar se a normalização está ativa (linha 241-242)
+//    - Limpar tabela conflitos_ignorados e recarregar
 //
 // 🔄 FUNCIONALIDADES:
 // - Arquivar: Move conflito para lista de arquivados
@@ -732,15 +760,16 @@ export default Conflitos;
 // 1. Busca todos os orçamentos ativos
 // 2. Agrupa por CNPJ
 // 3. Se 2+ vendedores → conflito crítico
-// 4. Agrupa por cidade+bairro (excluindo os que já têm conflito de CNPJ)
-// 5. Se 2+ vendedores → conflito atenção
-// 6. Remove conflitos arquivados
+// 4. Normaliza cidade+bairro para minúsculas
+// 5. Agrupa por localização (excluindo os que já têm conflito de CNPJ)
+// 6. Se 2+ vendedores → conflito atenção
+// 7. Remove conflitos arquivados
 //
 // 🗄️ ESTRUTURA DO BANCO:
 // conflitos_ignorados:
 // - id (uuid)
 // - tipo ('CNPJ' ou 'LOCALIZACAO')
-// - chave_conflito (CNPJ ou "cidade|bairro")
+// - chave_conflito (CNPJ ou "cidade|bairro" em MINÚSCULAS!)
 // - orcamento_ids (array de IDs)
 // - ignorado_por (uuid do usuário)
 // - created_at (timestamp)
