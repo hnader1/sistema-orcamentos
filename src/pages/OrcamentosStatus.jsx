@@ -33,7 +33,7 @@
 -- - Apenas Comercial e Administrador podem mudar para "Finalizado"
 -- - Similar à restrição do status "Lançado"
 -- ====================================================================================
->>>>>>> ac64a9ffd7177acb536ca71e784b840e5a1516d4
+
 
 -- ====================================================================================
 -- 1. VERIFICAR SE O TIPO ENUM JÁ EXISTE
