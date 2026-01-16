@@ -1332,11 +1332,13 @@ function OrcamentoForm() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Condições de Pagamento *
                   </label>
-                  <SearchableSelectFormaPagamento
-                    value={formData.forma_pagamento_id}
-                    onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
-                    placeholder="Digite para buscar (ex: 28, pix, boleto)..."
-                  />
+                  <div style={{ color: '#000000' }}>
+                    <SearchableSelectFormaPagamento
+                      value={formData.forma_pagamento_id}
+                      onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
+                      placeholder="Digite para buscar (ex: 28, pix, boleto)..."
+                    />
+                  </div>
                 </div>
               </div>
             </div>
