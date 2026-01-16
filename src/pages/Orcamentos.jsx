@@ -8,6 +8,7 @@ import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
+import { MapPin } from 'lucide-react';
 
 export default function Orcamentos() {
   const navigate = useNavigate()
