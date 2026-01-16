@@ -173,7 +173,14 @@ export default function PropostaComercial({
               <img src={logoConstrucom} alt="Construcom" style={styles.logo} />
               <div style={styles.headerRight}>
                 <div style={styles.titulo}>PROPOSTA COMERCIAL</div>
-                <div style={styles.numero}>{dadosOrcamento.numero}</div>
+                <div style={styles.numero}>
+                  {dadosOrcamento.numero}
+                  {dadosOrcamento.numero_proposta && (
+                    <span style={{ color: '#9333ea', marginLeft: '8px', fontWeight: 'bold' }}>
+                      | PROPOSTA: {dadosOrcamento.numero_proposta}
+                    </span>
+                  )}
+                </div>
                 <div style={styles.dataLocal}>{formatarData(dadosOrcamento.data_orcamento)} | Pedro Leopoldo - MG</div>
               </div>
             </div>
