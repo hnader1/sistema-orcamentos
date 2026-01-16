@@ -1,4 +1,4 @@
-// src/
+// src/pages/OrcamentoForm.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
@@ -11,7 +11,7 @@ import CNPJCPFForm from '../components/CNPJCPFForm'
 import EnderecoObraForm from '../components/EnderecoObraForm'
 import { verificarConcorrenciaInterna } from '../utils/concorrenciaUtils'
 import ModalAlertaConcorrencia from '../components/ModalAlertaConcorrencia'
-import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaPagamento';
+import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaPagamento'
 
 const TABELA_ITENS = 'orcamentos_itens'
 
@@ -70,7 +70,6 @@ function OrcamentoForm() {
     obra_numero: '',
     obra_complemento: '',
     obra_endereco_validado: false
-
   })
 
   const carregarVendedores = async () => {
@@ -111,52 +110,51 @@ function OrcamentoForm() {
     }
   }
 
-const verificarConcorrencia = async () => {
-  if (!dadosCNPJCPF?.cnpj_cpf && !dadosEndereco?.obra_cidade) {
-    return
-  }
-
-  try {
-    const resultado = await verificarConcorrenciaInterna(
-      {
-        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
-        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado,
-        obra_cidade: dadosEndereco?.obra_cidade,
-        obra_bairro: dadosEndereco?.obra_bairro
-      },
-      user?.id,
-      id
-    )
-
-    if (resultado.temConflito) {
-      setConflitosDetectados(resultado)
-      setMostrarAlertaConcorrencia(true)
-      console.log('⚠️ Conflitos detectados:', resultado.totalConflitos)
-    } else {
-      console.log('✅ Nenhum conflito detectado')
+  const verificarConcorrencia = async () => {
+    if (!dadosCNPJCPF?.cnpj_cpf && !dadosEndereco?.obra_cidade) {
+      return
     }
-  } catch (error) {
-    console.error('Erro ao verificar concorrência:', error)
+
+    try {
+      const resultado = await verificarConcorrenciaInterna(
+        {
+          cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
+          cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado,
+          obra_cidade: dadosEndereco?.obra_cidade,
+          obra_bairro: dadosEndereco?.obra_bairro
+        },
+        user?.id,
+        id
+      )
+
+      if (resultado.temConflito) {
+        setConflitosDetectados(resultado)
+        setMostrarAlertaConcorrencia(true)
+        console.log('⚠️ Conflitos detectados:', resultado.totalConflitos)
+      } else {
+        console.log('✅ Nenhum conflito detectado')
+      }
+    } catch (error) {
+      console.error('Erro ao verificar concorrência:', error)
+    }
   }
-}
 
-useEffect(() => {
-  if (isReadOnly) return
-  
-  const temCNPJ = dadosCNPJCPF?.cnpj_cpf && !dadosCNPJCPF?.cnpj_cpf_nao_informado
-  const temLocalizacao = dadosEndereco?.obra_cidade
-  
-  if (!temCNPJ && !temLocalizacao) {
-    return
-  }
+  useEffect(() => {
+    if (isReadOnly) return
+    
+    const temCNPJ = dadosCNPJCPF?.cnpj_cpf && !dadosCNPJCPF?.cnpj_cpf_nao_informado
+    const temLocalizacao = dadosEndereco?.obra_cidade
+    
+    if (!temCNPJ && !temLocalizacao) {
+      return
+    }
 
-  const timer = setTimeout(() => {
-    verificarConcorrencia()
-  }, 1000)
+    const timer = setTimeout(() => {
+      verificarConcorrencia()
+    }, 1000)
 
-  return () => clearTimeout(timer)
-}, [dadosCNPJCPF, dadosEndereco, isReadOnly])
-
+    return () => clearTimeout(timer)
+  }, [dadosCNPJCPF, dadosEndereco, isReadOnly])
 
   useEffect(() => {
     carregarProdutos()
@@ -180,8 +178,6 @@ useEffect(() => {
   useEffect(() => {
     calcularDataValidade()
   }, [formData.data_orcamento, formData.validade_dias])
-
-
 
   const calcularDataValidade = () => {
     if (formData.data_orcamento && formData.validade_dias) {
@@ -250,7 +246,7 @@ useEffect(() => {
 
       setFormData({
         numero: orc.numero,
-        cliente_nome: orc.cliente_nome || ''
+        cliente_nome: orc.cliente_nome || '',
         cliente_empresa: orc.cliente_empresa || '',
         cliente_email: orc.cliente_email || '',
         cliente_telefone: orc.cliente_telefone || '',
@@ -273,6 +269,24 @@ useEffect(() => {
         cnpj_cpf: orc.cnpj_cpf || null,
         cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
         cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null,
+        obra_cep: orc.obra_cep || '',
+        obra_cidade: orc.obra_cidade || '',
+        obra_bairro: orc.obra_bairro || '',
+        obra_logradouro: orc.obra_logradouro || '',
+        obra_numero: orc.obra_numero || '',
+        obra_complemento: orc.obra_complemento || '',
+        obra_endereco_validado: orc.obra_endereco_validado || false
+      })
+
+      // ✅ CORREÇÃO: Inicializar dadosCNPJCPF com valores do banco
+      setDadosCNPJCPF({
+        cnpj_cpf: orc.cnpj_cpf || null,
+        cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null
+      })
+
+      // ✅ CORREÇÃO: Inicializar dadosEndereco com valores do banco
+      setDadosEndereco({
         obra_cep: orc.obra_cep || '',
         obra_cidade: orc.obra_cidade || '',
         obra_bairro: orc.obra_bairro || '',
@@ -397,11 +411,11 @@ useEffect(() => {
         .map(p => p.mpa)
     )]
     return mpas.sort((a, b) => {
-    const numA = parseFloat(a.replace(/[^\d.]/g, ''))
-    const numB = parseFloat(b.replace(/[^\d.]/g, ''))
-    return numA - numB
-  })
-}
+      const numA = parseFloat(a.replace(/[^\d.]/g, ''))
+      const numB = parseFloat(b.replace(/[^\d.]/g, ''))
+      return numA - numB
+    })
+  }
 
   const getProdutoCompleto = (nomeProduto, classe, mpa) => {
     return produtos.find(p => 
@@ -611,166 +625,166 @@ useEffect(() => {
     }
   }
 
-    const salvar = async () => {
-      try {
-        if (!formData.numero || !formData.cliente_nome) {
-          alert('Preencha os campos obrigatórios!')
-          return
-        }
-
-        if (!formData.cliente_email) {
-          alert('Por favor, informe o email do cliente!')
-          return
-        }
-
-        if (!formData.cliente_telefone) {
-          alert('Por favor, informe o telefone do cliente!')
-          return
-        }
-
-        if (!formData.forma_pagamento_id) {
-          alert('Por favor, selecione uma forma de pagamento!')
-          return
-        }
-
-    setLoading(true)
-
-    const subtotal = calcularSubtotal()
-    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-    const subtotalComDesconto = subtotal - desconto
-    const frete = dadosFrete?.valor_total_frete || 0
-    const total = subtotalComDesconto + frete
-
-    const dadosOrcamento = {
-      numero: formData.numero,
-      cliente_nome: formData.cliente_nome,
-      cliente_empresa: formData.cliente_empresa,
-      cliente_email: formData.cliente_email,
-      cliente_telefone: formData.cliente_telefone,
-      cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
-      endereco_entrega: formData.endereco_entrega,
-      vendedor: formData.vendedor,
-      vendedor_telefone: formData.vendedor_telefone,
-      vendedor_email: formData.vendedor_email,
-      data_orcamento: formData.data_orcamento,
-      validade_dias: parseInt(formData.validade_dias),
-      data_validade: formData.data_validade,
-      forma_pagamento_id: formData.forma_pagamento_id,
-      prazo_entrega: formData.prazo_entrega,
-      desconto_geral: parseFloat(formData.desconto_geral),
-      subtotal: subtotalComDesconto,
-      frete: frete,
-      frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
-      frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-      frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-      frete_cidade: dadosFrete?.localidade || null,
-      frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
-      total,
-      observacoes: formData.observacoes,
-      status: formData.status,
-      numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
-      cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
-      cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
-      cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
-      cnpj_cpf_nao_informado_aceite_ip: null,
-      obra_cep: dadosEndereco?.obra_cep || null,
-      obra_cidade: dadosEndereco?.obra_cidade || null,
-      obra_bairro: dadosEndereco?.obra_bairro || null,
-      obra_logradouro: dadosEndereco?.obra_logradouro || null,
-      obra_numero: dadosEndereco?.obra_numero || null,
-      obra_complemento: dadosEndereco?.obra_complemento || null,
-      obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
-    }
-
-    if (!id) {
-      dadosOrcamento.usuario_id = user?.id || null
-    } else {
-      dadosOrcamento.usuario_id = formData.usuario_id_original
-    }
-
-    if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
-      dadosOrcamento.data_lancamento = new Date().toISOString()
-    }
-
-    let orcamentoId = id
-
-    if (id) {
-      console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
-      
-      const { error } = await supabase
-        .from('orcamentos')
-        .update(dadosOrcamento)
-        .eq('id', id)
-
-      if (error) throw error
-      console.log('✅ [EDITAR] Orçamento atualizado')
-
-      console.log('🗑️ [EDITAR] Deletando itens antigos...')
-      const { error: errorDelete } = await supabase
-        .from(TABELA_ITENS)
-        .delete()
-        .eq('orcamento_id', id)
-
-      if (errorDelete) {
-        console.error('❌ [EDITAR] Erro ao deletar:', errorDelete)
-        throw errorDelete
+  const salvar = async () => {
+    try {
+      if (!formData.numero || !formData.cliente_nome) {
+        alert('Preencha os campos obrigatórios!')
+        return
       }
-      console.log('✅ [EDITAR] Itens deletados')
 
-    } else {
-      console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
-      
-      const { data, error } = await supabase
-        .from('orcamentos')
-        .insert([dadosOrcamento])
-        .select()
-        .single()
+      if (!formData.cliente_email) {
+        alert('Por favor, informe o email do cliente!')
+        return
+      }
 
-      if (error) throw error
-      
-      orcamentoId = data.id
-      console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
+      if (!formData.cliente_telefone) {
+        alert('Por favor, informe o telefone do cliente!')
+        return
+      }
+
+      if (!formData.forma_pagamento_id) {
+        alert('Por favor, selecione uma forma de pagamento!')
+        return
+      }
+
+      setLoading(true)
+
+      const subtotal = calcularSubtotal()
+      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+      const subtotalComDesconto = subtotal - desconto
+      const frete = dadosFrete?.valor_total_frete || 0
+      const total = subtotalComDesconto + frete
+
+      const dadosOrcamento = {
+        numero: formData.numero,
+        cliente_nome: formData.cliente_nome,
+        cliente_empresa: formData.cliente_empresa,
+        cliente_email: formData.cliente_email,
+        cliente_telefone: formData.cliente_telefone,
+        cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
+        endereco_entrega: formData.endereco_entrega,
+        vendedor: formData.vendedor,
+        vendedor_telefone: formData.vendedor_telefone,
+        vendedor_email: formData.vendedor_email,
+        data_orcamento: formData.data_orcamento,
+        validade_dias: parseInt(formData.validade_dias),
+        data_validade: formData.data_validade,
+        forma_pagamento_id: formData.forma_pagamento_id,
+        prazo_entrega: formData.prazo_entrega,
+        desconto_geral: parseFloat(formData.desconto_geral),
+        subtotal: subtotalComDesconto,
+        frete: frete,
+        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+        total,
+        observacoes: formData.observacoes,
+        status: formData.status,
+        numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
+        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
+        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
+        cnpj_cpf_nao_informado_aceite_ip: null,
+        obra_cep: dadosEndereco?.obra_cep || null,
+        obra_cidade: dadosEndereco?.obra_cidade || null,
+        obra_bairro: dadosEndereco?.obra_bairro || null,
+        obra_logradouro: dadosEndereco?.obra_logradouro || null,
+        obra_numero: dadosEndereco?.obra_numero || null,
+        obra_complemento: dadosEndereco?.obra_complemento || null,
+        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
+      }
+
+      if (!id) {
+        dadosOrcamento.usuario_id = user?.id || null
+      } else {
+        dadosOrcamento.usuario_id = formData.usuario_id_original
+      }
+
+      if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
+        dadosOrcamento.data_lancamento = new Date().toISOString()
+      }
+
+      let orcamentoId = id
+
+      if (id) {
+        console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
+        
+        const { error } = await supabase
+          .from('orcamentos')
+          .update(dadosOrcamento)
+          .eq('id', id)
+
+        if (error) throw error
+        console.log('✅ [EDITAR] Orçamento atualizado')
+
+        console.log('🗑️ [EDITAR] Deletando itens antigos...')
+        const { error: errorDelete } = await supabase
+          .from(TABELA_ITENS)
+          .delete()
+          .eq('orcamento_id', id)
+
+        if (errorDelete) {
+          console.error('❌ [EDITAR] Erro ao deletar:', errorDelete)
+          throw errorDelete
+        }
+        console.log('✅ [EDITAR] Itens deletados')
+
+      } else {
+        console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
+        
+        const { data, error } = await supabase
+          .from('orcamentos')
+          .insert([dadosOrcamento])
+          .select()
+          .single()
+
+        if (error) throw error
+        
+        orcamentoId = data.id
+        console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
+      }
+
+      const itens = produtosSelecionados.map((item, index) => ({
+        orcamento_id: orcamentoId,
+        produto_id: item.produto_id,
+        produto_codigo: item.codigo,
+        produto: item.produto,
+        classe: item.classe,
+        mpa: item.mpa,
+        quantidade: parseInt(item.quantidade),
+        preco_unitario: parseFloat(item.preco),
+        peso_unitario: parseFloat(item.peso_unitario),
+        qtd_por_pallet: parseInt(item.qtd_por_pallet),
+        subtotal: item.quantidade * item.preco,
+        ordem: index
+      }))
+
+      console.log(`💾 [INSERT] Inserindo ${itens.length} itens...`)
+
+      const { error: errorItens } = await supabase
+        .from(TABELA_ITENS)
+        .insert(itens)
+
+      if (errorItens) {
+        console.error('❌ [INSERT] Erro:', errorItens)
+        throw errorItens
+      }
+
+      console.log('✅ [INSERT] Itens inseridos')
+      console.log('🎉 Salvamento concluído!')
+
+      alert('Orçamento salvo com sucesso!')
+      navigate('/orcamentos')
+
+    } catch (error) {
+      console.error('❌ Erro ao salvar:', error)
+      alert('Erro ao salvar orçamento: ' + error.message)
+    } finally {
+      setLoading(false)
     }
-
-    const itens = produtosSelecionados.map((item, index) => ({
-      orcamento_id: orcamentoId,
-      produto_id: item.produto_id,
-      produto_codigo: item.codigo,
-      produto: item.produto,
-      classe: item.classe,
-      mpa: item.mpa,
-      quantidade: parseInt(item.quantidade),
-      preco_unitario: parseFloat(item.preco),
-      peso_unitario: parseFloat(item.peso_unitario),
-      qtd_por_pallet: parseInt(item.qtd_por_pallet),
-      subtotal: item.quantidade * item.preco,
-      ordem: index
-    }))
-
-    console.log(`💾 [INSERT] Inserindo ${itens.length} itens...`)
-
-    const { error: errorItens } = await supabase
-      .from(TABELA_ITENS)
-      .insert(itens)
-
-    if (errorItens) {
-      console.error('❌ [INSERT] Erro:', errorItens)
-      throw errorItens
-    }
-
-    console.log('✅ [INSERT] Itens inseridos')
-    console.log('🎉 Salvamento concluído!')
-
-    alert('Orçamento salvo com sucesso!')
-    navigate('/orcamentos')
-
-  } catch (error) {
-    console.error('❌ Erro ao salvar:', error)
-    alert('Erro ao salvar orçamento: ' + error.message)
-  } finally {
-    setLoading(false)
   }
-}
 
   if (loading && id) {
     return (
@@ -866,7 +880,6 @@ useEffect(() => {
                 {isReadOnly ? 'Visualizar Orçamento' : (id ? 'Editar Orçamento' : 'Novo Orçamento')}
               </h1>
             </div>
-            {/* ✨ BOTÕES SEMPRE VISÍVEIS NO MOBILE */}
             <div className="flex items-center gap-2">
               {isReadOnly && (
                 <button
@@ -878,7 +891,6 @@ useEffect(() => {
                   <span className="hidden sm:inline">Duplicar</span>
                 </button>
               )}
-              {/* ✅ BOTÃO GERAR PROPOSTA - SEMPRE VISÍVEL */}
               <button
                 onClick={() => setMostrarProposta(true)}
                 disabled={produtosSelecionados.length === 0}
@@ -1016,80 +1028,77 @@ useEffect(() => {
           </div>
         </div>
 
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Dados do Cliente</h2>
+          
+          <CNPJCPFForm
+            valores={formData}
+            onChange={(dados) => {
+              setDadosCNPJCPF(dados)
+              setFormData(prev => ({ ...prev, ...dados }))
+            }}
+            onValidacao={setCnpjCpfValido}
+          />
 
-<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-  <h2 className="text-lg font-semibold mb-4">Dados do Cliente</h2>
-  
-  {/* COMPONENTE CNPJ/CPF INTEGRADO */}
-  <CNPJCPFForm
-    valores={formData}
-    onChange={(dados) => {
-      setDadosCNPJCPF(dados)
-      setFormData(prev => ({ ...prev, ...dados }))
-    }}
-    onValidacao={setCnpjCpfValido}
-  />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cliente <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.cliente_nome}
+                onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Contato</label>
+              <input
+                type="text"
+                value={formData.cliente_empresa}
+                onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Telefone <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.cliente_telefone}
+                onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={formData.cliente_email}
+                onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isReadOnly}
+              />
+            </div>
+          </div>
+        </div>
 
-  {/* CAMPOS DE DADOS DO CLIENTE */}
- 
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Cliente <span className="text-red-500">*</span>
-    </label>
-    <input
-      type="text"
-      value={formData.cliente_nome}
-      onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
-      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-      disabled={isReadOnly}
-    />
-  </div>
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">Nome Contato</label>
-    <input
-      type="text"
-      value={formData.cliente_empresa}
-      onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
-      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-      disabled={isReadOnly}
-    />
-  </div>
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Telefone <span className="text-red-500">*</span>
-    </label>
-    <input
-      type="text"
-      value={formData.cliente_telefone}
-      onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
-      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-      disabled={isReadOnly}
-    />
-  </div>
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Email <span className="text-red-500">*</span>
-    </label>
-    <input
-      type="email"
-      value={formData.cliente_email}
-      onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
-      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-      disabled={isReadOnly}
-    />
-  </div>
-</div>
-
-<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-  <EnderecoObraForm
-    valores={formData}
-    onChange={(dados) => {
-      setDadosEndereco(dados)
-      setFormData(prev => ({ ...prev, ...dados }))
-    }}
-  />
-</div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <EnderecoObraForm
+            valores={formData}
+            onChange={(dados) => {
+              setDadosEndereco(dados)
+              setFormData(prev => ({ ...prev, ...dados }))
+            }}
+          />
+        </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -1109,145 +1118,134 @@ useEffect(() => {
               Clique em "Adicionar Produto" para incluir produtos no orçamento
             </div>
           ) : (
-           
             <div className="overflow-x-auto">
-  <table className="w-full text-sm">
-    <thead className="bg-gray-100">
-      <tr>
-        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
-        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
-        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
-        <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
-        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
-        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
-        <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
-        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
-        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
-        <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
-        <th className="px-2 py-2"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {produtosSelecionados.map((item, index) => (
-        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-          {/* PRODUTO - LARGURA REDUZIDA */}
-          <td className="px-2 py-1">
-            <select
-              value={item.produto}
-              onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
-              disabled={isReadOnly}
-              className="w-40 px-2 py-1 border rounded text-sm"
-            >
-              <option value="">Selecione...</option>
-              {getProdutosUnicos().map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </td>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
+                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
+                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
+                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
+                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
+                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
+                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
+                    <th className="px-2 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {produtosSelecionados.map((item, index) => (
+                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-2 py-1">
+                        <select
+                          value={item.produto}
+                          onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
+                          disabled={isReadOnly}
+                          className="w-40 px-2 py-1 border rounded text-sm"
+                        >
+                          <option value="">Selecione...</option>
+                          {getProdutosUnicos().map(p => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </td>
 
-          {/* CLASSE */}
-          <td className="px-2 py-1">
-            <select
-              value={item.classe}
-              onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
-              disabled={!item.produto || isReadOnly}
-              className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
-            >
-              <option value="">-</option>
-              {getClassesDisponiveis(item.produto).map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </td>
+                      <td className="px-2 py-1">
+                        <select
+                          value={item.classe}
+                          onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
+                          disabled={!item.produto || isReadOnly}
+                          className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
+                        >
+                          <option value="">-</option>
+                          {getClassesDisponiveis(item.produto).map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </td>
 
-          {/* MPA */}
-          <td className="px-2 py-1">
-            <select
-              value={item.mpa}
-              onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
-              disabled={!item.classe || isReadOnly}
-              className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
-            >
-              <option value="">-</option>
-              {getMPAsDisponiveis(item.produto, item.classe).map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </td>
+                      <td className="px-2 py-1">
+                        <select
+                          value={item.mpa}
+                          onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
+                          disabled={!item.classe || isReadOnly}
+                          className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
+                        >
+                          <option value="">-</option>
+                          {getMPAsDisponiveis(item.produto, item.classe).map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </td>
 
-          {/* QUANTIDADE */}
-          <td className="px-2 py-1">
-            <input
-              type="number"
-              value={item.quantidade}
-              onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
-              disabled={isReadOnly}
-              className="w-20 px-2 py-1 border rounded text-sm text-center"
-              min="1"
-            />
-          </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          value={item.quantidade}
+                          onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
+                          disabled={isReadOnly}
+                          className="w-20 px-2 py-1 border rounded text-sm text-center"
+                          min="1"
+                        />
+                      </td>
 
-          {/* PREÇO */}
-          <td className="px-2 py-1 text-right text-gray-600">
-            {item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
-          </td>
+                      <td className="px-2 py-1 text-right text-gray-600">
+                        {item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
+                      </td>
 
-          {/* PESO UNITÁRIO */}
-          <td className="px-2 py-1 text-right text-gray-600">
-            {item.peso_unitario ? `${item.peso_unitario} kg` : '-'}
-          </td>
+                      <td className="px-2 py-1 text-right text-gray-600">
+                        {item.peso_unitario ? `${item.peso_unitario} kg` : '-'}
+                      </td>
 
-          {/* ✨ NOVA COLUNA: QTD POR PALLET */}
-          <td className="px-2 py-1 text-center">
-            {item.qtd_por_pallet ? (
-              <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold min-w-[40px]">
-                {item.qtd_por_pallet}
-              </span>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </td>
+                      <td className="px-2 py-1 text-center">
+                        {item.qtd_por_pallet ? (
+                          <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold min-w-[40px]">
+                            {item.qtd_por_pallet}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
 
-          {/* PESO TOTAL */}
-          <td className="px-2 py-1 text-right text-gray-600">
-            {item.peso_unitario && item.quantidade 
-              ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
-              : '-'} 
-          </td>
+                      <td className="px-2 py-1 text-right text-gray-600">
+                        {item.peso_unitario && item.quantidade 
+                          ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
+                          : '-'} 
+                      </td>
 
-          {/* SUBTOTAL */}
-          <td className="px-2 py-1 text-right font-semibold text-gray-900">
-            {item.preco && item.quantidade 
-              ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
-              : '-'}
-          </td>
+                      <td className="px-2 py-1 text-right font-semibold text-gray-900">
+                        {item.preco && item.quantidade 
+                          ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                          : '-'}
+                      </td>
 
-          {/* TOTAL DE PALLETS */}
-          <td className="px-2 py-1 text-center">
-            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold">
-              {item.qtd_por_pallet && item.quantidade 
-                ? (item.quantidade / item.qtd_por_pallet).toFixed(2) 
-                : '-'}
-            </span>
-          </td>
+                      <td className="px-2 py-1 text-center">
+                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold">
+                          {item.qtd_por_pallet && item.quantidade 
+                            ? (item.quantidade / item.qtd_por_pallet).toFixed(2) 
+                            : '-'}
+                        </span>
+                      </td>
 
-          {/* BOTÃO REMOVER */}
-          <td className="px-2 py-1">
-            <button
-              onClick={() => removerProduto(index)}
-              disabled={isReadOnly}
-              className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Trash2 size={16} />
-            </button>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
+                      <td className="px-2 py-1">
+                        <button
+                          onClick={() => removerProduto(index)}
+                          disabled={isReadOnly}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <FreteSelector 
             pesoTotal={calcularPesoTotal()}
@@ -1257,11 +1255,9 @@ useEffect(() => {
           />
         </div>
 
-        {/* ✨ OBSERVAÇÕES E TOTAIS LADO A LADO */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* COLUNA ESQUERDA - OBSERVAÇÕES */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Observações</h2>
               <textarea
@@ -1274,7 +1270,6 @@ useEffect(() => {
               />
             </div>
 
-            {/* COLUNA DIREITA - TOTAIS */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Resumo Financeiro</h2>
               <div className="space-y-2">
@@ -1333,15 +1328,14 @@ useEffect(() => {
                   </span>
                 </div>
 
-                {/* CONDIÇÕES DE PAGAMENTO */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                  Condições de Pagamento *
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Condições de Pagamento *
                   </label>
                   <SearchableSelectFormaPagamento
-                  value={formData.forma_pagamento_id}
-                  onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
-                  placeholder="Digite para buscar (ex: 28, pix, boleto)..."
+                    value={formData.forma_pagamento_id}
+                    onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
+                    placeholder="Digite para buscar (ex: 28, pix, boleto)..."
                   />
                 </div>
               </div>
@@ -1352,15 +1346,14 @@ useEffect(() => {
       </div>
 
       <PropostaComercial
-
-
         isOpen={mostrarProposta}
         onClose={() => setMostrarProposta(false)}
         dadosOrcamento={formData}
         produtos={produtosSelecionados}
         dadosFrete={dadosFrete}
       />
-       <ModalAlertaConcorrencia
+      
+      <ModalAlertaConcorrencia
         isOpen={mostrarAlertaConcorrencia}
         onClose={() => setMostrarAlertaConcorrencia(false)}
         conflitos={conflitosDetectados}
