@@ -62,9 +62,16 @@ export default function Orcamentos() {
       
       // Query base: busca todos os orçamentos não excluídos
       let query = supabase
-        .from('orcamentos')
-        .select('*')
-        .eq('excluido', false)
+      .from('orcamentos')
+      .select(`
+        *,
+        formas_pagamento (
+          id,
+          descricao,
+          categoria
+    )
+  `)
+  .eq('excluido', false)
       
       // Se for vendedor, filtrar apenas seus orçamentos
       if (isVendedor()) {
@@ -368,7 +375,9 @@ export default function Orcamentos() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* ==================================================================== */}
+       
+
+       javascriptreact{/* ==================================================================== */}
         {/* CARDS DE STATUS - DASHBOARD */}
         {/* ==================================================================== */}
         <div className="mb-8">
@@ -464,6 +473,16 @@ export default function Orcamentos() {
                             <div className="flex items-center gap-1">
                               <User size={14} className="text-gray-400" />
                               <span className="text-xs">{orc.vendedor}</span>
+                            </div>
+                          </>
+                        )}
+                        {orc.formas_pagamento?.descricao && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-gray-600">
+                                {orc.formas_pagamento.descricao}
+                              </span>
                             </div>
                           </>
                         )}
@@ -602,6 +621,16 @@ export default function Orcamentos() {
                             </div>
                           </>
                         )}
+                        {orc.formas_pagamento?.descricao && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-gray-600">
+                                {orc.formas_pagamento.descricao}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                     
@@ -632,7 +661,7 @@ export default function Orcamentos() {
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Cancelar"
                           >
-                            <Ban size={20} />
+                           <Ban size={20} />
                           </button>
                         )}
                       </div>
@@ -648,6 +677,7 @@ export default function Orcamentos() {
   )
 }
 
+export default Orcamentos
 // ====================================================================================
 // NOTAS IMPORTANTES PARA FUTURAS MODIFICAÇÕES:
 // ====================================================================================

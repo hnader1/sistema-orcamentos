@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Printer } from 'lucide-react'
+import { supabase } from '../services/supabase'
 import logoConstrucom from '../assets/logo-construcom.png'
 
 export default function PropostaComercial({ 
@@ -10,6 +11,40 @@ export default function PropostaComercial({
   dadosFrete 
 }) {
   const printRef = useRef()
+  const [formaPagamento, setFormaPagamento] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  // Buscar forma de pagamento quando abrir o modal
+  useEffect(() => {
+    if (isOpen && dadosOrcamento?.forma_pagamento_id) {
+      carregarFormaPagamento()
+    } else {
+      setLoading(false)
+    }
+  }, [isOpen, dadosOrcamento?.forma_pagamento_id])
+
+  const carregarFormaPagamento = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('formas_pagamento')
+        .select('descricao')
+        .eq('id', dadosOrcamento.forma_pagamento_id)
+        .single()
+
+      if (error) {
+        console.error('Erro ao carregar forma de pagamento:', error)
+        setFormaPagamento(null)
+      } else {
+        setFormaPagamento(data)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar forma de pagamento:', error)
+      setFormaPagamento(null)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -102,9 +137,9 @@ export default function PropostaComercial({
     clausula: { marginBottom: '10px' },
     clausulaTitulo: { fontSize: '10px', fontWeight: 'bold', color: '#4c7f8a', marginBottom: '4px' },
     clausulaTexto: { fontSize: '9px', color: '#4a5568', paddingLeft: '10px' },
-    destaque: { backgroundColor: '#ebf8ff', border: '1px solid #3182ce', padding: '4px', textAlign: 'center', margin: '4px 0' },
+    destaque: { backgroundColor: '#ebf8ff', border: '1px solid #3182ce', padding: '8px', textAlign: 'center', margin: '4px 0' },
     destaqueValor: { fontSize: '16px', fontWeight: 'bold', color: '#2b6cb0' },
-    observacoes: { fontSize: '14px', backgroundColor: '#fffbeb', border: '1px dashed #d69e2e', padding: '4px', marginTop: '4px' },
+    observacoes: { fontSize: '10px', backgroundColor: '#fffbeb', border: '1px dashed #d69e2e', padding: '8px', marginTop: '4px' },
     footer: { borderTop: '2px solid #4c7f8a', paddingTop: '12px', marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' },
     assinatura: { },
     validadeBox: { backgroundColor: '#4c7f8a', color: '#fff', padding: '10px 20px', textAlign: 'center' },
@@ -126,7 +161,12 @@ export default function PropostaComercial({
 
         {/* Conteúdo */}
         <div style={{ flex: 1, overflow: 'auto', padding: '20px', backgroundColor: '#f0f0f0' }}>
-          <div ref={printRef} style={styles.container}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+              Carregando proposta...
+            </div>
+          ) : (
+            <div ref={printRef} style={styles.container}>
             
             {/* Header */}
             <div style={styles.header}>
@@ -294,11 +334,16 @@ export default function PropostaComercial({
                 </div>
               </div>
 
+              {/* ===== FORMA DE PAGAMENTO ATUALIZADA ===== */}
               <div style={styles.clausula}>
                 <div style={styles.clausulaTitulo}>09. CONDIÇÕES DE PAGAMENTO</div>
                 <div style={styles.destaque}>
-                  <div style={styles.destaqueValor}>{dadosOrcamento.condicoes_pagamento || '28 DIAS'}</div>
-                  <div style={{ fontSize: '9px', color: '#666' }}>Prazo para pagamento após faturamento</div>
+                  <div style={styles.destaqueValor}>
+                    {formaPagamento?.descricao || dadosOrcamento.condicoes_pagamento || 'A DEFINIR'}
+                  </div>
+                  <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
+                    Prazo para pagamento após faturamento
+                  </div>
                 </div>
               </div>
 
@@ -332,22 +377,23 @@ export default function PropostaComercial({
             {/* Footer */}
             <div style={styles.footer}>
               <div style={styles.assinatura}>
-                  <div style={{ fontStyle: 'italic', color: '#666', marginBottom: '5px' }}>Atenciosamente,</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4c7f8a' }}>CONSTRUCOM</div>
-                    <div style={{ fontSize: '11px', marginTop: '8px' }}>
-                    <strong>{dadosOrcamento.vendedor || 'Vendedor'}</strong><br/>
-                    {dadosOrcamento.vendedor_telefone && <span>📞 {dadosOrcamento.vendedor_telefone}</span>}
-                    {dadosOrcamento.vendedor_telefone && dadosOrcamento.vendedor_email && <br/>}
-                    {dadosOrcamento.vendedor_email && <span>📧 {dadosOrcamento.vendedor_email}</span>}
+                <div style={{ fontStyle: 'italic', color: '#666', marginBottom: '5px' }}>Atenciosamente,</div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4c7f8a' }}>CONSTRUCOM</div>
+                <div style={{ fontSize: '11px', marginTop: '8px' }}>
+                  <strong>{dadosOrcamento.vendedor || 'Vendedor'}</strong><br/>
+                  {dadosOrcamento.vendedor_telefone && <span>📞 {dadosOrcamento.vendedor_telefone}</span>}
+                  {dadosOrcamento.vendedor_telefone && dadosOrcamento.vendedor_email && <br/>}
+                  {dadosOrcamento.vendedor_email && <span>📧 {dadosOrcamento.vendedor_email}</span>}
+                </div>
               </div>
-          </div>
-  <div style={styles.validadeBox}>
-    <div style={styles.validadeDias}>{dadosOrcamento.validade_dias || 15}</div>
-    <div style={styles.validadeTexto}>dias de validade</div>
-  </div>
-</div>
+              <div style={styles.validadeBox}>
+                <div style={styles.validadeDias}>{dadosOrcamento.validade_dias || 15}</div>
+                <div style={styles.validadeTexto}>dias de validade</div>
+              </div>
+            </div>
 
           </div>
+          )}
         </div>
 
         {/* Ações */}
@@ -355,7 +401,11 @@ export default function PropostaComercial({
           <button onClick={onClose} style={{ padding: '10px 20px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
             Fechar
           </button>
-          <button onClick={imprimir} style={{ padding: '10px 20px', backgroundColor: '#4c7f8a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button 
+            onClick={imprimir} 
+            disabled={loading}
+            style={{ padding: '10px 20px', backgroundColor: '#4c7f8a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', opacity: loading ? 0.5 : 1 }}
+          >
             <Printer size={18} />
             Imprimir / Salvar PDF
           </button>

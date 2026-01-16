@@ -11,6 +11,7 @@ import CNPJCPFForm from '../components/CNPJCPFForm'
 import EnderecoObraForm from '../components/EnderecoObraForm'
 import { verificarConcorrenciaInterna } from '../utils/concorrenciaUtils'
 import ModalAlertaConcorrencia from '../components/ModalAlertaConcorrencia'
+import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaPagamento';
 
 const TABELA_ITENS = 'orcamentos_itens'
 
@@ -51,7 +52,7 @@ function OrcamentoForm() {
     data_orcamento: new Date().toISOString().split('T')[0],
     validade_dias: 15,
     data_validade: '',
-    condicoes_pagamento: '',
+    forma_pagamento_id: '',
     prazo_entrega: '',
     desconto_geral: 0,
     observacoes: '',
@@ -612,9 +613,16 @@ useEffect(() => {
 const salvar = async () => {
   try {
     if (!formData.numero || !formData.cliente_nome) {
-      alert('Preencha os campos obrigatórios!')
-      return
-    }
+    alert('Preencha os campos obrigatórios!')
+    return
+  }
+
+  if (!formData.forma_pagamento_id) {
+    alert('Por favor, selecione uma forma de pagamento!')
+    return
+  }
+
+    // ==========================================
 
     if (produtosSelecionados.length === 0) {
       alert('Adicione pelo menos um produto!')
@@ -656,7 +664,7 @@ const salvar = async () => {
       data_orcamento: formData.data_orcamento,
       validade_dias: parseInt(formData.validade_dias),
       data_validade: formData.data_validade,
-      condicoes_pagamento: formData.condicoes_pagamento,
+      forma_pagamento_id: formData.forma_pagamento_id,
       prazo_entrega: formData.prazo_entrega,
       desconto_geral: parseFloat(formData.desconto_geral),
       subtotal: subtotalComDesconto,
@@ -1329,20 +1337,16 @@ const salvar = async () => {
                 </div>
 
                 {/* CONDIÇÕES DE PAGAMENTO */}
-                <div className="border-t pt-3 mt-3">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                      Condições de Pagamento <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.condicoes_pagamento}
-                      onChange={(e) => setFormData({ ...formData, condicoes_pagamento: e.target.value })}
-                      placeholder="Ex: 28 DIAS, À VISTA, 30/60/90..."
-                      disabled={isReadOnly}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
-                  </div>
+                <div>
+  <label className="block text-sm font-medium mb-1">
+    Condições de Pagamento *
+  </label>
+  <SearchableSelectFormaPagamento
+    value={formData.forma_pagamento_id}
+    onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
+    placeholder="Digite para buscar (ex: 28, pix, boleto)..."
+  />
+</div>
                 </div>
               </div>
             </div>
