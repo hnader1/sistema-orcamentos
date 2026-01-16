@@ -20,27 +20,27 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
   }, [])
 
   const carregarFormasPagamento = async () => {
-  try {
-    console.log('🔍 Carregando formas de pagamento...')
-    
-    const { data, error } = await supabase
-      .from('formas_pagamento')
-      .select('*')
-      // REMOVI O .eq('ativo', true) temporariamente
-      .order('ordem', { ascending: true })
+    try {
+      console.log('🔍 Carregando formas de pagamento...')
+      
+      const { data, error } = await supabase
+        .from('formas_pagamento')
+        .select('*')
+        .order('ordem', { ascending: true })
 
-    console.log('Resultado:', { data, error })
+      console.log('Resultado:', { data, error })
 
-    if (error) throw error
-    
-    setFormasPagamento(data || [])
-    console.log(`✅ ${data?.length || 0} formas carregadas`)
-  } catch (error) {
-    console.error('❌ Erro ao carregar:', error)
-  } finally {
-    setLoading(false)
+      if (error) throw error
+      
+      setFormasPagamento(data || [])
+      console.log(`✅ ${data?.length || 0} formas carregadas`)
+    } catch (error) {
+      console.error('❌ Erro ao carregar:', error)
+    } finally {
+      setLoading(false)
+    }
   }
-}
+
   const normalizeText = (text) => {
     return text
       .toLowerCase()
@@ -128,7 +128,7 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
 
   if (loading) {
     return (
-      <div className="w-full p-2 border border-gray-300 rounded bg-gray-50 text-gray-500">
+      <div className="w-full p-2 border border-gray-300 rounded bg-gray-50 text-gray-900">
         Carregando formas de pagamento...
       </div>
     )
@@ -140,7 +140,7 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
         <input
           ref={inputRef}
           type="text"
-          className="w-full p-2 pr-10 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-2 pr-10 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder:text-gray-400"
           placeholder={selectedOption ? selectedOption.descricao : placeholder}
           value={searchTerm}
           onChange={(e) => {
@@ -161,6 +161,13 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
+
+        {/* ✅ EXIBIR VALOR SELECIONADO EM TEXTO PRETO */}
+        {selectedOption && !isOpen && !searchTerm && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-900 font-medium">
+            {selectedOption.descricao}
+          </div>
+        )}
       </div>
 
       {isOpen && (
@@ -170,7 +177,7 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
               {filteredOptions.map((option, index) => (
                 <li
                   key={option.id}
-                  className={`px-3 py-2 cursor-pointer transition-colors ${
+                  className={`px-3 py-2 cursor-pointer transition-colors text-gray-900 ${
                     index === highlightedIndex
                       ? 'bg-blue-100 text-blue-900'
                       : 'hover:bg-gray-100'
@@ -180,7 +187,7 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span>{option.descricao}</span>
+                      <span className="text-gray-900">{option.descricao}</span>
                       <span className="text-xs text-gray-500 ml-2">({option.categoria})</span>
                     </div>
                     {value === option.id && (
