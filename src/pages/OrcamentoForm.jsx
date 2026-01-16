@@ -165,7 +165,7 @@ function OrcamentoForm() {
     if (id) {
       carregarOrcamento()
     } else {
-      gerarNumero()
+      gerarNumeroSequencial()
       if (user) {
         setFormData(prev => ({
           ...prev,
@@ -192,7 +192,7 @@ function OrcamentoForm() {
     }
   }
 
-  const gerarNumero = async () => {
+  const gerarNumeroSequencial = async () => {
     try {
       const { data, error } = await supabase
         .from('orcamentos')
@@ -281,14 +281,12 @@ function OrcamentoForm() {
         obra_endereco_validado: orc.obra_endereco_validado || false
       })
 
-      // ✅ CORREÇÃO: Inicializar dadosCNPJCPF com valores do banco
       setDadosCNPJCPF({
         cnpj_cpf: orc.cnpj_cpf || null,
         cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
         cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null
       })
 
-      // ✅ CORREÇÃO: Inicializar dadosEndereco com valores do banco
       setDadosEndereco({
         obra_cep: orc.obra_cep || '',
         obra_cidade: orc.obra_cidade || '',
@@ -630,7 +628,7 @@ function OrcamentoForm() {
 
   const salvar = async () => {
     try {
-      if (!formData.numero || !formData.cliente_nome) {
+      if (!formData.cliente_nome) {
         alert('Preencha os campos obrigatórios!')
         return
       }
@@ -653,7 +651,7 @@ function OrcamentoForm() {
       setLoading(true)
 
       // ✨ GERAR NÚMERO DA PROPOSTA AUTOMATICAMENTE
-      let numeroProposta = formData.numero_proposta // Manter o número existente se já tiver
+      let numeroProposta = formData.numero_proposta
       
       if (!numeroProposta) {
         try {
@@ -687,7 +685,7 @@ function OrcamentoForm() {
       const total = subtotalComDesconto + frete
 
       const dadosOrcamento = {
-        numero: formData.numero,
+        numero: formData.numero || 'TEMP',
         numero_proposta: numeroProposta || null,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
@@ -764,7 +762,7 @@ function OrcamentoForm() {
         console.log('✅ [EDITAR] Itens deletados')
 
       } else {
-        console.log('✨ [CRIAR] Criando novo orçamento:', formData.numero)
+        console.log('✨ [CRIAR] Criando novo orçamento')
         
         const { data, error } = await supabase
           .from('orcamentos')
@@ -948,33 +946,20 @@ function OrcamentoForm() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Dados do Orçamento</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Dados do Orçamento</h2>
+            {formData.numero_proposta && (
+              <div className="text-xs text-gray-400">
+                Proposta: <span className="font-mono font-semibold text-purple-600">{formData.numero_proposta}</span>
+              </div>
+            )}
+            {!formData.numero_proposta && !id && (
+              <div className="text-xs text-gray-400 italic">
+                Número da proposta será gerado ao salvar
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Número *</label>
-              <input
-                type="text"
-                value={formData.numero}
-                onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={!!id || isReadOnly}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nº Proposta
-                {formData.numero_proposta && (
-                  <span className="ml-2 text-xs text-green-600">✓ Gerado</span>
-                )}
-              </label>
-              <input
-                type="text"
-                value={formData.numero_proposta || 'Será gerado ao salvar'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-semibold text-purple-700"
-                disabled
-                title={formData.numero_proposta ? `Número da proposta: ${formData.numero_proposta}` : 'Número será gerado automaticamente ao salvar o orçamento'}
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
               <input
