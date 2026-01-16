@@ -250,7 +250,7 @@ useEffect(() => {
 
       setFormData({
         numero: orc.numero,
-        cliente_nome: orc.cliente_nome || '',
+        cliente_nome: orc.cliente_nome || ''
         cliente_empresa: orc.cliente_empresa || '',
         cliente_email: orc.cliente_email || '',
         cliente_telefone: orc.cliente_telefone || '',
@@ -263,6 +263,7 @@ useEffect(() => {
         validade_dias: orc.validade_dias || 15,
         data_validade: orc.data_validade || '',
         condicoes_pagamento: orc.condicoes_pagamento || '',
+        forma_pagamento_id: orc.forma_pagamento_id || '',
         prazo_entrega: orc.prazo_entrega || '',
         desconto_geral: orc.desconto_geral || 0,
         observacoes: orc.observacoes || '',
@@ -610,37 +611,27 @@ useEffect(() => {
     }
   }
 
-const salvar = async () => {
-  try {
-    if (!formData.numero || !formData.cliente_nome) {
-    alert('Preencha os campos obrigatórios!')
-    return
-  }
+    const salvar = async () => {
+      try {
+        if (!formData.numero || !formData.cliente_nome) {
+          alert('Preencha os campos obrigatórios!')
+          return
+        }
 
-  if (!formData.forma_pagamento_id) {
-    alert('Por favor, selecione uma forma de pagamento!')
-    return
-  }
+        if (!formData.cliente_email) {
+          alert('Por favor, informe o email do cliente!')
+          return
+        }
 
-    // ==========================================
+        if (!formData.cliente_telefone) {
+          alert('Por favor, informe o telefone do cliente!')
+          return
+        }
 
-    if (produtosSelecionados.length === 0) {
-      alert('Adicione pelo menos um produto!')
-      return
-    }
-
-    const produtoIncompleto = produtosSelecionados.find(
-      p => !p.produto || !p.classe || !p.mpa
-    )
-    if (produtoIncompleto) {
-      alert('Complete a seleção de todos os produtos (Produto, Classe e MPA)!')
-      return
-    }
-
-    if (formData.status === 'lancado' && !formData.numero_lancamento_erp) {
-      alert('Informe o Número de Lançamento no ERP!')
-      return
-    }
+        if (!formData.forma_pagamento_id) {
+          alert('Por favor, selecione uma forma de pagamento!')
+          return
+        }
 
     setLoading(true)
 
@@ -1040,47 +1031,53 @@ const salvar = async () => {
   />
 
   {/* CAMPOS DE DADOS DO CLIENTE */}
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
-      <input
-        type="text"
-        value={formData.cliente_nome}
-        onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        disabled={isReadOnly}
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Nome Contato</label>
-      <input
-        type="text"
-        value={formData.cliente_empresa}
-        onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        disabled={isReadOnly}
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-      <input
-        type="text"
-        value={formData.cliente_telefone}
-        onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        disabled={isReadOnly}
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-      <input
-        type="email"
-        value={formData.cliente_email}
-        onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        disabled={isReadOnly}
-      />
-    </div>
+ 
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Cliente <span className="text-red-500">*</span>
+    </label>
+    <input
+      type="text"
+      value={formData.cliente_nome}
+      onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
+      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+      disabled={isReadOnly}
+    />
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">Nome Contato</label>
+    <input
+      type="text"
+      value={formData.cliente_empresa}
+      onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
+      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+      disabled={isReadOnly}
+    />
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Telefone <span className="text-red-500">*</span>
+    </label>
+    <input
+      type="text"
+      value={formData.cliente_telefone}
+      onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
+      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+      disabled={isReadOnly}
+    />
+  </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Email <span className="text-red-500">*</span>
+    </label>
+    <input
+      type="email"
+      value={formData.cliente_email}
+      onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
+      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+      disabled={isReadOnly}
+    />
   </div>
 </div>
 
