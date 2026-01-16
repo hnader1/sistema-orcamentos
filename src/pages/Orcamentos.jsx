@@ -1,14 +1,35 @@
+// ====================================================================================
+// PÁGINA DE LISTAGEM DE ORÇAMENTOS - CONSTRUCOM
+// ====================================================================================
+// Descrição: Lista todos os orçamentos com filtros, estatísticas e ações
+// Autor: Nader
+// Última atualização: Janeiro 2026
+//
+// FUNCIONALIDADES:
+// - Dashboard com cards de status (Rascunho, Enviado, Aprovado, Lançado, Cancelado)
+// - Últimos 5 orçamentos em destaque
+// - Lista completa com busca e filtros
+// - Ações: Editar, Duplicar, Cancelar
+// - Soft delete (marca como cancelado, não exclui do banco)
+// - Permissões: Vendedor vê apenas seus orçamentos, outros veem todos
+//
+// MELHORIAS RECENTES:
+// - Layout compacto (2 linhas por orçamento)
+// - Nome do cliente ao lado do número (#ORC-0010 • Nome Cliente)
+// - Badge de status posicionado ao lado dos botões de ação
+// - Cidade do cadastro incluída nas informações
+// ====================================================================================
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, FileText, Plus, Search, Edit2, Copy, Ban, Calendar, User, DollarSign,
-  Edit, Send, CheckCircle, XCircle, Briefcase, TrendingUp
+  Edit, Send, CheckCircle, XCircle, Briefcase, TrendingUp, MapPin
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
-import { MapPin } from 'lucide-react';
 
 export default function Orcamentos() {
   const navigate = useNavigate()
@@ -25,6 +46,9 @@ export default function Orcamentos() {
     cancelado: 0
   })
 
+  // ====================================================================================
+  // CARREGAMENTO INICIAL DE DADOS
+  // ====================================================================================
   useEffect(() => {
     carregarOrcamentos()
   }, [user])
@@ -35,6 +59,7 @@ export default function Orcamentos() {
       
       console.log('🔍 Carregando orçamentos (excluido = false)')
       
+      // Query base: busca todos os orçamentos não excluídos
       let query = supabase
         .from('orcamentos')
         .select('*')
@@ -54,7 +79,7 @@ export default function Orcamentos() {
       
       setOrcamentos(data || [])
 
-      // Calcular estatísticas
+      // Calcular estatísticas por status
       const stats = {
         rascunho: data?.filter(o => o.status === 'rascunho').length || 0,
         enviado: data?.filter(o => o.status === 'enviado').length || 0,
@@ -71,19 +96,31 @@ export default function Orcamentos() {
     }
   }
 
+  // ====================================================================================
+  // FILTROS E BUSCAS
+  // ====================================================================================
   const orcamentosFiltrados = orcamentos.filter(orc => {
+    // Filtro de busca por texto (número, nome do cliente ou empresa)
     const matchBusca = !busca || 
       orc.numero?.toLowerCase().includes(busca.toLowerCase()) ||
       orc.cliente_nome?.toLowerCase().includes(busca.toLowerCase()) ||
       orc.cliente_empresa?.toLowerCase().includes(busca.toLowerCase())
     
+    // Filtro de status
     const matchStatus = filtroStatus === 'todos' || orc.status === filtroStatus
     
     return matchBusca && matchStatus
   })
 
+  // Pega os 5 orçamentos mais recentes para exibir em destaque
   const ultimos5 = orcamentos.slice(0, 5)
 
+  // ====================================================================================
+  // AÇÕES DE ORÇAMENTO
+  // ====================================================================================
+  
+  // CANCELAR ORÇAMENTO
+  // Soft delete: marca status como 'cancelado' mas não exclui do banco
   const cancelar = async (id, numero) => {
     if (!confirm(`Tem certeza que deseja CANCELAR o orçamento ${numero}?\n\nO orçamento será marcado como CANCELADO.`)) return
 
@@ -110,10 +147,13 @@ export default function Orcamentos() {
     }
   }
 
+  // DUPLICAR ORÇAMENTO
+  // Cria uma cópia completa do orçamento incluindo todos os itens
   const duplicar = async (id) => {
     try {
       console.log('📋 Duplicando orçamento ID:', id)
       
+      // Busca o orçamento original
       const { data: original, error: errorOrc } = await supabase
         .from('orcamentos')
         .select('*')
@@ -122,6 +162,7 @@ export default function Orcamentos() {
 
       if (errorOrc) throw errorOrc
 
+      // Busca os itens do orçamento
       const { data: itens, error: errorItens } = await supabase
         .from('orcamentos_itens')
         .select('*')
@@ -129,7 +170,7 @@ export default function Orcamentos() {
 
       if (errorItens) throw errorItens
 
-      // Gerar novo número
+      // Gerar novo número sequencial
       const { data: ultimoOrc, error: errorUltimo } = await supabase
         .from('orcamentos')
         .select('numero')
@@ -147,6 +188,7 @@ export default function Orcamentos() {
 
       console.log('📝 Novo número gerado:', novoNumero)
 
+      // Cria o novo orçamento
       const novoOrcamento = {
         ...original,
         id: undefined,
@@ -172,6 +214,7 @@ export default function Orcamentos() {
 
       console.log('✅ Orçamento duplicado com ID:', orcCriado.id)
 
+      // Copia os itens para o novo orçamento
       if (itens && itens.length > 0) {
         const novosItens = itens.map(item => ({
           ...item,
@@ -199,22 +242,28 @@ export default function Orcamentos() {
     }
   }
 
+  // ====================================================================================
+  // COMPONENTE DE BADGE DE STATUS
+  // ====================================================================================
   const getStatusBadge = (status) => {
     const styles = {
-      'rascunho': 'bg-gray-100 text-gray-800',
-      'enviado': 'bg-blue-100 text-blue-800',
-      'aprovado': 'bg-green-100 text-green-800',
-      'lancado': 'bg-purple-100 text-purple-800',
-      'rejeitado': 'bg-red-100 text-red-800',
-      'cancelado': 'bg-red-100 text-red-800'
+      'rascunho': 'bg-gray-100 text-gray-700 border border-gray-200',
+      'enviado': 'bg-blue-100 text-blue-700 border border-blue-200',
+      'aprovado': 'bg-green-100 text-green-700 border border-green-200',
+      'lancado': 'bg-purple-100 text-purple-700 border border-purple-200',
+      'rejeitado': 'bg-red-100 text-red-700 border border-red-200',
+      'cancelado': 'bg-red-100 text-red-700 border border-red-200'
     }
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || styles.rascunho}`}>
+      <span className={`px-2 py-0.5 rounded text-xs font-medium ${styles[status] || styles.rascunho}`}>
         {status?.toUpperCase() || 'RASCUNHO'}
       </span>
     )
   }
 
+  // ====================================================================================
+  // CONFIGURAÇÃO DOS CARDS DE STATUS
+  // ====================================================================================
   const statusCards = [
     {
       status: 'rascunho',
@@ -263,11 +312,16 @@ export default function Orcamentos() {
     }
   ]
 
+  // ====================================================================================
+  // RENDERIZAÇÃO DO COMPONENTE
+  // ====================================================================================
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      {/* Header da Página */}
+      {/* ==================================================================== */}
+      {/* HEADER DA PÁGINA */}
+      {/* ==================================================================== */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -302,7 +356,9 @@ export default function Orcamentos() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Cards de Status */}
+        {/* ==================================================================== */}
+        {/* CARDS DE STATUS - DASHBOARD */}
+        {/* ==================================================================== */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="text-gray-600" size={20} />
@@ -336,6 +392,9 @@ export default function Orcamentos() {
           </div>
         </div>
 
+        {/* ==================================================================== */}
+        {/* ÚLTIMOS 5 ORÇAMENTOS */}
+        {/* ==================================================================== */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="text-gray-600" size={20} />
@@ -351,9 +410,10 @@ export default function Orcamentos() {
             <div className="grid grid-cols-1 gap-3">
               {ultimos5.map((orc) => (
                 <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Coluna Esquerda: Informações do Orçamento */}
                     <div className="flex-1 min-w-0">
-                      {/* Linha 1: Número + Nome do Cliente + Badge Status */}
+                      {/* Linha 1: Número • Nome do Cliente */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <h3 className="text-base font-bold text-gray-900">
                           #{orc.numero}
@@ -362,7 +422,6 @@ export default function Orcamentos() {
                         <span className="text-gray-700 font-medium truncate">
                           {orc.cliente_nome || 'Sem cliente'}
                         </span>
-                        {getStatusBadge(orc.status)}
                       </div>
                       
                       {/* Linha 2: Cidade | Valor | Data | Vendedor */}
@@ -399,133 +458,37 @@ export default function Orcamentos() {
                       </div>
                     </div>
                     
-                    {/* Botões de Ação */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => duplicar(orc.id)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Duplicar"
-                      >
-                        <Copy size={18} />
-                      </button>
-                      {orc.status !== 'cancelado' && (
-                        <button
-                          onClick={() => cancelar(orc.id, orc.numero)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Cancelar"
-                        >
-                          <Ban size={18} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-// ====================================================================================
-// SEÇÃO 2: TODOS OS ORÇAMENTOS - VERSÃO COMPACTA
-// ====================================================================================
-// Substitua a seção "Todos os Orçamentos" pelo código abaixo:
-
-        {/* Lista Completa de Orçamentos */}
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Todos os Orçamentos</h2>
-          
-          {loading ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-              Carregando...
-            </div>
-          ) : orcamentosFiltrados.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-              {busca || filtroStatus !== 'todos' ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento cadastrado'}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {orcamentosFiltrados.map((orc) => (
-                <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      {/* Linha 1: Número + Nome do Cliente + Badge Status */}
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h3 className="text-base font-bold text-gray-900">
-                          #{orc.numero}
-                        </h3>
-                        <span className="text-blue-600 font-semibold">•</span>
-                        <span className="text-gray-700 font-medium truncate">
-                          {orc.cliente_nome || 'Sem cliente'}
-                        </span>
-                        {getStatusBadge(orc.status)}
-                      </div>
+                    {/* Coluna Direita: Badge Status + Botões de Ação */}
+                    <div className="flex flex-col items-end gap-2">
+                      {/* Badge de Status */}
+                      {getStatusBadge(orc.status)}
                       
-                      {/* Linha 2: Cidade | Valor | Data | Vendedor */}
-                      <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-                        {orc.cidade && (
-                          <>
-                            <div className="flex items-center gap-1">
-                              <MapPin size={14} className="text-gray-400" />
-                              <span>{orc.cidade}</span>
-                            </div>
-                            <span className="text-gray-300">|</span>
-                          </>
-                        )}
-                        <div className="flex items-center gap-1">
-                          <DollarSign size={14} className="text-blue-500" />
-                          <span className="font-semibold text-gray-900">
-                            R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <span className="text-gray-300">|</span>
-                        <div className="flex items-center gap-1">
-                          <Calendar size={14} className="text-gray-400" />
-                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
-                        </div>
-                        {orc.vendedor && (
-                          <>
-                            <span className="text-gray-300">|</span>
-                            <div className="flex items-center gap-1">
-                              <User size={14} className="text-gray-400" />
-                              <span className="text-xs">{orc.vendedor}</span>
-                            </div>
-                          </>
+                      {/* Botões de Ação */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          onClick={() => duplicar(orc.id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Duplicar"
+                        >
+                          <Copy size={18} />
+                        </button>
+                        {orc.status !== 'cancelado' && (
+                          <button
+                            onClick={() => cancelar(orc.id, orc.numero)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Cancelar"
+                          >
+                            <Ban size={18} />
+                          </button>
                         )}
                       </div>
-                    </div>
-                    
-                    {/* Botões de Ação */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 size={20} />
-                      </button>
-                      <button
-                        onClick={() => duplicar(orc.id)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Duplicar"
-                      >
-                        <Copy size={20} />
-                      </button>
-                      {orc.status !== 'cancelado' && (
-                        <button
-                          onClick={() => cancelar(orc.id, orc.numero)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Cancelar"
-                        >
-                          <Ban size={20} />
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -534,7 +497,9 @@ export default function Orcamentos() {
           )}
         </div>
 
-        {/* Filtros */}
+        {/* ==================================================================== */}
+        {/* FILTROS DE BUSCA */}
+        {/* ==================================================================== */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -561,7 +526,9 @@ export default function Orcamentos() {
           </select>
         </div>
 
-        {/* Lista Completa de Orçamentos */}
+        {/* ==================================================================== */}
+        {/* LISTA COMPLETA DE ORÇAMENTOS */}
+        {/* ==================================================================== */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Todos os Orçamentos</h2>
           
@@ -574,69 +541,88 @@ export default function Orcamentos() {
               {busca || filtroStatus !== 'todos' ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento cadastrado'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-3">
               {orcamentosFiltrados.map((orc) => (
-                <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Orçamento #{orc.numero}
+                <div key={orc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Coluna Esquerda: Informações do Orçamento */}
+                    <div className="flex-1 min-w-0">
+                      {/* Linha 1: Número • Nome do Cliente */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h3 className="text-base font-bold text-gray-900">
+                          #{orc.numero}
                         </h3>
-                        {getStatusBadge(orc.status)}
+                        <span className="text-blue-600 font-semibold">•</span>
+                        <span className="text-gray-700 font-medium truncate">
+                          {orc.cliente_nome || 'Sem cliente'}
+                        </span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <User size={16} className="text-gray-400" />
-                          <span>{orc.cliente_nome || 'Sem cliente'}</span>
-                        </div>
-                        {orc.cliente_empresa && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-400">•</span>
-                            <span>{orc.cliente_empresa}</span>
-                          </div>
+                      
+                      {/* Linha 2: Cidade | Valor | Data | Vendedor */}
+                      <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
+                        {orc.cidade && (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <MapPin size={14} className="text-gray-400" />
+                              <span>{orc.cidade}</span>
+                            </div>
+                            <span className="text-gray-300">|</span>
+                          </>
                         )}
-                        <div className="flex items-center gap-2">
-                          <Calendar size={16} className="text-gray-400" />
-                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <DollarSign size={16} className="text-gray-400" />
+                        <div className="flex items-center gap-1">
+                          <DollarSign size={14} className="text-blue-500" />
                           <span className="font-semibold text-gray-900">
                             R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
-                      </div>
-                      {orc.vendedor && (
-                        <div className="text-xs text-gray-500 mt-2">
-                          👤 Vendedor: {orc.vendedor}
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-1">
+                          <Calendar size={14} className="text-gray-400" />
+                          <span>{orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}</span>
                         </div>
-                      )}
+                        {orc.vendedor && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                              <User size={14} className="text-gray-400" />
+                              <span className="text-xs">{orc.vendedor}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 size={20} />
-                      </button>
-                      <button
-                        onClick={() => duplicar(orc.id)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Duplicar"
-                      >
-                        <Copy size={20} />
-                      </button>
-                      {orc.status !== 'cancelado' && (
+                    
+                    {/* Coluna Direita: Badge Status + Botões de Ação */}
+                    <div className="flex flex-col items-end gap-2">
+                      {/* Badge de Status */}
+                      {getStatusBadge(orc.status)}
+                      
+                      {/* Botões de Ação */}
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => cancelar(orc.id, orc.numero)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Cancelar"
+                          onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar"
                         >
-                          <Ban size={20} />
+                          <Edit2 size={20} />
                         </button>
-                      )}
+                        <button
+                          onClick={() => duplicar(orc.id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Duplicar"
+                        >
+                          <Copy size={20} />
+                        </button>
+                        {orc.status !== 'cancelado' && (
+                          <button
+                            onClick={() => cancelar(orc.id, orc.numero)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Cancelar"
+                          >
+                            <Ban size={20} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -648,3 +634,55 @@ export default function Orcamentos() {
     </div>
   )
 }
+
+// ====================================================================================
+// NOTAS IMPORTANTES PARA FUTURAS MODIFICAÇÕES:
+// ====================================================================================
+//
+// 1. ESTRUTURA DO LAYOUT:
+//    - Cards organizados em 2 linhas por orçamento
+//    - Linha 1: #Número • Nome do Cliente
+//    - Linha 2: 📍 Cidade | 💰 Valor | 📅 Data | 👤 Vendedor
+//    - Badge de status posicionado acima dos botões de ação (lado direito)
+//
+// 2. FILTROS:
+//    - Busca por texto: número, nome do cliente ou empresa
+//    - Filtro por status: todos, rascunho, enviado, aprovado, lançado, cancelado
+//    - Ambos podem ser combinados
+//
+// 3. PERMISSÕES:
+//    - Vendedor: vê apenas seus orçamentos (filtro por usuario_id)
+//    - Outros usuários: veem todos os orçamentos
+//
+// 4. SOFT DELETE:
+//    - Ao cancelar, muda status para 'cancelado'
+//    - Não exclui fisicamente do banco (excluido = false sempre)
+//    - Mantém numeração sequencial íntegra
+//
+// 5. CAMPOS NECESSÁRIOS NO BANCO (tabela orcamentos):
+//    - numero (string) - Número do orçamento formato ORC-0001
+//    - cliente_nome (string) - Nome do cliente
+//    - cliente_empresa (string) - Nome da empresa (não usado neste layout)
+//    - cidade (string) - Cidade do cadastro (IMPORTANTE: garantir que está sendo buscado)
+//    - total (decimal) - Valor total do orçamento
+//    - data_orcamento (date) - Data de criação
+//    - vendedor (string) - Nome do vendedor (pode vir de join com tabela usuarios)
+//    - status (enum) - rascunho, enviado, aprovado, lancado, rejeitado, cancelado
+//    - excluido (boolean) - Sempre false nesta listagem
+//    - usuario_id (uuid) - ID do vendedor responsável
+//
+// 6. QUERIES DO SUPABASE:
+//    Certifique-se que a query está buscando TODOS os campos necessários:
+//    .select('*, cidade, vendedor, usuarios!orcamentos_usuario_id_fkey!inner(nome)')
+//
+// 7. RESPONSIVIDADE:
+//    - Mobile: Badge e botões empilham verticalmente
+//    - Desktop: Badge e botões ficam lado a lado na direita
+//    - Informações sempre em 2 linhas (compacto)
+//
+// 8. ÍCONES USADOS:
+//    - MapPin (cidade), DollarSign (valor), Calendar (data), User (vendedor)
+//    - Edit2 (editar), Copy (duplicar), Ban (cancelar)
+//    - Todos do lucide-react
+//
+// ====================================================================================
