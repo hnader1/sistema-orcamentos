@@ -336,7 +336,7 @@ export default function Orcamentos() {
           </div>
         </div>
 
-        {/* <div className="mb-8">
+        <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="text-gray-600" size={20} />
             <h2 className="text-lg font-semibold text-gray-900">Últimos 5 Orçamentos</h2>
