@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Package, Users, Truck, BarChart3, ArrowLeft, Settings, AlertTriangle } from 'lucide-react'
+import { Package, Users, Truck, BarChart3, ArrowLeft, Settings, AlertTriangle, CreditCard } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
 
@@ -66,6 +66,15 @@ export default function Admin() {
       stats: 'Tabela de preços'
     },
     {
+      id: 'formas-pagamento',
+      titulo: 'Formas de Pagamento',
+      descricao: 'Condições de pagamento',
+      icone: CreditCard,
+      cor: 'from-indigo-500 to-indigo-600',
+      rota: '/admin/formas-pagamento',
+      stats: 'Gerenciar opções'
+    },
+    {
       id: 'concorrencia',
       titulo: 'Concorrência Interna',
       descricao: 'Análise de conflitos',
@@ -108,7 +117,7 @@ export default function Admin() {
 
       {/* Cards Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cards.map((card) => {
             const Icone = card.icone
             return (

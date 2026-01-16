@@ -13,6 +13,7 @@ import AdminFrete from './pages/AdminFrete'
 import AdminDashboard from './pages/AdminDashboard'
 import RelatorioOrcamentos from './pages/RelatorioOrcamentos' // ✨ NOVO
 import Conflitos from './pages/Conflitos';
+import FormasPagamentoAdmin from './pages/FormasPagamentoAdmin'
 
 function App() {
   return (
@@ -21,7 +22,7 @@ function App() {
         <Routes>
           {/* Rota pública - Login */}
           <Route path="/login" element={<Login />} />
-          
+
           {/* Rotas protegidas - Dashboard */}
           <Route path="/" element={
             <ProtectedRoute>
@@ -29,7 +30,11 @@ function App() {
             </ProtectedRoute>
           } />
           
-<Route path="/conflitos" element={<Conflitos />} />
+          <Route path="/conflitos" element={
+            <ProtectedRoute>
+              <Conflitos />
+            </ProtectedRoute>
+          } />
 
           <Route path="/orcamentos/status/:status" element={
             <ProtectedRoute>
@@ -55,7 +60,6 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* ✨ NOVA ROTA - Relatório de Concorrência */}
           <Route path="/relatorios/orcamentos" element={
             <ProtectedRoute>
               <RelatorioOrcamentos />
@@ -90,6 +94,13 @@ function App() {
           <Route path="/admin/frete" element={
             <ProtectedRoute>
               <AdminFrete />
+            </ProtectedRoute>
+          } />
+
+          {/* ===== ADICIONAR AQUI ===== */}
+          <Route path="/admin/formas-pagamento" element={
+            <ProtectedRoute>
+              <FormasPagamentoAdmin />
             </ProtectedRoute>
           } />
           
