@@ -1104,114 +1104,144 @@ const salvar = async () => {
               Clique em "Adicionar Produto" para incluir produtos no orçamento
             </div>
           ) : (
+           
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
-                    <th className="px-2 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {produtosSelecionados.map((item, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-2 py-1">
-                        <select
-                          value={item.produto}
-                          onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
-                          disabled={isReadOnly}
-                          className="w-full px-2 py-1 border rounded text-sm"
-                        >
-                          <option value="">Selecione...</option>
-                          {getProdutosUnicos().map(p => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
-                        <select
-                          value={item.classe}
-                          onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
-                          disabled={!item.produto || isReadOnly}
-                          className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
-                        >
-                          <option value="">-</option>
-                          {getClassesDisponiveis(item.produto).map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
-                        <select
-                          value={item.mpa}
-                          onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
-                          disabled={!item.classe || isReadOnly}
-                          className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
-                        >
-                          <option value="">-</option>
-                          {getMPAsDisponiveis(item.produto, item.classe).map(m => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
-                        {/* ✨ AUMENTAR LARGURA PARA 5 DÍGITOS (99999) */}
-                        <input
-                          type="number"
-                          value={item.quantidade}
-                          onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
-                          disabled={isReadOnly}
-                          className="w-20 px-2 py-1 border rounded text-sm text-center"
-                          min="1"
-                        />
-                      </td>
-                      <td className="px-2 py-1 text-right text-gray-600">
-                        {item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
-                      </td>
-                      <td className="px-2 py-1 text-right text-gray-600">
-                        {item.peso_unitario ? `${item.peso_unitario} kg` : '-'}
-                      </td>
-                      <td className="px-2 py-1 text-right text-gray-600">
-                        {item.peso_unitario && item.quantidade 
-                          ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
-                          : '-'} 
-                      </td>
-                      <td className="px-2 py-1 text-right font-semibold text-gray-900">
-                        {item.preco && item.quantidade 
-                          ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
-                          : '-'}
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold">
-                          {item.qtd_por_pallet && item.quantidade 
-                            ? (item.quantidade / item.qtd_por_pallet).toFixed(2) 
-                            : '-'}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1">
-                        <button
-                          onClick={() => removerProduto(index)}
-                          disabled={isReadOnly}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+  <table className="w-full text-sm">
+    <thead className="bg-gray-100">
+      <tr>
+        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
+        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
+        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
+        <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
+        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
+        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
+        <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
+        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
+        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
+        <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
+        <th className="px-2 py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {produtosSelecionados.map((item, index) => (
+        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+          {/* PRODUTO - LARGURA REDUZIDA */}
+          <td className="px-2 py-1">
+            <select
+              value={item.produto}
+              onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
+              disabled={isReadOnly}
+              className="w-40 px-2 py-1 border rounded text-sm"
+            >
+              <option value="">Selecione...</option>
+              {getProdutosUnicos().map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </td>
+
+          {/* CLASSE */}
+          <td className="px-2 py-1">
+            <select
+              value={item.classe}
+              onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
+              disabled={!item.produto || isReadOnly}
+              className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
+            >
+              <option value="">-</option>
+              {getClassesDisponiveis(item.produto).map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </td>
+
+          {/* MPA */}
+          <td className="px-2 py-1">
+            <select
+              value={item.mpa}
+              onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
+              disabled={!item.classe || isReadOnly}
+              className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
+            >
+              <option value="">-</option>
+              {getMPAsDisponiveis(item.produto, item.classe).map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </td>
+
+          {/* QUANTIDADE */}
+          <td className="px-2 py-1">
+            <input
+              type="number"
+              value={item.quantidade}
+              onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
+              disabled={isReadOnly}
+              className="w-20 px-2 py-1 border rounded text-sm text-center"
+              min="1"
+            />
+          </td>
+
+          {/* PREÇO */}
+          <td className="px-2 py-1 text-right text-gray-600">
+            {item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
+          </td>
+
+          {/* PESO UNITÁRIO */}
+          <td className="px-2 py-1 text-right text-gray-600">
+            {item.peso_unitario ? `${item.peso_unitario} kg` : '-'}
+          </td>
+
+          {/* ✨ NOVA COLUNA: QTD POR PALLET */}
+          <td className="px-2 py-1 text-center">
+            {item.qtd_por_pallet ? (
+              <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold min-w-[40px]">
+                {item.qtd_por_pallet}
+              </span>
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </td>
+
+          {/* PESO TOTAL */}
+          <td className="px-2 py-1 text-right text-gray-600">
+            {item.peso_unitario && item.quantidade 
+              ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
+              : '-'} 
+          </td>
+
+          {/* SUBTOTAL */}
+          <td className="px-2 py-1 text-right font-semibold text-gray-900">
+            {item.preco && item.quantidade 
+              ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+              : '-'}
+          </td>
+
+          {/* TOTAL DE PALLETS */}
+          <td className="px-2 py-1 text-center">
+            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold">
+              {item.qtd_por_pallet && item.quantidade 
+                ? (item.quantidade / item.qtd_por_pallet).toFixed(2) 
+                : '-'}
+            </span>
+          </td>
+
+          {/* BOTÃO REMOVER */}
+          <td className="px-2 py-1">
+            <button
+              onClick={() => removerProduto(index)}
+              disabled={isReadOnly}
+              className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 size={16} />
+            </button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <FreteSelector 
