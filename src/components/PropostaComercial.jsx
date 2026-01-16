@@ -336,16 +336,13 @@ export default function PropostaComercial({
 
               {/* ===== FORMA DE PAGAMENTO ATUALIZADA ===== */}
               <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>09. CONDIÇÕES DE PAGAMENTO</div>
-                <div style={styles.destaque}>
-                  <div style={styles.destaqueValor}>
-                    {formaPagamento?.descricao || dadosOrcamento.condicoes_pagamento || 'A DEFINIR'}
-                  </div>
-                  <div style={{ fontSize: '9px', color: '#666', marginTop: '4px' }}>
-                    Prazo para pagamento após faturamento
-                  </div>
-                </div>
-              </div>
+  <div style={styles.clausulaTitulo}>09. CONDIÇÕES DE PAGAMENTO</div>
+  <div style={styles.destaque}>
+    <div style={styles.destaqueValor}>
+      {formaPagamento?.descricao || dadosOrcamento.condicoes_pagamento || 'A DEFINIR'}
+    </div>
+  </div>
+</div>
 
               <div style={styles.clausula}>
                 <div style={styles.clausulaTitulo}>10. CARREGAMENTO E DESCARGA</div>
