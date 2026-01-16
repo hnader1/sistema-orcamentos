@@ -1,3 +1,4 @@
+// src/
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
@@ -393,8 +394,12 @@ useEffect(() => {
         .filter(p => p.produto === nomeProduto && p.classe === classe)
         .map(p => p.mpa)
     )]
-    return mpas.sort()
-  }
+    return mpas.sort((a, b) => {
+    const numA = parseFloat(a.replace(/[^\d.]/g, ''))
+    const numB = parseFloat(b.replace(/[^\d.]/g, ''))
+    return numA - numB
+  })
+}
 
   const getProdutoCompleto = (nomeProduto, classe, mpa) => {
     return produtos.find(p => 
