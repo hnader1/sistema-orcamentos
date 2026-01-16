@@ -4,14 +4,19 @@
 // ============================================================================
 // 🎯 FUNÇÃO: 
 // - Visualizar grupos de orçamentos com múltiplos vendedores
-// - Arquivar conflitos que não precisam mais de atenção
+// - Arquivar conflitos inteiros (grupo) ou orçamentos individuais
 // - Restaurar conflitos arquivados
 // - Navegar para orçamentos específicos
 //
 // 📅 CRIADO EM: 16/01/2026
-// 📅 ATUALIZADO EM: 16/01/2026 - Adicionada normalização de cidade/bairro
+// 📅 ATUALIZADO EM: 16/01/2026 - Adicionados botões individuais de arquivar
 // 🔗 ROTA: /conflitos
 // 👥 ACESSO: Apenas administradores
+//
+// ⭐ NOVIDADES:
+// - Botão para arquivar grupo inteiro (header do grupo)
+// - Botão para arquivar orçamento individual (cada card)
+// - Quando sobra apenas 1 orçamento no grupo, o grupo some automaticamente
 //
 // 💡 COMO FUNCIONA:
 // 1. Busca todos os orçamentos ativos (últimos 180 dias)
@@ -21,15 +26,12 @@
 // 5. Exclui conflitos que foram arquivados
 // 6. Permite arquivar/restaurar conflitos
 //
-// ⚠️ CORREÇÕES APLICADAS:
-// - Normalização de cidade/bairro para minúsculas (evita "Centro" ≠ "centro")
-// - Isso garante que "CENTRO", "Centro" e "centro" sejam considerados iguais
-//
 // 🗄️ TABELAS USADAS:
 // - orcamentos (orçamentos principais)
 // - orcamentos_itens (produtos de cada orçamento)
 // - usuarios (nome dos vendedores)
 // - conflitos_ignorados (conflitos arquivados)
+// - orcamentos_ignorados (orçamentos individuais arquivados) ← NOVA!
 //
 // 📦 COMPONENTES USADOS:
 // - Header (cabeçalho da página)
@@ -47,7 +49,8 @@ import {
   MapPin,           // 📍 Ícone de localização
   FileText,         // 📄 Ícone de documento
   Archive,          // 📦 Ícone de arquivar
-  ArchiveRestore    // 🔄 Ícone de restaurar
+  ArchiveRestore,   // 🔄 Ícone de restaurar
+  XCircle           // ❌ Ícone de remover individual
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -58,14 +61,14 @@ const Conflitos = () => {
   // 🔧 HOOKS E ESTADOS
   // ==========================================================================
   const navigate = useNavigate();
-  const { user } = useAuth(); // Usuário logado (para saber quem arquivou)
+  const { user } = useAuth();
   
-  // Estados principais
-  const [conflitos, setConflitos] = useState([]);                    // Lista de conflitos ativos
-  const [conflitosIgnorados, setConflitosIgnorados] = useState([]);  // Lista de conflitos arquivados
-  const [loading, setLoading] = useState(true);                      // Estado de carregamento
-  const [gruposExpandidos, setGruposExpandidos] = useState({});      // Controla quais grupos estão expandidos
-  const [mostrarIgnorados, setMostrarIgnorados] = useState(false);   // Toggle: mostrar ativos ou arquivados
+  const [conflitos, setConflitos] = useState([]);
+  const [conflitosIgnorados, setConflitosIgnorados] = useState([]);
+  const [orcamentosIgnorados, setOrcamentosIgnorados] = useState([]); // ⭐ NOVO
+  const [loading, setLoading] = useState(true);
+  const [gruposExpandidos, setGruposExpandidos] = useState({});
+  const [mostrarIgnorados, setMostrarIgnorados] = useState(false);
 
   // ==========================================================================
   // ⚙️ EFFECT: Carrega dados quando a página abre
@@ -77,28 +80,16 @@ const Conflitos = () => {
   // ==========================================================================
   // 📥 FUNÇÃO: Carregar Conflitos
   // ==========================================================================
-  // Esta é a função PRINCIPAL que busca e organiza todos os dados
-  // 
-  // PASSO A PASSO:
-  // 1. Busca orçamentos dos últimos 180 dias (exceto cancelados)
-  // 2. Para cada orçamento, busca os produtos (itens)
-  // 3. Busca conflitos que foram arquivados
-  // 4. Agrupa orçamentos por CNPJ e Localização (com normalização!)
-  // 5. Identifica quais grupos têm múltiplos vendedores
-  // 6. Remove grupos que foram arquivados
-  // ==========================================================================
   const carregarConflitos = async () => {
     try {
       setLoading(true);
 
-      // ----------------------------------------------------------------------
-      // 1️⃣ BUSCAR ORÇAMENTOS ATIVOS
-      // ----------------------------------------------------------------------
-      // Data de corte: 180 dias atrás
       const data180DiasAtras = new Date();
       data180DiasAtras.setDate(data180DiasAtras.getDate() - 180);
 
-      // Query principal: busca orçamentos com join de usuários
+      // ----------------------------------------------------------------------
+      // 1️⃣ BUSCAR ORÇAMENTOS ATIVOS
+      // ----------------------------------------------------------------------
       const { data: orcamentos, error } = await supabase
         .from('orcamentos')
         .select(`
@@ -116,15 +107,14 @@ const Conflitos = () => {
           usuarios!orcamentos_usuario_id_fkey(nome)
         `)
         .gte('created_at', data180DiasAtras.toISOString())
-        .in('status', ['rascunho', 'enviado', 'aprovado', 'lancado']) // ⚠️ Inclui "lancado"!
+        .in('status', ['rascunho', 'enviado', 'aprovado', 'lancado'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       // ----------------------------------------------------------------------
-      // 2️⃣ BUSCAR ITENS (PRODUTOS) DE CADA ORÇAMENTO
+      // 2️⃣ BUSCAR ITENS (PRODUTOS)
       // ----------------------------------------------------------------------
-      // Para cada orçamento, busca seus produtos para exibir no card
       const orcamentosComItens = await Promise.all(
         orcamentos.map(async (orc) => {
           const { data: itens } = await supabase
@@ -137,7 +127,7 @@ const Conflitos = () => {
       );
 
       // ----------------------------------------------------------------------
-      // 3️⃣ BUSCAR CONFLITOS ARQUIVADOS
+      // 3️⃣ BUSCAR CONFLITOS ARQUIVADOS (GRUPOS)
       // ----------------------------------------------------------------------
       const { data: ignorados } = await supabase
         .from('conflitos_ignorados')
@@ -146,52 +136,51 @@ const Conflitos = () => {
 
       setConflitosIgnorados(ignorados || []);
 
-      // Criar Set de chaves ignoradas para filtrar depois
-      // Formato: "CNPJ:12.345.678/0001-90" ou "LOCALIZACAO:belo horizonte|centro"
       const chavesIgnoradas = new Set(
         (ignorados || []).map(i => `${i.tipo}:${i.chave_conflito}`)
       );
 
       // ----------------------------------------------------------------------
-      // 4️⃣ AGRUPAR E IDENTIFICAR CONFLITOS
+      // 4️⃣ BUSCAR ORÇAMENTOS ARQUIVADOS INDIVIDUALMENTE ⭐ NOVO
       // ----------------------------------------------------------------------
-      const grupos = agruparConflitos(orcamentosComItens, chavesIgnoradas);
+      const { data: orcsIgnorados } = await supabase
+        .from('orcamentos_ignorados')
+        .select('orcamento_id');
+
+      setOrcamentosIgnorados(orcsIgnorados || []);
+      
+      const idsIgnorados = new Set(
+        (orcsIgnorados || []).map(o => o.orcamento_id)
+      );
+
+      // Filtrar orçamentos individuais ignorados
+      const orcamentosFiltrados = orcamentosComItens.filter(
+        orc => !idsIgnorados.has(orc.id)
+      );
+
+      // ----------------------------------------------------------------------
+      // 5️⃣ AGRUPAR E IDENTIFICAR CONFLITOS
+      // ----------------------------------------------------------------------
+      const grupos = agruparConflitos(orcamentosFiltrados, chavesIgnoradas);
       setConflitos(grupos);
 
     } catch (error) {
       console.error('❌ Erro ao carregar conflitos:', error);
-      alert('Erro ao carregar conflitos. Verifique o console para detalhes.');
+      alert('Erro ao carregar conflitos. Verifique o console.');
     } finally {
       setLoading(false);
     }
   };
 
   // ==========================================================================
-  // 📊 FUNÇÃO: Agrupar Conflitos (VERSÃO CORRIGIDA)
-  // ==========================================================================
-  // Recebe lista de orçamentos e retorna grupos de conflitos
-  //
-  // ⭐ NOVIDADE: Normaliza cidade e bairro para minúsculas
-  // Antes: "Centro" ≠ "centro" ≠ "CENTRO" (gerava 3 grupos diferentes)
-  // Agora: "Centro" = "centro" = "CENTRO" (todos viram "centro")
-  //
-  // LÓGICA:
-  // 1. Agrupa por CNPJ (mesmo cliente)
-  // 2. Se 2+ vendedores para mesmo CNPJ = CONFLITO CRÍTICO 🔴
-  // 3. Agrupa por Localização NORMALIZADA (cidade + bairro em minúsculas)
-  // 4. Se 2+ vendedores na mesma localização = CONFLITO ATENÇÃO 🟡
-  // 5. Remove conflitos que foram arquivados
-  // 6. Ordena: críticos primeiro, depois por qtd de vendedores
+  // 📊 FUNÇÃO: Agrupar Conflitos
   // ==========================================================================
   const agruparConflitos = (orcamentos, chavesIgnoradas) => {
     const grupos = [];
 
-    // --------------------------------------------------------------------------
-    // PARTE 1: CONFLITOS POR CNPJ (CRÍTICO - VERMELHO)
-    // --------------------------------------------------------------------------
+    // PARTE 1: CONFLITOS POR CNPJ
     const porCNPJ = {};
     
-    // Agrupa orçamentos pelo CNPJ
     orcamentos.forEach(orc => {
       if (orc.cnpj_cpf) {
         if (!porCNPJ[orc.cnpj_cpf]) {
@@ -201,11 +190,9 @@ const Conflitos = () => {
       }
     });
 
-    // Para cada CNPJ, verifica se tem múltiplos vendedores
     Object.entries(porCNPJ).forEach(([cnpj, orcs]) => {
       const vendedoresUnicos = new Set(orcs.map(o => o.usuario_id));
       
-      // Se tem 2 ou mais vendedores = CONFLITO!
       if (vendedoresUnicos.size > 1 && !chavesIgnoradas.has(`CNPJ:${cnpj}`)) {
         grupos.push({
           id: `cnpj-${cnpj}`,
@@ -219,12 +206,7 @@ const Conflitos = () => {
       }
     });
 
-    // --------------------------------------------------------------------------
-    // PARTE 2: CONFLITOS POR LOCALIZAÇÃO (ATENÇÃO - AMARELO)
-    // ⭐ COM NORMALIZAÇÃO DE TEXTO
-    // --------------------------------------------------------------------------
-    // Primeiro, cria Set de CNPJs que já têm conflito
-    // (para não duplicar: se já tem conflito de CNPJ, não precisa alertar por localização)
+    // PARTE 2: CONFLITOS POR LOCALIZAÇÃO
     const cnpjsConflitantes = new Set(
       Object.entries(porCNPJ)
         .filter(([, orcs]) => new Set(orcs.map(o => o.usuario_id)).size > 1)
@@ -233,22 +215,18 @@ const Conflitos = () => {
 
     const porLocalizacao = {};
     
-    // Agrupa orçamentos por localização (cidade + bairro)
-    // Exclui os que já têm conflito de CNPJ
     orcamentos
       .filter(orc => !cnpjsConflitantes.has(orc.cnpj_cpf))
       .forEach(orc => {
         if (orc.obra_cidade && orc.obra_bairro) {
-          // ⭐ NORMALIZAÇÃO: Converte para minúsculas e remove espaços extras
-          // Isso garante que "Centro", "centro" e "CENTRO" sejam tratados como iguais
           const cidadeNormalizada = orc.obra_cidade.toLowerCase().trim();
           const bairroNormalizado = orc.obra_bairro.toLowerCase().trim();
           const chave = `${cidadeNormalizada}|${bairroNormalizado}`;
           
           if (!porLocalizacao[chave]) {
             porLocalizacao[chave] = {
-              cidade: orc.obra_cidade, // Mantém original para exibição bonita
-              bairro: orc.obra_bairro,  // Mantém original para exibição bonita
+              cidade: orc.obra_cidade,
+              bairro: orc.obra_bairro,
               orcamentos: []
             };
           }
@@ -256,28 +234,22 @@ const Conflitos = () => {
         }
       });
 
-    // Para cada localização, verifica se tem múltiplos vendedores
     Object.entries(porLocalizacao).forEach(([chave, dados]) => {
       const vendedoresUnicos = new Set(dados.orcamentos.map(o => o.usuario_id));
       
-      // Se tem 2 ou mais vendedores = CONFLITO!
       if (vendedoresUnicos.size > 1 && !chavesIgnoradas.has(`LOCALIZACAO:${chave}`)) {
         grupos.push({
           id: `loc-${chave}`,
           tipo: 'LOCALIZACAO',
           nivel: 'ATENCAO',
           chave,
-          titulo: `${dados.cidade} - ${dados.bairro}`, // Usa original para exibir
+          titulo: `${dados.cidade} - ${dados.bairro}`,
           orcamentos: dados.orcamentos,
           totalVendedores: vendedoresUnicos.size
         });
       }
     });
 
-    // --------------------------------------------------------------------------
-    // PARTE 3: ORDENAR GRUPOS
-    // --------------------------------------------------------------------------
-    // Críticos primeiro, depois por quantidade de vendedores
     return grupos.sort((a, b) => {
       if (a.nivel !== b.nivel) {
         return a.nivel === 'CRITICO' ? -1 : 1;
@@ -287,25 +259,10 @@ const Conflitos = () => {
   };
 
   // ==========================================================================
-  // 🗄️ FUNÇÃO: Arquivar Conflito
+  // 🗄️ FUNÇÃO: Arquivar GRUPO Completo
   // ==========================================================================
-  // Quando o admin clica em "Arquivar", este conflito some da lista ativa
-  // e vai para a lista de arquivados
-  //
-  // ⚠️ IMPORTANTE: A chave salva no banco já está normalizada!
-  // Formato: "belo horizonte|centro" (tudo minúsculo)
-  //
-  // PARÂMETROS:
-  // - grupo: objeto com informações do conflito (tipo, chave, orcamentos)
-  //
-  // O QUE FAZ:
-  // 1. Pede confirmação
-  // 2. Insere registro na tabela conflitos_ignorados
-  // 3. Recarrega a página
-  // ==========================================================================
-  const ignorarConflito = async (grupo) => {
-    // Confirmação antes de arquivar
-    if (!confirm(`Deseja arquivar este conflito? Ele não aparecerá mais na lista de conflitos ativos.`)) {
+  const ignorarGrupo = async (grupo) => {
+    if (!confirm(`Deseja arquivar TODOS os ${grupo.orcamentos.length} orçamentos deste grupo?`)) {
       return;
     }
 
@@ -313,38 +270,75 @@ const Conflitos = () => {
       const { error } = await supabase
         .from('conflitos_ignorados')
         .insert({
-          tipo: grupo.tipo,                           // 'CNPJ' ou 'LOCALIZACAO'
-          chave_conflito: grupo.chave,                // CNPJ ou "cidade|bairro" (normalizado!)
-          orcamento_ids: grupo.orcamentos.map(o => o.id),  // Array de IDs
-          ignorado_por: user?.id                      // Quem arquivou
+          tipo: grupo.tipo,
+          chave_conflito: grupo.chave,
+          orcamento_ids: grupo.orcamentos.map(o => o.id),
+          ignorado_por: user?.id
         });
 
       if (error) throw error;
 
-      alert('✅ Conflito arquivado com sucesso!');
-      carregarConflitos(); // Recarrega a lista
+      alert('✅ Grupo arquivado com sucesso!');
+      carregarConflitos();
       
     } catch (error) {
-      console.error('❌ Erro ao arquivar conflito:', error);
-      alert('Erro ao arquivar conflito. Verifique o console.');
+      console.error('❌ Erro ao arquivar grupo:', error);
+      alert('Erro ao arquivar grupo. Verifique o console.');
+    }
+  };
+
+  // ==========================================================================
+  // 📦 FUNÇÃO: Arquivar ORÇAMENTO Individual ⭐ NOVO
+  // ==========================================================================
+  const ignorarOrcamento = async (orcamento, grupo) => {
+    if (!confirm(`Deseja arquivar apenas o orçamento ${orcamento.numero}?`)) {
+      return;
+    }
+
+    try {
+      // Verifica se já existe tabela orcamentos_ignorados
+      // Se não existir, usa conflitos_ignorados como fallback
+      const { error } = await supabase
+        .from('orcamentos_ignorados')
+        .insert({
+          orcamento_id: orcamento.id,
+          tipo_conflito: grupo.tipo,
+          chave_conflito: grupo.chave,
+          ignorado_por: user?.id
+        });
+
+      if (error) {
+        // Se tabela não existir, usar conflitos_ignorados
+        if (error.code === '42P01') {
+          console.warn('Tabela orcamentos_ignorados não existe. Usando conflitos_ignorados.');
+          // Criar entrada individual no conflitos_ignorados
+          await supabase
+            .from('conflitos_ignorados')
+            .insert({
+              tipo: `${grupo.tipo}_INDIVIDUAL`,
+              chave_conflito: `${grupo.chave}|${orcamento.id}`,
+              orcamento_ids: [orcamento.id],
+              ignorado_por: user?.id
+            });
+        } else {
+          throw error;
+        }
+      }
+
+      alert(`✅ Orçamento ${orcamento.numero} arquivado!`);
+      carregarConflitos();
+      
+    } catch (error) {
+      console.error('❌ Erro ao arquivar orçamento:', error);
+      alert('Erro ao arquivar orçamento. Verifique o console.');
     }
   };
 
   // ==========================================================================
   // 🔄 FUNÇÃO: Restaurar Conflito
   // ==========================================================================
-  // Quando o admin clica em "Restaurar", o conflito volta para a lista ativa
-  //
-  // PARÂMETROS:
-  // - ignorado: registro da tabela conflitos_ignorados
-  //
-  // O QUE FAZ:
-  // 1. Pede confirmação
-  // 2. Deleta registro da tabela conflitos_ignorados
-  // 3. Recarrega a página
-  // ==========================================================================
   const restaurarConflito = async (ignorado) => {
-    if (!confirm('Deseja restaurar este conflito? Ele voltará a aparecer na lista ativa.')) {
+    if (!confirm('Deseja restaurar este conflito?')) {
       return;
     }
 
@@ -357,19 +351,18 @@ const Conflitos = () => {
       if (error) throw error;
 
       alert('✅ Conflito restaurado!');
-      carregarConflitos(); // Recarrega a lista
+      carregarConflitos();
       
     } catch (error) {
       console.error('❌ Erro ao restaurar conflito:', error);
-      alert('Erro ao restaurar conflito. Verifique o console.');
+      alert('Erro ao restaurar conflito.');
     }
   };
 
   // ==========================================================================
-  // 🔧 FUNÇÕES AUXILIARES (Formatação e Navegação)
+  // 🔧 FUNÇÕES AUXILIARES
   // ==========================================================================
 
-  // Formata CNPJ: 12345678000190 → 12.345.678/0001-90
   const formatarCNPJ = (cnpj) => {
     const nums = cnpj.replace(/\D/g, '');
     if (nums.length === 14) {
@@ -378,21 +371,17 @@ const Conflitos = () => {
     return cnpj;
   };
 
-  // Formata lista de produtos: "50 un Bloco + 20 un Tijolo +2 mais"
   const formatarProdutos = (itens) => {
     if (!itens || itens.length === 0) return 'Sem produtos';
-    
     const resumo = itens.slice(0, 3).map(item => 
       `${item.quantidade} un ${item.produto}`
     ).join(' + ');
-    
     if (itens.length > 3) {
       return `${resumo} +${itens.length - 3} mais`;
     }
     return resumo;
   };
 
-  // Expande/recolhe um grupo de conflitos
   const toggleGrupo = (grupoId) => {
     setGruposExpandidos(prev => ({ 
       ...prev, 
@@ -400,13 +389,12 @@ const Conflitos = () => {
     }));
   };
 
-  // Navega para a página de edição do orçamento
   const verOrcamento = (orcamentoId) => {
     navigate(`/orcamentos/editar/${orcamentoId}`);
   };
 
   // ==========================================================================
-  // 🎨 RENDERIZAÇÃO - Estado de Loading
+  // 🎨 RENDERIZAÇÃO - Loading
   // ==========================================================================
   if (loading) {
     return (
@@ -428,13 +416,9 @@ const Conflitos = () => {
       
       <div className="max-w-7xl mx-auto px-4 py-6">
         
-        {/* ====================================================================
-            HEADER DA PÁGINA
-            ==================================================================== */}
+        {/* HEADER DA PÁGINA */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between">
-            
-            {/* Título e Estatísticas */}
             <div className="flex items-center gap-3">
               <div className="p-2 bg-orange-100 rounded-full">
                 <AlertTriangle className="text-orange-600" size={24} />
@@ -449,7 +433,6 @@ const Conflitos = () => {
               </div>
             </div>
 
-            {/* Botão Toggle: Ver Ativos / Ver Arquivados */}
             <button
               onClick={() => setMostrarIgnorados(!mostrarIgnorados)}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -469,12 +452,9 @@ const Conflitos = () => {
           </div>
         </div>
 
-        {/* ====================================================================
-            CONFLITOS ATIVOS
-            ==================================================================== */}
+        {/* CONFLITOS ATIVOS */}
         {!mostrarIgnorados && (
           <>
-            {/* Nenhum conflito - Mensagem de Sucesso */}
             {conflitos.length === 0 ? (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
@@ -488,7 +468,6 @@ const Conflitos = () => {
                 </p>
               </div>
             ) : (
-              /* Lista de Grupos de Conflitos */
               <div className="space-y-4">
                 {conflitos.map((grupo) => (
                   <div
@@ -499,13 +478,11 @@ const Conflitos = () => {
                         : 'border-yellow-200 bg-yellow-50'
                     }`}
                   >
-                    {/* --------------------------------------------------------
+                    {/* ========================================
                         HEADER DO GRUPO
-                        -------------------------------------------------------- */}
+                        ======================================== */}
                     <div className="p-4">
                       <div className="flex items-center justify-between">
-                        
-                        {/* Título e Info do Grupo - Clicável para Expandir */}
                         <div
                           className="flex items-center gap-3 flex-1 cursor-pointer"
                           onClick={() => toggleGrupo(grupo.id)}
@@ -535,7 +512,6 @@ const Conflitos = () => {
                             </p>
                           </div>
                           
-                          {/* Contador e Seta */}
                           <div className="flex items-center gap-4">
                             <span className={`text-sm font-medium ${
                               grupo.nivel === 'CRITICO' ? 'text-red-700' : 'text-yellow-700'
@@ -550,38 +526,44 @@ const Conflitos = () => {
                           </div>
                         </div>
 
-                        {/* Botão Arquivar */}
+                        {/* ⭐ BOTÃO ARQUIVAR GRUPO COMPLETO */}
                         <button
-                          onClick={() => ignorarConflito(grupo)}
+                          onClick={() => ignorarGrupo(grupo)}
                           className="ml-4 p-2 text-gray-600 hover:bg-white rounded-lg transition-colors"
-                          title="Arquivar conflito"
+                          title="Arquivar grupo completo"
                         >
                           <Archive size={20} />
                         </button>
                       </div>
                     </div>
 
-                    {/* --------------------------------------------------------
-                        CONTEÚDO EXPANDIDO - CARDS DE ORÇAMENTOS
-                        -------------------------------------------------------- */}
+                    {/* ========================================
+                        CARDS DE ORÇAMENTOS
+                        ======================================== */}
                     {gruposExpandidos[grupo.id] && (
                       <div className="border-t border-gray-200 bg-white p-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           
-                          {/* Loop: Card para cada orçamento do grupo */}
                           {grupo.orcamentos.map((orc) => (
                             <div
                               key={orc.id}
-                              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
+                              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white relative"
                             >
-                              {/* Header do Card */}
-                              <div className="flex items-start justify-between mb-3">
+                              {/* ⭐ BOTÃO ARQUIVAR INDIVIDUAL (canto superior direito) */}
+                              <button
+                                onClick={() => ignorarOrcamento(orc, grupo)}
+                                className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                title="Arquivar apenas este orçamento"
+                              >
+                                <XCircle size={18} />
+                              </button>
+
+                              <div className="flex items-start justify-between mb-3 pr-8">
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
                                     <span className="font-bold text-gray-900">
                                       {orc.numero}
                                     </span>
-                                    {/* Badge de Status */}
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                       orc.status === 'lancado' ? 'bg-purple-100 text-purple-700' :
                                       orc.status === 'aprovado' ? 'bg-green-100 text-green-700' :
@@ -597,10 +579,7 @@ const Conflitos = () => {
                                 </div>
                               </div>
 
-                              {/* Informações do Orçamento */}
                               <div className="space-y-2 text-sm">
-                                
-                                {/* Vendedor */}
                                 <div className="flex items-center gap-2">
                                   <Users size={14} className="text-gray-400" />
                                   <span className="text-gray-700 font-medium">
@@ -608,7 +587,6 @@ const Conflitos = () => {
                                   </span>
                                 </div>
 
-                                {/* CNPJ */}
                                 {orc.cnpj_cpf && (
                                   <div className="flex items-center gap-2">
                                     <FileText size={14} className="text-gray-400" />
@@ -618,7 +596,6 @@ const Conflitos = () => {
                                   </div>
                                 )}
 
-                                {/* Localização */}
                                 {orc.obra_cidade && (
                                   <div className="flex items-center gap-2">
                                     <MapPin size={14} className="text-gray-400" />
@@ -629,7 +606,6 @@ const Conflitos = () => {
                                   </div>
                                 )}
 
-                                {/* Produtos */}
                                 <div className="pt-2 border-t border-gray-100">
                                   <p className="text-xs text-gray-500 mb-1">Produtos:</p>
                                   <p className="text-xs text-gray-700">
@@ -638,7 +614,6 @@ const Conflitos = () => {
                                 </div>
                               </div>
 
-                              {/* Botão Ver Detalhes */}
                               <button
                                 onClick={() => verOrcamento(orc.id)}
                                 className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -658,9 +633,7 @@ const Conflitos = () => {
           </>
         )}
 
-        {/* ====================================================================
-            CONFLITOS ARQUIVADOS
-            ==================================================================== */}
+        {/* CONFLITOS ARQUIVADOS */}
         {mostrarIgnorados && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold mb-4">Conflitos Arquivados</h2>
@@ -694,7 +667,6 @@ const Conflitos = () => {
                       </p>
                     </div>
                     
-                    {/* Botão Restaurar */}
                     <button
                       onClick={() => restaurarConflito(ignorado)}
                       className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -716,62 +688,27 @@ const Conflitos = () => {
 export default Conflitos;
 
 // ============================================================================
-// 📝 NOTAS IMPORTANTES PARA O FUTURO
+// 📝 NOTAS IMPORTANTES
 // ============================================================================
 //
-// ⭐ CORREÇÃO APLICADA EM 16/01/2026:
-// - Normalização de cidade e bairro para minúsculas (linha 241-243)
-// - Problema resolvido: "Centro" ≠ "centro" ≠ "CENTRO"
-// - Solução: Todos viram "centro" antes de comparar
-// - A exibição continua bonita (mantém original - linha 245-246)
+// ⭐ NOVIDADES EM 16/01/2026:
+// - Botão no header do grupo: Arquiva TODOS os orçamentos do grupo
+// - Botão em cada card (❌ canto superior direito): Arquiva APENAS aquele orçamento
+// - Quando sobra apenas 1 orçamento no grupo, o grupo desaparece automaticamente
 //
-// 🔧 MANUTENÇÃO:
-// - Para mudar o período de análise (180 dias): linha 112
-// - Para adicionar novos status: linha 129 (array de status)
-// - Para mudar cores dos conflitos: procure por "bg-red-" e "bg-yellow-"
-// - Para desativar normalização: remova .toLowerCase().trim() nas linhas 241-242
+// 🗄️ NOVA TABELA NECESSÁRIA:
+// Você precisa criar a tabela orcamentos_ignorados no Supabase:
 //
-// 🐛 TROUBLESHOOTING COMUM:
-// 1. "Nenhum conflito de localização aparece":
-//    - Verificar se cidade E bairro estão preenchidos
-//    - Verificar se são vendedores diferentes (usuario_id)
-//    - Verificar se não estão no mesmo grupo de CNPJ
+// CREATE TABLE orcamentos_ignorados (
+//   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+//   orcamento_id UUID REFERENCES orcamentos(id) ON DELETE CASCADE,
+//   tipo_conflito VARCHAR(20), -- 'CNPJ' ou 'LOCALIZACAO'
+//   chave_conflito VARCHAR(255),
+//   ignorado_por UUID REFERENCES usuarios(id),
+//   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+//   UNIQUE(orcamento_id)
+// );
 //
-// 2. "Erro ao arquivar":
-//    - Verificar se tabela conflitos_ignorados existe
-//    - Verificar RLS policies da tabela
-//    - Verificar se user.id está disponível
-//
-// 3. "Conflitos duplicados":
-//    - Verificar se a normalização está ativa (linha 241-242)
-//    - Limpar tabela conflitos_ignorados e recarregar
-//
-// 🔄 FUNCIONALIDADES:
-// - Arquivar: Move conflito para lista de arquivados
-// - Restaurar: Volta conflito para lista ativa
-// - Expandir/Recolher: Mostra/esconde cards de orçamentos
-// - Ver Detalhes: Abre orçamento para edição
-//
-// 📊 TIPOS DE CONFLITO:
-// - CRÍTICO (🔴): Mesmo CNPJ - mesmo cliente
-// - ATENÇÃO (🟡): Mesma localização - possível obra por administração
-//
-// ⚙️ COMO FUNCIONA O AGRUPAMENTO:
-// 1. Busca todos os orçamentos ativos
-// 2. Agrupa por CNPJ
-// 3. Se 2+ vendedores → conflito crítico
-// 4. Normaliza cidade+bairro para minúsculas
-// 5. Agrupa por localização (excluindo os que já têm conflito de CNPJ)
-// 6. Se 2+ vendedores → conflito atenção
-// 7. Remove conflitos arquivados
-//
-// 🗄️ ESTRUTURA DO BANCO:
-// conflitos_ignorados:
-// - id (uuid)
-// - tipo ('CNPJ' ou 'LOCALIZACAO')
-// - chave_conflito (CNPJ ou "cidade|bairro" em MINÚSCULAS!)
-// - orcamento_ids (array de IDs)
-// - ignorado_por (uuid do usuário)
-// - created_at (timestamp)
+// Se a tabela não existir, o código usa conflitos_ignorados como fallback
 //
 // ============================================================================
