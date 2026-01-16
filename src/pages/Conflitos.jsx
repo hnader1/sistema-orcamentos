@@ -291,48 +291,70 @@ const Conflitos = () => {
   // 📦 FUNÇÃO: Arquivar ORÇAMENTO Individual ⭐ NOVO
   // ==========================================================================
   const ignorarOrcamento = async (orcamento, grupo) => {
-    if (!confirm(`Deseja arquivar apenas o orçamento ${orcamento.numero}?`)) {
-      return;
-    }
+  if (!confirm(`Deseja arquivar apenas o orçamento ${orcamento.numero}?`)) {
+    return;
+  }
 
-    try {
-      // Verifica se já existe tabela orcamentos_ignorados
-      // Se não existir, usa conflitos_ignorados como fallback
-      const { error } = await supabase
-        .from('orcamentos_ignorados')
+  try {
+    console.log('🔄 Tentando arquivar orçamento:', orcamento.id);
+    console.log('📝 Tipo conflito:', grupo.tipo);
+    console.log('🔑 Chave conflito:', grupo.chave);
+    
+    // Tentativa 1: Inserir em orcamentos_ignorados
+    const { data, error } = await supabase
+      .from('orcamentos_ignorados')
+      .insert({
+        orcamento_id: orcamento.id,
+        tipo_conflito: grupo.tipo,
+        chave_conflito: grupo.chave,
+        ignorado_por: user?.id
+      })
+      .select();
+
+    // Se erro for "tabela não existe" (42P01), usar método alternativo
+    if (error && error.code === '42P01') {
+      console.warn('⚠️ Tabela orcamentos_ignorados não existe. Usando conflitos_ignorados...');
+      
+      // Método alternativo: inserir em conflitos_ignorados com chave única
+      const chaveUnica = `${grupo.tipo}_INDIVIDUAL:${grupo.chave}|${orcamento.id}`;
+      
+      const { error: error2 } = await supabase
+        .from('conflitos_ignorados')
         .insert({
-          orcamento_id: orcamento.id,
-          tipo_conflito: grupo.tipo,
-          chave_conflito: grupo.chave,
+          tipo: `${grupo.tipo}_INDIVIDUAL`,
+          chave_conflito: chaveUnica,
+          orcamento_ids: [orcamento.id],
           ignorado_por: user?.id
         });
 
-      if (error) {
-        // Se tabela não existir, usar conflitos_ignorados
-        if (error.code === '42P01') {
-          console.warn('Tabela orcamentos_ignorados não existe. Usando conflitos_ignorados.');
-          // Criar entrada individual no conflitos_ignorados
-          await supabase
-            .from('conflitos_ignorados')
-            .insert({
-              tipo: `${grupo.tipo}_INDIVIDUAL`,
-              chave_conflito: `${grupo.chave}|${orcamento.id}`,
-              orcamento_ids: [orcamento.id],
-              ignorado_por: user?.id
-            });
-        } else {
-          throw error;
-        }
+      if (error2) {
+        console.error('❌ Erro no método alternativo:', error2);
+        throw error2;
       }
-
-      alert(`✅ Orçamento ${orcamento.numero} arquivado!`);
-      carregarConflitos();
       
-    } catch (error) {
-      console.error('❌ Erro ao arquivar orçamento:', error);
-      alert('Erro ao arquivar orçamento. Verifique o console.');
+      console.log('✅ Arquivado usando método alternativo');
+      
+    } else if (error) {
+      console.error('❌ Erro ao arquivar:', error);
+      console.error('📋 Detalhes do erro:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    } else {
+      console.log('✅ Arquivado com sucesso:', data);
     }
-  };
+
+    alert(`✅ Orçamento ${orcamento.numero} arquivado!`);
+    carregarConflitos();
+    
+  } catch (error) {
+    console.error('❌ Erro fatal ao arquivar orçamento:', error);
+    alert(`Erro ao arquivar orçamento: ${error.message || 'Erro desconhecido'}`);
+  }
+};
 
   // ==========================================================================
   // 🔄 FUNÇÃO: Restaurar Conflito
