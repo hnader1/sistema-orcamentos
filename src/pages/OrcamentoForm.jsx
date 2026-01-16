@@ -10,6 +10,7 @@ import Header from '../components/Header'
 import CNPJCPFForm from '../components/CNPJCPFForm'
 import EnderecoObraForm from '../components/EnderecoObraForm'
 import { verificarConcorrenciaInterna } from '../utils/concorrenciaUtils'
+import { gerarNumeroProposta, buscarCodigoVendedor } from '../utils/numeracaoPropostaUtils'
 import ModalAlertaConcorrencia from '../components/ModalAlertaConcorrencia'
 import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaPagamento'
 
@@ -40,6 +41,7 @@ function OrcamentoForm() {
   
   const [formData, setFormData] = useState({
     numero: '',
+    numero_proposta: '',
     cliente_nome: '',
     cliente_empresa: '',
     cliente_email: '',
@@ -246,6 +248,7 @@ function OrcamentoForm() {
 
       setFormData({
         numero: orc.numero,
+        numero_proposta: orc.numero_proposta || '',
         cliente_nome: orc.cliente_nome || '',
         cliente_empresa: orc.cliente_empresa || '',
         cliente_email: orc.cliente_email || '',
@@ -649,6 +652,34 @@ function OrcamentoForm() {
 
       setLoading(true)
 
+      // ✨ GERAR NÚMERO DA PROPOSTA AUTOMATICAMENTE
+      let numeroProposta = formData.numero_proposta // Manter o número existente se já tiver
+      
+      if (!numeroProposta) {
+        try {
+          const codigoVendedor = await buscarCodigoVendedor(user?.id)
+          
+          if (!codigoVendedor) {
+            const resposta = confirm(
+              'Você não possui um código de vendedor cadastrado.\n' +
+              'Deseja continuar sem gerar número de proposta?\n\n' +
+              '(Solicite ao administrador para cadastrar seu código de 2 ou 3 letras)'
+            )
+            
+            if (!resposta) {
+              setLoading(false)
+              return
+            }
+          } else {
+            numeroProposta = await gerarNumeroProposta(user?.id, codigoVendedor)
+            console.log('✅ [SALVAR] Número de proposta gerado:', numeroProposta)
+          }
+        } catch (error) {
+          console.error('❌ [SALVAR] Erro ao gerar número de proposta:', error)
+          alert('Erro ao gerar número de proposta. Continuando sem numeração...')
+        }
+      }
+
       const subtotal = calcularSubtotal()
       const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
       const subtotalComDesconto = subtotal - desconto
@@ -657,6 +688,7 @@ function OrcamentoForm() {
 
       const dadosOrcamento = {
         numero: formData.numero,
+        numero_proposta: numeroProposta || null,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
         cliente_email: formData.cliente_email,
@@ -926,6 +958,21 @@ function OrcamentoForm() {
                 onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 disabled={!!id || isReadOnly}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nº Proposta
+                {formData.numero_proposta && (
+                  <span className="ml-2 text-xs text-green-600">✓ Gerado</span>
+                )}
+              </label>
+              <input
+                type="text"
+                value={formData.numero_proposta || 'Será gerado ao salvar'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-semibold text-purple-700"
+                disabled
+                title={formData.numero_proposta ? `Número da proposta: ${formData.numero_proposta}` : 'Número será gerado automaticamente ao salvar o orçamento'}
               />
             </div>
             <div>
@@ -1332,13 +1379,11 @@ function OrcamentoForm() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Condições de Pagamento *
                   </label>
-                  <div style={{ color: '#000000' }}>
-                    <SearchableSelectFormaPagamento
-                      value={formData.forma_pagamento_id}
-                      onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
-                      placeholder="Digite para buscar (ex: 28, pix, boleto)..."
-                    />
-                  </div>
+                  <SearchableSelectFormaPagamento
+                    value={formData.forma_pagamento_id}
+                    onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
+                    placeholder="Digite para buscar (ex: 28, pix, boleto)..."
+                  />
                 </div>
               </div>
             </div>

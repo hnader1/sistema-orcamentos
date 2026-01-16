@@ -14,6 +14,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import RelatorioOrcamentos from './pages/RelatorioOrcamentos' // ✨ NOVO
 import Conflitos from './pages/Conflitos';
 import FormasPagamentoAdmin from './pages/FormasPagamentoAdmin'
+import GerenciarCodigosVendedores from './pages/GerenciarCodigosVendedores'
 
 function App() {
   return (
@@ -96,6 +97,9 @@ function App() {
               <AdminFrete />
             </ProtectedRoute>
           } />
+<Route path="/admin/codigos-vendedores" element={<GerenciarCodigosVendedores />} />   
+
+
 
           {/* ===== ADICIONAR AQUI ===== */}
           <Route path="/admin/formas-pagamento" element={
