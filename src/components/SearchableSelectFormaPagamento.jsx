@@ -20,27 +20,27 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
   }, [])
 
   const carregarFormasPagamento = async () => {
-    try {
-      console.log('🔍 Carregando formas de pagamento...')
-      
-      const { data, error } = await supabase
-        .from('formas_pagamento')
-        .select('*')
-        .order('ordem', { ascending: true })
+  try {
+    console.log('🔍 Carregando formas de pagamento...')
+    
+    const { data, error } = await supabase
+      .from('formas_pagamento')
+      .select('*')
+      // REMOVI O .eq('ativo', true) temporariamente
+      .order('ordem', { ascending: true })
 
-      console.log('Resultado:', { data, error })
+    console.log('Resultado:', { data, error })
 
-      if (error) throw error
-      
-      setFormasPagamento(data || [])
-      console.log(`✅ ${data?.length || 0} formas carregadas`)
-    } catch (error) {
-      console.error('❌ Erro ao carregar:', error)
-    } finally {
-      setLoading(false)
-    }
+    if (error) throw error
+    
+    setFormasPagamento(data || [])
+    console.log(`✅ ${data?.length || 0} formas carregadas`)
+  } catch (error) {
+    console.error('❌ Erro ao carregar:', error)
+  } finally {
+    setLoading(false)
   }
-
+}
   const normalizeText = (text) => {
     return text
       .toLowerCase()
