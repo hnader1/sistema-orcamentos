@@ -302,17 +302,15 @@ function OrcamentoForm() {
       }
 
       if (orc.frete_cidade || orc.frete_modalidade) {
-        setDadosFrete({
-          modalidade: orc.frete_modalidade || '',
-          tipo_veiculo: orc.frete_tipo_caminhao || '',
-          localidade: orc.frete_cidade || '',
-          tipo_frete: orc.frete_modalidade || 'FOB',
-          tipo_caminhao: orc.frete_tipo_caminhao || '',
-          viagens_necessarias: orc.frete_qtd_viagens || 0,
-          valor_unitario_viagem: orc.frete_valor_viagem || 0,
-          valor_total_frete: orc.frete || 0
-        })
-      }
+  setDadosFrete({
+    tipo_frete: orc.frete_modalidade || 'FOB',
+    tipo_caminhao: orc.frete_tipo_caminhao || '',
+    localidade: orc.frete_cidade || '',
+    viagens_necessarias: orc.frete_qtd_viagens || 0,
+    valor_unitario_viagem: orc.frete_valor_viagem || 0,
+    valor_total_frete: orc.frete || 0
+  })
+}
 
       console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
       
