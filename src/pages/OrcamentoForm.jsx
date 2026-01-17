@@ -806,7 +806,13 @@ function OrcamentoForm() {
       console.log('🎉 Salvamento concluído!')
 
       alert('Orçamento salvo com sucesso!')
-      navigate('/orcamentos')
+      
+      // ✅ CORREÇÃO: Redireciona para a tela de edição ao invés de sair
+      if (!id) {
+        // Se era um orçamento NOVO, vai para edição
+        navigate(`/orcamentos/editar/${orcamentoId}`)
+      }
+      // Se já estava editando (id existe), permanece na mesma tela
 
     } catch (error) {
       console.error('❌ Erro ao salvar:', error)
