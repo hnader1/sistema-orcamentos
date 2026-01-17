@@ -989,6 +989,8 @@ function OrcamentoForm() {
               )}
             </div>  
           </div>
+          
+          {/* ✅ OTIMIZADO: 4 campos em uma linha - Data, Vendedor, Validade (dias), Status */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
@@ -1015,27 +1017,6 @@ function OrcamentoForm() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">📞 Tel. Vendedor</label>
-              <input
-                type="text"
-                value={formData.vendedor_telefone}
-                onChange={(e) => setFormData({ ...formData, vendedor_telefone: e.target.value })}
-                placeholder="(XX) XXXXX-XXXX"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                disabled
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">📧 Email Vendedor</label>
-              <input
-                type="email"
-                value={formData.vendedor_email}
-                placeholder="vendedor@email.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                disabled
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Validade (dias)</label>
               <input
                 type="number"
@@ -1043,15 +1024,6 @@ function OrcamentoForm() {
                 onChange={(e) => setFormData({ ...formData, validade_dias: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 disabled={isReadOnly}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Válido até</label>
-              <input
-                type="date"
-                value={formData.data_validade}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
               />
             </div>
             <div>
