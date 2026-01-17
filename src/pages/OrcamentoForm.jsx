@@ -1283,11 +1283,14 @@ function OrcamentoForm() {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <FreteSelector 
-            pesoTotal={calcularPesoTotal()}
-            totalPallets={calcularTotalPallets()}
-            onFreteChange={setDadosFrete}
-            freteAtual={dadosFrete}
-          />
+  pesoTotal={calcularPesoTotal()}
+  totalPallets={calcularTotalPallets()}
+  onFreteChange={(dados) => {
+    console.log('🚚 FRETE RECEBIDO:', dados)
+    setDadosFrete(dados)
+  }}
+  freteAtual={dadosFrete}
+/>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
