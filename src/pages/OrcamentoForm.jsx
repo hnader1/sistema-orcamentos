@@ -305,19 +305,19 @@ function OrcamentoForm() {
       console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
       
 if (orc.frete_cidade || orc.frete_modalidade) {
-  console.log('📦 Dados do frete no banco:', {
-    modalidade: orc.frete_modalidade,
-    cidade: orc.frete_cidade,
-    caminhao: orc.frete_tipo_caminhao,
-    viagens: orc.frete_qtd_viagens,
-    valor_viagem: orc.frete_valor_viagem,
-    total: orc.frete
-  })
-  
- if (orc.frete_cidade || orc.frete_modalidade) {
   setDadosFrete({
     modalidade: orc.frete_modalidade || 'FOB',
     tipo_veiculo: orc.frete_tipo_caminhao || '',
+    localidade: orc.frete_cidade || '',
+    viagens_necessarias: orc.frete_qtd_viagens || 0,
+    valor_unitario_viagem: orc.frete_valor_viagem || 0,
+    valor_total_frete: orc.frete || 0
+  })
+}
+  
+  setDadosFrete({
+    modalidade: orc.frete_modalidade || 'FOB',      // ← MUDOU
+    tipo_veiculo: orc.frete_tipo_caminhao || '',    // ← MUDOU
     localidade: orc.frete_cidade || '',
     viagens_necessarias: orc.frete_qtd_viagens || 0,
     valor_unitario_viagem: orc.frete_valor_viagem || 0,
