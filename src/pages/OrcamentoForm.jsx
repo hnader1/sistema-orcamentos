@@ -301,10 +301,22 @@ function OrcamentoForm() {
         setDescontoLiberado(true)
       }
 
-      if (orc.frete_cidade || orc.frete_modalidade) {
+      
+      console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
+      
+if (orc.frete_cidade || orc.frete_modalidade) {
+  console.log('📦 Dados do frete no banco:', {
+    modalidade: orc.frete_modalidade,
+    cidade: orc.frete_cidade,
+    caminhao: orc.frete_tipo_caminhao,
+    viagens: orc.frete_qtd_viagens,
+    valor_viagem: orc.frete_valor_viagem,
+    total: orc.frete
+  })
+  
   setDadosFrete({
-    tipo_frete: orc.frete_modalidade || 'FOB',
-    tipo_caminhao: orc.frete_tipo_caminhao || '',
+    modalidade: orc.frete_modalidade || 'FOB',      // ← MUDOU
+    tipo_veiculo: orc.frete_tipo_caminhao || '',    // ← MUDOU
     localidade: orc.frete_cidade || '',
     viagens_necessarias: orc.frete_qtd_viagens || 0,
     valor_unitario_viagem: orc.frete_valor_viagem || 0,
@@ -312,8 +324,7 @@ function OrcamentoForm() {
   })
 }
 
-      console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
-      
+
       const { data: itens, error: errorItens } = await supabase
         .from(TABELA_ITENS)
         .select('*')
