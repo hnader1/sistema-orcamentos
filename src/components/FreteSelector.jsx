@@ -1,20 +1,24 @@
-import { useState, useEffect } from 'react'
-import { Truck, Package, AlertCircle, CheckCircle, Search } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Truck, Package, CheckCircle, Search } from 'lucide-react'
 
 export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, freteAtual }) {
   const [fretes, setFretes] = useState([])
   const [localidades, setLocalidades] = useState([])
-  const [buscaCidade, setBuscaCidade] = useState(freteAtual?.localidade || '')
+  const [buscaCidade, setBuscaCidade] = useState('')
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false)
 
-const [modalidade, setModalidade] = useState(freteAtual?.modalidade || '')
-const [tipoVeiculo, setTipoVeiculo] = useState(freteAtual?.tipo_veiculo || '')
-const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidade || '')
+  const [modalidade, setModalidade] = useState('')
+  const [tipoVeiculo, setTipoVeiculo] = useState('')
+  const [cidadeSelecionada, setCidadeSelecionada] = useState('')
   
   const [freteManual, setFreteManual] = useState(false)
   const [valorManual, setValorManual] = useState('')
   
   const [calculoFrete, setCalculoFrete] = useState(null)
+  
+  // ✅ CORREÇÃO: Flag para controlar inicialização
+  const [jaInicializado, setJaInicializado] = useState(false)
+  const inicializandoRef = useRef(false)
 
   const capacidadesVeiculo = {
     'Toco 8t': 8000,
@@ -22,30 +26,63 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
     'Carreta 32t': 32000
   }
 
+  // Carrega fretes do banco
   useEffect(() => {
     carregarFretes()
   }, [])
 
+  // ✅ CORREÇÃO: useEffect do cálculo com proteção
   useEffect(() => {
-    calcularFrete()
-  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, freteManual, valorManual])
-
-  useEffect(() => {
-    console.log('🔄 useEffect freteAtual executando:', { freteAtual, fretesLength: fretes.length })
+    // Não calcula durante inicialização
+    if (inicializandoRef.current) {
+      console.log('⏳ Aguardando inicialização, não calculando...')
+      return
+    }
     
-    if (freteAtual && fretes.length > 0) {
-      console.log('✅ Setando valores no FreteSelector:', {
-        modalidade: freteAtual.modalidade || freteAtual.tipo_frete,
-        tipo_veiculo: freteAtual.tipo_veiculo || freteAtual.tipo_caminhao,
+    // Só calcula se já inicializou OU se não tem freteAtual (orçamento novo)
+    if (jaInicializado || !freteAtual) {
+      calcularFrete()
+    }
+  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, freteManual, valorManual, jaInicializado])
+
+  // ✅ CORREÇÃO: useEffect do freteAtual com controle de inicialização
+  useEffect(() => {
+    console.log('🔄 useEffect freteAtual:', { 
+      freteAtual, 
+      fretesLength: fretes.length,
+      jaInicializado 
+    })
+    
+    // Se tem freteAtual e fretes carregados, inicializa os valores
+    if (freteAtual && fretes.length > 0 && !jaInicializado) {
+      inicializandoRef.current = true
+      
+      console.log('✅ Inicializando FreteSelector com:', {
+        modalidade: freteAtual.modalidade,
+        tipo_veiculo: freteAtual.tipo_veiculo,
         localidade: freteAtual.localidade
       })
       
-      setModalidade(freteAtual.modalidade || freteAtual.tipo_frete || '')
-      setTipoVeiculo(freteAtual.tipo_veiculo || freteAtual.tipo_caminhao || '')
+      // Seta os valores vindos do banco
+      setModalidade(freteAtual.modalidade || '')
+      setTipoVeiculo(freteAtual.tipo_veiculo || '')
       setCidadeSelecionada(freteAtual.localidade || '')
       setBuscaCidade(freteAtual.localidade || '')
+      
+      // Libera para calcular após um pequeno delay
+      setTimeout(() => {
+        inicializandoRef.current = false
+        setJaInicializado(true)
+        console.log('✅ FreteSelector inicializado!')
+      }, 150)
+    } 
+    // Se não tem freteAtual (orçamento novo), libera imediatamente
+    else if (!freteAtual && fretes.length > 0 && !jaInicializado) {
+      setJaInicializado(true)
+      console.log('✅ Orçamento novo - FreteSelector liberado')
     }
   }, [freteAtual, fretes])
+
   const carregarFretes = async () => {
     try {
       const { supabase } = await import('../services/supabase')
@@ -76,10 +113,12 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
   }
 
   const calcularFrete = () => {
+    console.log('🧮 calcularFrete executando:', { modalidade, tipoVeiculo, cidadeSelecionada })
+    
     if (modalidade === 'FOB') {
       const resultado = {
-        tipo_frete: 'FOB',
-        tipo_caminhao: null,
+        modalidade: 'FOB',
+        tipo_veiculo: null,
         localidade: null,
         capacidade_kg: 0,
         peso_total_kg: pesoTotal || 0,
@@ -96,8 +135,8 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
 
     if (freteManual && valorManual) {
       const resultado = {
-        tipo_frete: modalidade,
-        tipo_caminhao: tipoVeiculo,
+        modalidade: modalidade,
+        tipo_veiculo: tipoVeiculo,
         localidade: cidadeSelecionada,
         capacidade_kg: capacidadesVeiculo[tipoVeiculo] || 0,
         peso_total_kg: pesoTotal || 0,
@@ -115,7 +154,10 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
 
     if (!modalidade || !tipoVeiculo || !cidadeSelecionada) {
       setCalculoFrete(null)
-      notificarFrete(null)
+      // ✅ CORREÇÃO: Só notifica null se já inicializou
+      if (jaInicializado) {
+        notificarFrete(null)
+      }
       return
     }
 
@@ -130,7 +172,9 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
 
     if (!frete) {
       setCalculoFrete(null)
-      notificarFrete(null)
+      if (jaInicializado) {
+        notificarFrete(null)
+      }
       return
     }
 
@@ -153,9 +197,10 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
     const valorUnitarioViagem = frete.preco_fixo || frete.preco_por_kg || 0
     const valorTotalFrete = valorUnitarioViagem * viagensNecessarias
 
+    // ✅ CORREÇÃO: Nomes padronizados
     const resultado = {
-      tipo_frete: modalidade,
-      tipo_caminhao: tipoVeiculo,
+      modalidade: modalidade,
+      tipo_veiculo: tipoVeiculo,
       localidade: cidadeSelecionada,
       capacidade_kg: capacidadeKg,
       peso_total_kg: pesoTotalKg,
@@ -166,11 +211,13 @@ const [cidadeSelecionada, setCidadeSelecionada] = useState(freteAtual?.localidad
       valor_total_frete: valorTotalFrete
     }
 
+    console.log('✅ Frete calculado:', resultado)
     setCalculoFrete(resultado)
     notificarFrete(resultado)
   }
 
   const notificarFrete = (dadosFrete) => {
+    console.log('📤 Notificando frete para OrcamentoForm:', dadosFrete)
     if (onFreteChange) onFreteChange(dadosFrete)
   }
 

@@ -245,6 +245,16 @@ function OrcamentoForm() {
       if (errorOrc) throw errorOrc
 
       console.log('✅ [CARREGAR] Orçamento carregado:', orc.numero)
+      
+      // ✅ LOG para debug do frete
+      console.log('🚚 [CARREGAR] Dados de frete do banco:', {
+        frete_modalidade: orc.frete_modalidade,
+        frete_tipo_caminhao: orc.frete_tipo_caminhao,
+        frete_cidade: orc.frete_cidade,
+        frete_qtd_viagens: orc.frete_qtd_viagens,
+        frete_valor_viagem: orc.frete_valor_viagem,
+        frete: orc.frete
+      })
 
       setFormData({
         numero: orc.numero,
@@ -301,18 +311,21 @@ function OrcamentoForm() {
         setDescontoLiberado(true)
       }
 
-      console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
+      // ✅ CORREÇÃO: Carregar frete com nomes PADRONIZADOS
+      if (orc.frete_cidade || orc.frete_modalidade) {
+        const dadosFreteCarregados = {
+          modalidade: orc.frete_modalidade || 'FOB',
+          tipo_veiculo: orc.frete_tipo_caminhao || '',
+          localidade: orc.frete_cidade || '',
+          viagens_necessarias: orc.frete_qtd_viagens || 0,
+          valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
+          valor_total_frete: parseFloat(orc.frete) || 0
+        }
+        console.log('🚚 [CARREGAR] setDadosFrete com:', dadosFreteCarregados)
+        setDadosFrete(dadosFreteCarregados)
+      }
 
-if (orc.frete_cidade || orc.frete_modalidade) {
-  setDadosFrete({
-    modalidade: orc.frete_modalidade || 'FOB',
-    tipo_veiculo: orc.frete_tipo_caminhao || '',
-    localidade: orc.frete_cidade || '',
-    viagens_necessarias: orc.frete_qtd_viagens || 0,
-    valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
-    valor_total_frete: parseFloat(orc.frete) || 0
-  })
-}
+      console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
 
       const { data: itens, error: errorItens } = await supabase
         .from(TABELA_ITENS)
@@ -551,6 +564,7 @@ if (orc.frete_cidade || orc.frete_modalidade) {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
+      // ✅ CORREÇÃO: Usar nomes PADRONIZADOS
       const novoOrcamento = {
         numero: novoNumero,
         cliente_nome: formData.cliente_nome,
@@ -570,11 +584,11 @@ if (orc.frete_cidade || orc.frete_modalidade) {
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
         frete: frete,
-        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
+        frete_modalidade: dadosFrete?.modalidade || 'FOB',
         frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
         frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
         frete_cidade: dadosFrete?.localidade || null,
-        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
         total,
         observacoes: formData.observacoes,
         status: 'rascunho',
@@ -582,6 +596,12 @@ if (orc.frete_cidade || orc.frete_modalidade) {
         usuario_id: user?.id || null,
         excluido: false
       }
+
+      console.log('🚚 [DUPLICAR] Dados de frete:', {
+        frete_modalidade: novoOrcamento.frete_modalidade,
+        frete_tipo_caminhao: novoOrcamento.frete_tipo_caminhao,
+        frete_cidade: novoOrcamento.frete_cidade
+      })
 
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
@@ -682,6 +702,7 @@ if (orc.frete_cidade || orc.frete_modalidade) {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
+      // ✅ CORREÇÃO: Usar nomes PADRONIZADOS (sem fallbacks confusos)
       const dadosOrcamento = {
         numero: formData.numero || 'TEMP',
         numero_proposta: numeroProposta || null,
@@ -702,13 +723,11 @@ if (orc.frete_cidade || orc.frete_modalidade) {
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
         frete: frete,
-        frete_modalidade: dadosFrete?.modalidade || dadosFrete?.tipo_frete || 'FOB',
-frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-frete_cidade: dadosFrete?.localidade || null,
-frete_tipo_caminhao: dadosFrete?.tipo_veiculo || dadosFrete?.tipo_caminhao || null,
-
-
+        frete_modalidade: dadosFrete?.modalidade || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
         total,
         observacoes: formData.observacoes,
         status: formData.status,
@@ -725,6 +744,16 @@ frete_tipo_caminhao: dadosFrete?.tipo_veiculo || dadosFrete?.tipo_caminhao || nu
         obra_complemento: dadosEndereco?.obra_complemento || null,
         obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
       }
+
+      // ✅ LOG para debug
+      console.log('🚚 [SALVAR] Dados de frete a serem salvos:', {
+        frete_modalidade: dadosOrcamento.frete_modalidade,
+        frete_tipo_caminhao: dadosOrcamento.frete_tipo_caminhao,
+        frete_cidade: dadosOrcamento.frete_cidade,
+        frete_qtd_viagens: dadosOrcamento.frete_qtd_viagens,
+        frete_valor_viagem: dadosOrcamento.frete_valor_viagem,
+        frete: dadosOrcamento.frete
+      })
 
       if (!id) {
         dadosOrcamento.usuario_id = user?.id || null
@@ -807,12 +836,9 @@ frete_tipo_caminhao: dadosFrete?.tipo_veiculo || dadosFrete?.tipo_caminhao || nu
 
       alert('Orçamento salvo com sucesso!')
       
-      // ✅ CORREÇÃO: Redireciona para a tela de edição ao invés de sair
       if (!id) {
-        // Se era um orçamento NOVO, vai para edição
         navigate(`/orcamentos/editar/${orcamentoId}`)
       }
-      // Se já estava editando (id existe), permanece na mesma tela
 
     } catch (error) {
       console.error('❌ Erro ao salvar:', error)
@@ -949,7 +975,8 @@ frete_tipo_caminhao: dadosFrete?.tipo_veiculo || dadosFrete?.tipo_caminhao || nu
           </div>
         </div>
       </div>
-<div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Dados do Orçamento</h2>
@@ -1283,14 +1310,14 @@ frete_tipo_caminhao: dadosFrete?.tipo_veiculo || dadosFrete?.tipo_caminhao || nu
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <FreteSelector 
-  pesoTotal={calcularPesoTotal()}
-  totalPallets={calcularTotalPallets()}
-  onFreteChange={(dados) => {
-    console.log('🚚 FRETE RECEBIDO:', dados)
-    setDadosFrete(dados)
-  }}
-  freteAtual={dadosFrete}
-/>
+            pesoTotal={calcularPesoTotal()}
+            totalPallets={calcularTotalPallets()}
+            onFreteChange={(dados) => {
+              console.log('🚚 FRETE RECEBIDO no OrcamentoForm:', dados)
+              setDadosFrete(dados)
+            }}
+            freteAtual={dadosFrete}
+          />
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
