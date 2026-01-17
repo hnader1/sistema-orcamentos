@@ -174,13 +174,14 @@ export default function PropostaComercial({
               <div style={styles.headerRight}>
                 <div style={styles.titulo}>PROPOSTA COMERCIAL</div>
                 <div style={styles.numero}>
-                  {dadosOrcamento.numero}
-                  {dadosOrcamento.numero_proposta && (
-                    <span style={{ color: '#9333ea', marginLeft: '8px', fontWeight: 'bold' }}>
-                      | PROPOSTA: {dadosOrcamento.numero_proposta}
-                    </span>
-                  )}
-                </div>
+  {dadosOrcamento.numero_proposta ? (
+    <span style={{ color: '#9333ea', fontWeight: 'bold' }}>
+      PROPOSTA: {dadosOrcamento.numero_proposta}
+    </span>
+  ) : (
+    dadosOrcamento.numero
+  )}
+</div>
                 <div style={styles.dataLocal}>{formatarData(dadosOrcamento.data_orcamento)} | Pedro Leopoldo - MG</div>
               </div>
             </div>
@@ -268,6 +269,22 @@ export default function PropostaComercial({
                   </div>
                 </div>
                 <div style={styles.freteAviso}>⚠️ {getMensagemFrete()}</div>
+             {dadosFrete?.tipo_frete && dadosFrete.tipo_frete !== 'FOB' && (
+  <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9', padding: '10px', marginTop: '10px', borderRadius: '6px' }}>
+    <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#0369a1', marginBottom: '4px' }}>
+      📍 ENDEREÇO DE ENTREGA
+    </div>
+    <div style={{ fontSize: '10px', color: '#0c4a6e' }}>
+      {dadosOrcamento.obra_logradouro && `${dadosOrcamento.obra_logradouro}, `}
+      {dadosOrcamento.obra_numero && `${dadosOrcamento.obra_numero}`}
+      {dadosOrcamento.obra_complemento && ` - ${dadosOrcamento.obra_complemento}`}
+      <br />
+      {dadosOrcamento.obra_bairro && `${dadosOrcamento.obra_bairro}, `}
+      {dadosOrcamento.obra_cidade}
+      {dadosOrcamento.obra_cep && ` - CEP: ${dadosOrcamento.obra_cep}`}
+    </div>
+  </div>
+)}
               </div>
             </div>
 
