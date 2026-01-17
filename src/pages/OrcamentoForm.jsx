@@ -314,9 +314,10 @@ if (orc.frete_cidade || orc.frete_modalidade) {
     total: orc.frete
   })
   
+ if (orc.frete_cidade || orc.frete_modalidade) {
   setDadosFrete({
-    modalidade: orc.frete_modalidade || 'FOB',      // ← MUDOU
-    tipo_veiculo: orc.frete_tipo_caminhao || '',    // ← MUDOU
+    modalidade: orc.frete_modalidade || 'FOB',
+    tipo_veiculo: orc.frete_tipo_caminhao || '',
     localidade: orc.frete_cidade || '',
     viagens_necessarias: orc.frete_qtd_viagens || 0,
     valor_unitario_viagem: orc.frete_valor_viagem || 0,
