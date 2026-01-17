@@ -14,7 +14,6 @@ export default function PropostaComercial({
   const [formaPagamento, setFormaPagamento] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Buscar forma de pagamento quando abrir o modal
   useEffect(() => {
     if (isOpen && dadosOrcamento?.forma_pagamento_id) {
       carregarFormaPagamento()
@@ -59,43 +58,47 @@ export default function PropostaComercial({
   const totalFrete = parseFloat(dadosFrete?.valor_total_frete) || 0
   const totalGeral = totalProdutosComDesconto + totalFrete
 
-  // Formatar data
   const formatarData = (dataStr) => {
     if (!dataStr) return ''
     const data = new Date(dataStr + 'T00:00:00')
     return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  // Formatar valor
   const formatarValor = (valor) => {
     return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
 
-  // ✅ CORREÇÃO: Usar nomes padronizados
   const getTipoFreteExibicao = () => {
     const modalidade = dadosFrete?.modalidade || 'FOB'
-    if (modalidade === 'FOB') return 'FOB'
+    if (modalidade === 'FOB') return 'FOB (Cliente Retira)'
     if (modalidade === 'CIF_SEM_DESCARGA') return 'CIF - Sem Descarga'
     if (modalidade === 'CIF_COM_DESCARGA') return 'CIF - Com Descarga'
     return modalidade
   }
 
-  // ✅ CORREÇÃO: Mensagem do tipo de frete usando nome padronizado
   const getMensagemFrete = () => {
     const modalidade = dadosFrete?.modalidade || 'FOB'
-    if (modalidade === 'FOB') return 'FRETE POR CONTA DO CLIENTE'
-    if (modalidade === 'CIF_SEM_DESCARGA') return 'DESCARGA POR CONTA DO CLIENTE'
-    if (modalidade === 'CIF_COM_DESCARGA') return 'FRETE COM DESCARGA INCLUSA'
-    return 'FRETE POR CONTA DO CLIENTE'
+    if (modalidade === 'FOB') return 'Cliente retira na fábrica'
+    if (modalidade === 'CIF_SEM_DESCARGA') return 'Entrega sem descarga'
+    if (modalidade === 'CIF_COM_DESCARGA') return 'Entrega com descarga inclusa'
+    return ''
   }
 
-  // ✅ CORREÇÃO: Verificar se é CIF usando nome padronizado
   const isCIF = () => {
     const modalidade = dadosFrete?.modalidade || 'FOB'
     return modalidade === 'CIF_SEM_DESCARGA' || modalidade === 'CIF_COM_DESCARGA'
   }
 
-  // Imprimir
+  const getEnderecoCompleto = () => {
+    const partes = []
+    if (dadosOrcamento.obra_logradouro) partes.push(dadosOrcamento.obra_logradouro)
+    if (dadosOrcamento.obra_numero) partes.push(dadosOrcamento.obra_numero)
+    if (dadosOrcamento.obra_bairro) partes.push(dadosOrcamento.obra_bairro)
+    if (dadosOrcamento.obra_cidade) partes.push(dadosOrcamento.obra_cidade)
+    if (dadosOrcamento.obra_cep) partes.push(`CEP: ${dadosOrcamento.obra_cep}`)
+    return partes.join(', ')
+  }
+
   const imprimir = () => {
     const conteudo = printRef.current.innerHTML
     const janela = window.open('', '_blank')
@@ -103,11 +106,11 @@ export default function PropostaComercial({
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Proposta ${dadosOrcamento.numero}</title>
+        <title>Proposta ${dadosOrcamento.numero_proposta || dadosOrcamento.numero}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 11px; color: #333; line-height: 1.4; }
-          @page { margin: 15mm; size: A4; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; color: #1a1a1a; line-height: 1.4; }
+          @page { margin: 10mm; size: A4; }
           @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         </style>
       </head>
@@ -118,335 +121,246 @@ export default function PropostaComercial({
     setTimeout(() => { janela.print(); janela.close() }, 300)
   }
 
-  // Estilos inline
-  const styles = {
-    container: { maxWidth: '800px', margin: '0 auto', backgroundColor: '#fff', padding: '20px' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #4c7f8a', paddingBottom: '15px', marginBottom: '15px' },
-    logo: { height: '50px', maxWidth: '150px' },
-    headerRight: { textAlign: 'right' },
-    titulo: { fontSize: '18px', fontWeight: 'bold', color: '#4c7f8a', marginBottom: '3px' },
-    numero: { fontSize: '14px', color: '#666' },
-    dataLocal: { fontSize: '11px', color: '#666' },
-    secao: { marginBottom: '15px' },
-    secaoTitulo: { backgroundColor: '#4c7f8a', color: '#fff', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' },
-    grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' },
-    campo: { marginBottom: '4px' },
-    label: { fontSize: '9px', color: '#666', textTransform: 'uppercase', fontWeight: 'bold' },
-    valor: { fontSize: '11px', color: '#333' },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: '10px', marginBottom: '10px' },
-    th: { backgroundColor: '#e2e8f0', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', borderBottom: '1px solid #cbd5e0', fontSize: '9px' },
-    thRight: { backgroundColor: '#e2e8f0', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', borderBottom: '1px solid #cbd5e0', fontSize: '9px' },
-    td: { padding: '5px 8px', borderBottom: '1px solid #e2e8f0' },
-    tdRight: { padding: '5px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontFamily: 'monospace' },
-    freteBox: { backgroundColor: '#f7fafc', border: '1px solid #e2e8f0', padding: '10px', marginBottom: '10px' },
-    freteGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', textAlign: 'center' },
-    freteItem: { padding: '8px' },
-    freteLabel: { fontSize: '9px', color: '#666', marginBottom: '3px' },
-    freteValor: { fontSize: '13px', fontWeight: 'bold', color: '#4c7f8a' },
-    freteAviso: { backgroundColor: '#fef3c7', border: '1px solid #f59e0b', padding: '6px 10px', fontSize: '10px', fontWeight: 'bold', color: '#92400e', textAlign: 'center', marginTop: '8px' },
-    totalBox: { backgroundColor: '#4c7f8a', color: '#fff', padding: '12px', marginBottom: '15px' },
-    totalGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', textAlign: 'center' },
-    totalItem: { },
-    totalLabel: { fontSize: '9px', opacity: 0.8 },
-    totalValor: { fontSize: '14px', fontWeight: 'bold' },
-    totalGeral: { fontSize: '20px', fontWeight: 'bold', color: '#f6ad55' },
-    clausula: { marginBottom: '10px' },
-    clausulaTitulo: { fontSize: '10px', fontWeight: 'bold', color: '#4c7f8a', marginBottom: '4px' },
-    clausulaTexto: { fontSize: '9px', color: '#4a5568', paddingLeft: '10px' },
-    destaque: { backgroundColor: '#ebf8ff', border: '1px solid #3182ce', padding: '8px', textAlign: 'center', margin: '4px 0' },
-    destaqueValor: { fontSize: '16px', fontWeight: 'bold', color: '#2b6cb0' },
-    observacoes: { fontSize: '10px', backgroundColor: '#fffbeb', border: '1px dashed #d69e2e', padding: '8px', marginTop: '4px' },
-    footer: { borderTop: '2px solid #4c7f8a', paddingTop: '12px', marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' },
-    assinatura: { },
-    validadeBox: { backgroundColor: '#4c7f8a', color: '#fff', padding: '10px 20px', textAlign: 'center' },
-    validadeDias: { fontSize: '20px', fontWeight: 'bold', color: '#f6ad55' },
-    validadeTexto: { fontSize: '9px' }
-  }
-
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '8px', width: '100%', maxWidth: '900px', maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '10px' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '850px', maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}>
         
         {/* Header Modal */}
-        <div style={{ backgroundColor: '#4c7f8a', color: '#fff', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 'bold' }}>Proposta Comercial - Pré-visualização</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '5px' }}>
-            <X size={20} />
+        <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', color: '#fff', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: '600', fontSize: '14px' }}>📄 Pré-visualização da Proposta</span>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex' }}>
+            <X size={18} />
           </button>
         </div>
 
         {/* Conteúdo */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px', backgroundColor: '#f0f0f0' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '15px', backgroundColor: '#e8e8e8' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-              Carregando proposta...
-            </div>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Carregando...</div>
           ) : (
-            <div ref={printRef} style={styles.container}>
-            
-            {/* Header */}
-            <div style={styles.header}>
-              <img src={logoConstrucom} alt="Construcom" style={styles.logo} />
-              <div style={styles.headerRight}>
-                <div style={styles.titulo}>PROPOSTA COMERCIAL</div>
-                <div style={styles.numero}>
-                  {dadosOrcamento.numero_proposta ? (
-                    <span style={{ color: '#9333ea', fontWeight: 'bold' }}>
-                      PROPOSTA: {dadosOrcamento.numero_proposta}
-                    </span>
-                  ) : (
-                    dadosOrcamento.numero
-                  )}
-                </div>
-                <div style={styles.dataLocal}>{formatarData(dadosOrcamento.data_orcamento)} | Pedro Leopoldo - MG</div>
-              </div>
-            </div>
-
-            {/* Cliente */}
-            <div style={styles.secao}>
-              <div style={styles.secaoTitulo}>DADOS DO CLIENTE</div>
-              <div style={styles.grid2}>
-                <div style={styles.campo}>
-                  <div style={styles.label}>Cliente</div>
-                  <div style={styles.valor}>{dadosOrcamento.cliente_nome || dadosOrcamento.cliente_empresa || '-'}</div>
-                </div>
-                {dadosOrcamento.cliente_cpf_cnpj && (
-                  <div style={styles.campo}>
-                    <div style={styles.label}>CPF/CNPJ</div>
-                    <div style={styles.valor}>{dadosOrcamento.cliente_cpf_cnpj}</div>
-                  </div>
-                )}
-                <div style={styles.campo}>
-                  <div style={styles.label}>Telefone</div>
-                  <div style={styles.valor}>{dadosOrcamento.cliente_telefone || '-'}</div>
-                </div>
-                <div style={styles.campo}>
-                  <div style={styles.label}>E-mail</div>
-                  <div style={styles.valor}>{dadosOrcamento.cliente_email || '-'}</div>
-                </div>
-              </div>
-              {dadosOrcamento.endereco_entrega && (
-                <div style={{ ...styles.campo, marginTop: '8px', backgroundColor: '#f7fafc', padding: '8px' }}>
-                  <div style={styles.label}>📍 Endereço de Entrega</div>
-                  <div style={styles.valor}>{dadosOrcamento.endereco_entrega}</div>
-                </div>
-              )}
-            </div>
-
-            {/* Produtos */}
-            <div style={styles.secao}>
-              <div style={styles.secaoTitulo}>01. PRODUTOS</div>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Material</th>
-                    <th style={styles.th}>Classe</th>
-                    <th style={styles.th}>MPA</th>
-                    <th style={styles.thRight}>Qtd</th>
-                    <th style={styles.thRight}>Valor Unit.</th>
-                    <th style={styles.thRight}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {produtos.map((p, i) => (
-                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f7fafc' }}>
-                      <td style={styles.td}>{p.produto}</td>
-                      <td style={styles.td}>{p.classe}</td>
-                      <td style={styles.td}>{p.mpa}</td>
-                      <td style={styles.tdRight}>{parseFloat(p.quantidade).toLocaleString('pt-BR')}</td>
-                      <td style={styles.tdRight}>{formatarValor(p.preco)}</td>
-                      <td style={styles.tdRight}><strong>{formatarValor(p.quantidade * p.preco)}</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Frete - ✅ CORRIGIDO */}
-            <div style={styles.secao}>
-              <div style={styles.secaoTitulo}>02. FRETE</div>
-              <div style={styles.freteBox}>
-                <div style={styles.freteGrid}>
-                  <div style={styles.freteItem}>
-                    <div style={styles.freteLabel}>TIPO</div>
-                    <div style={styles.freteValor}>{getTipoFreteExibicao()}</div>
-                  </div>
-                  <div style={styles.freteItem}>
-                    <div style={styles.freteLabel}>VIAGENS</div>
-                    <div style={styles.freteValor}>{dadosFrete?.viagens_necessarias || 0}</div>
-                  </div>
-                  <div style={styles.freteItem}>
-                    <div style={styles.freteLabel}>VALOR/VIAGEM</div>
-                    <div style={styles.freteValor}>{formatarValor(dadosFrete?.valor_unitario_viagem)}</div>
-                  </div>
-                  <div style={styles.freteItem}>
-                    <div style={styles.freteLabel}>TOTAL FRETE</div>
-                    <div style={{ ...styles.freteValor, color: '#c05621' }}>{formatarValor(totalFrete)}</div>
-                  </div>
-                </div>
-                <div style={styles.freteAviso}>⚠️ {getMensagemFrete()}</div>
-                
-                {/* ✅ CORREÇÃO: Usar função isCIF() */}
-                {isCIF() && (
-                  <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9', padding: '10px', marginTop: '10px', borderRadius: '6px' }}>
-                    <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#0369a1', marginBottom: '4px' }}>
-                      📍 ENDEREÇO DE ENTREGA
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#0c4a6e' }}>
-                      {dadosOrcamento.obra_logradouro && `${dadosOrcamento.obra_logradouro}, `}
-                      {dadosOrcamento.obra_numero && `${dadosOrcamento.obra_numero}`}
-                      {dadosOrcamento.obra_complemento && ` - ${dadosOrcamento.obra_complemento}`}
-                      <br />
-                      {dadosOrcamento.obra_bairro && `${dadosOrcamento.obra_bairro}, `}
-                      {dadosOrcamento.obra_cidade}
-                      {dadosOrcamento.obra_cep && ` - CEP: ${dadosOrcamento.obra_cep}`}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Totais */}
-            <div style={styles.totalBox}>
-              <div style={styles.totalGrid}>
-                <div style={styles.totalItem}>
-                  <div style={styles.totalLabel}>TOTAL PRODUTOS</div>
-                  <div style={styles.totalValor}>{formatarValor(totalProdutosComDesconto)}</div>
-                </div>
-                <div style={styles.totalItem}>
-                  <div style={styles.totalLabel}>TOTAL FRETE</div>
-                  <div style={styles.totalValor}>{formatarValor(totalFrete)}</div>
-                </div>
-                <div style={styles.totalItem}>
-                  <div style={styles.totalLabel}>TOTAL DA PROPOSTA</div>
-                  <div style={styles.totalGeral}>{formatarValor(totalGeral)}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Cláusulas */}
-            <div style={styles.secao}>
-              <div style={styles.secaoTitulo}>TERMOS E CONDIÇÕES</div>
+            <div ref={printRef} style={{ maxWidth: '780px', margin: '0 auto', backgroundColor: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
               
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>03. VALIDADE DA PROPOSTA</div>
-                <div style={styles.destaque}>
-                  <div style={styles.destaqueValor}>Válida por {dadosOrcamento.validade_dias || 15} dias</div>
+              {/* ========== HEADER COM DESTAQUE PARA O CLIENTE ========== */}
+              <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', color: '#fff', padding: '20px 25px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                  <img src={logoConstrucom} alt="Construcom" style={{ height: '40px', filter: 'brightness(0) invert(1)' }} />
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>PROPOSTA COMERCIAL</div>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fbbf24' }}>
+                      {dadosOrcamento.numero_proposta || dadosOrcamento.numero}
+                    </div>
+                    <div style={{ fontSize: '9px', opacity: 0.7, marginTop: '2px' }}>
+                      {formatarData(dadosOrcamento.data_orcamento)} • Pedro Leopoldo/MG
+                    </div>
+                  </div>
                 </div>
-                <div style={styles.clausulaTexto}>• Os preços são válidos por até 60 dias após o aceite.</div>
-              </div>
-
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>04. PROGRAMAÇÃO DE ENTREGA</div>
-                <div style={styles.clausulaTexto}>
-                  • O cronograma geral da obra deve ser entregue junto com este documento.<br/>
-                  • Qualquer alteração deve ser comunicada antecipadamente.<br/>
-                  • Programações devem ser enviadas até quarta-feira da semana anterior.<br/>
-                  • Prazo médio de fabricação: 7 dias úteis após confirmação.<br/>
-                  • Produtos acima de 10 MPa necessitam validação com equipe técnica.<br/>
-                  • Não são aceitas devoluções por erro de especificação.
-                </div>
-              </div>
-
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>05. GARANTIA DOS PRODUTOS</div>
-                <div style={styles.clausulaTexto}>
-                  • Garantia de 5 anos contra defeito de fabricação.<br/>
-                  • Válida desde que respeitadas as cargas e finalidades indicadas.<br/>
-                  • Avarias devem ser registradas no ato do recebimento.
-                </div>
-              </div>
-
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>06. QUALIDADE</div>
-                <div style={styles.clausulaTexto}>
-                  • Laboratório próprio para controle de qualidade.<br/>
-                  • Laudos de resistência à carga disponíveis.<br/>
-                  • Variações de coloração são naturais e não caracterizam defeito.<br/>
-                  • Eflorescência é fenômeno natural.
-                </div>
-              </div>
-
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>07. CANCELAMENTOS E ACRÉSCIMOS</div>
-                <div style={styles.clausulaTexto}>
-                  • Produtos sob encomenda só podem ser cancelados antes da fabricação.<br/>
-                  • Produtos acima de 8,0 MPa são fabricados sob demanda.<br/>
-                  • Cancelamento/redução acarreta multa de 15% (exceto se não iniciou fabricação ou redução &lt; 10%).
-                </div>
-              </div>
-
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>09. CONDIÇÕES DE PAGAMENTO</div>
-                <div style={styles.destaque}>
-                  <div style={styles.destaqueValor}>
-                    {formaPagamento?.descricao || dadosOrcamento.condicoes_pagamento || 'A DEFINIR'}
+                
+                {/* CLIENTE EM MEGA DESTAQUE */}
+                <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px 15px', borderLeft: '4px solid #fbbf24' }}>
+                  <div style={{ fontSize: '9px', opacity: 0.7, marginBottom: '3px' }}>PROPOSTA EXCLUSIVA PARA</div>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                    {dadosOrcamento.cliente_nome || dadosOrcamento.cliente_empresa || 'Cliente'}
+                  </div>
+                  <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '4px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                    {dadosOrcamento.cnpj_cpf && <span>📋 {dadosOrcamento.cnpj_cpf}</span>}
+                    {dadosOrcamento.cliente_telefone && <span>📞 {dadosOrcamento.cliente_telefone}</span>}
+                    {dadosOrcamento.cliente_email && <span>✉️ {dadosOrcamento.cliente_email}</span>}
                   </div>
                 </div>
               </div>
 
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>10. CARREGAMENTO E DESCARGA</div>
-                <div style={styles.clausulaTexto}>
-                  • Descarga pode ser negociada; na ausência, é responsabilidade do CLIENTE.<br/>
-                  • Não carregamos caminhões bascula.<br/>
-                  • Atraso &gt;2h na descarga: cobrança adicional de 20% do frete por hora.<br/>
-                  • Entrega não realizada por culpa do cliente: frete ida + 60% retorno.
+              {/* ========== PRODUTOS - TABELA LIMPA ========== */}
+              <div style={{ padding: '15px 20px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a5f', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ background: '#1e3a5f', color: '#fff', width: '18px', height: '18px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>1</span>
+                  MATERIAIS
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f5f9' }}>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: '600', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>Produto</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: '600', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>Classe</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: '600', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>MPa</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: '600', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>Qtd</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: '600', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>Unit.</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: '600', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {produtos.map((p, i) => (
+                      <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #f1f5f9', fontWeight: '500' }}>{p.produto}</td>
+                        <td style={{ padding: '7px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'center', color: '#64748b' }}>{p.classe || '-'}</td>
+                        <td style={{ padding: '7px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'center', color: '#64748b' }}>{p.mpa || '-'}</td>
+                        <td style={{ padding: '7px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'center', fontWeight: '600' }}>{parseFloat(p.quantidade).toLocaleString('pt-BR')}</td>
+                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#64748b' }}>{formatarValor(p.preco)}</td>
+                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: '600', color: '#1e3a5f' }}>{formatarValor(p.quantidade * p.preco)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ========== FRETE - COMPACTO EM LINHA ========== */}
+              <div style={{ padding: '0 20px 15px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a5f', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ background: '#1e3a5f', color: '#fff', width: '18px', height: '18px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>2</span>
+                  ENTREGA
+                </div>
+                <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', padding: '10px 12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ fontSize: '8px', color: '#64748b', display: 'block' }}>MODALIDADE</span>
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#1e3a5f' }}>{getTipoFreteExibicao()}</span>
+                      </div>
+                      {isCIF() && dadosFrete?.localidade && (
+                        <div>
+                          <span style={{ fontSize: '8px', color: '#64748b', display: 'block' }}>DESTINO</span>
+                          <span style={{ fontSize: '11px', fontWeight: '500' }}>{dadosFrete.localidade}</span>
+                        </div>
+                      )}
+                      {isCIF() && dadosFrete?.viagens_necessarias > 0 && (
+                        <div>
+                          <span style={{ fontSize: '8px', color: '#64748b', display: 'block' }}>VIAGENS</span>
+                          <span style={{ fontSize: '11px', fontWeight: '500' }}>{dadosFrete.viagens_necessarias}x</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '8px', color: '#64748b', display: 'block' }}>FRETE</span>
+                      <span style={{ fontSize: '14px', fontWeight: 'bold', color: totalFrete > 0 ? '#ea580c' : '#16a34a' }}>
+                        {totalFrete > 0 ? formatarValor(totalFrete) : 'GRÁTIS'}
+                      </span>
+                    </div>
+                  </div>
+                  {isCIF() && getEnderecoCompleto() && (
+                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', fontSize: '9px', color: '#475569' }}>
+                      📍 {getEnderecoCompleto()}
+                    </div>
+                  )}
+                  <div style={{ marginTop: '6px', fontSize: '8px', color: '#64748b', fontStyle: 'italic' }}>
+                    ℹ️ {getMensagemFrete()}
+                  </div>
                 </div>
               </div>
 
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>11. PALLETS</div>
-                <div style={styles.clausulaTexto}>
-                  • Pallets são bens consignados e devem ser devolvidos em perfeitas condições.<br/>
-                  • Danos, extravios ou não devolução: cobrança de R$ 50,00/unidade.<br/>
-                  • Não devolução pode suspender entregas futuras.
+              {/* ========== RESUMO FINANCEIRO - IMPACTANTE ========== */}
+              <div style={{ margin: '0 20px 15px', background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', borderRadius: '10px', padding: '15px 20px', color: '#fff' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '15px', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '8px', opacity: 0.7 }}>PRODUTOS</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600' }}>{formatarValor(totalProdutosComDesconto)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '8px', opacity: 0.7 }}>FRETE</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600' }}>{totalFrete > 0 ? formatarValor(totalFrete) : '—'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: '20px' }}>
+                    <div style={{ fontSize: '8px', opacity: 0.7 }}>TOTAL DA PROPOSTA</div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fbbf24' }}>{formatarValor(totalGeral)}</div>
+                  </div>
+                </div>
+                
+                {/* PAGAMENTO INTEGRADO */}
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '8px', opacity: 0.7 }}>CONDIÇÃO DE PAGAMENTO</span>
+                    <div style={{ fontSize: '12px', fontWeight: '600', marginTop: '2px' }}>
+                      {formaPagamento?.descricao || dadosOrcamento.condicoes_pagamento || 'A definir'}
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: 'rgba(251,191,36,0.2)', padding: '6px 12px', borderRadius: '20px', border: '1px solid #fbbf24' }}>
+                    <span style={{ fontSize: '9px', fontWeight: '600', color: '#fbbf24' }}>
+                      ⏱️ Válida por {dadosOrcamento.validade_dias || 15} dias
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div style={styles.clausula}>
-                <div style={styles.clausulaTitulo}>12. OBSERVAÇÕES FINAIS</div>
-                <div style={styles.observacoes}>
-                  {dadosOrcamento.observacoes || 'Esta proposta não possui observações adicionais.'}
+              {/* ========== TERMOS - COMPACTO EM COLUNAS ========== */}
+              <div style={{ padding: '0 20px 15px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a5f', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ background: '#1e3a5f', color: '#fff', width: '18px', height: '18px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>3</span>
+                  TERMOS E CONDIÇÕES
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '8px', color: '#475569' }}>
+                  <div style={{ backgroundColor: '#f8fafc', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ fontWeight: '600', color: '#1e3a5f', marginBottom: '4px', fontSize: '9px' }}>📦 Entrega</div>
+                    <div>• Prazo: 7 dias úteis após confirmação</div>
+                    <div>• Programação até quarta-feira anterior</div>
+                    <div>• Produtos +10 MPa: validação técnica</div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ fontWeight: '600', color: '#1e3a5f', marginBottom: '4px', fontSize: '9px' }}>✅ Garantia</div>
+                    <div>• 5 anos contra defeito de fabricação</div>
+                    <div>• Avarias: registrar no recebimento</div>
+                    <div>• Eflorescência é fenômeno natural</div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ fontWeight: '600', color: '#1e3a5f', marginBottom: '4px', fontSize: '9px' }}>🚛 Frete/Descarga</div>
+                    <div>• Atraso +2h: 20% adicional/hora</div>
+                    <div>• Não realizada: ida + 60% retorno</div>
+                    <div>• Não carregamos caminhão bascula</div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', borderRadius: '6px', padding: '8px 10px' }}>
+                    <div style={{ fontWeight: '600', color: '#1e3a5f', marginBottom: '4px', fontSize: '9px' }}>📋 Pallets</div>
+                    <div>• Bens consignados - devolver</div>
+                    <div>• Dano/extravio: R$ 50,00/un</div>
+                    <div>• Não devolução suspende entregas</div>
+                  </div>
+                </div>
+
+                {/* Observações */}
+                {dadosOrcamento.observacoes && (
+                  <div style={{ marginTop: '10px', backgroundColor: '#fef3c7', borderRadius: '6px', padding: '8px 10px', border: '1px solid #fbbf24' }}>
+                    <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '3px', fontSize: '9px' }}>📝 Observações</div>
+                    <div style={{ fontSize: '9px', color: '#78350f' }}>{dadosOrcamento.observacoes}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* ========== RODAPÉ - VENDEDOR ========== */}
+              <div style={{ backgroundColor: '#f1f5f9', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '2px solid #1e3a5f' }}>
+                <div>
+                  <div style={{ fontSize: '8px', color: '#64748b', marginBottom: '2px' }}>SEU CONSULTOR</div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e3a5f' }}>{dadosOrcamento.vendedor || 'Vendedor'}</div>
+                  <div style={{ fontSize: '9px', color: '#475569', marginTop: '3px' }}>
+                    {dadosOrcamento.vendedor_telefone && <span>📞 {dadosOrcamento.vendedor_telefone}</span>}
+                    {dadosOrcamento.vendedor_telefone && dadosOrcamento.vendedor_email && <span style={{ margin: '0 8px' }}>•</span>}
+                    {dadosOrcamento.vendedor_email && <span>✉️ {dadosOrcamento.vendedor_email}</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e3a5f' }}>CONSTRUCOM</div>
+                  <div style={{ fontSize: '8px', color: '#64748b' }}>Artefatos de Cimento</div>
+                  <div style={{ fontSize: '8px', color: '#64748b' }}>Pedro Leopoldo - MG</div>
                 </div>
               </div>
+
             </div>
-
-            {/* Footer */}
-            <div style={styles.footer}>
-              <div style={styles.assinatura}>
-                <div style={{ fontStyle: 'italic', color: '#666', marginBottom: '5px' }}>Atenciosamente,</div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#4c7f8a' }}>CONSTRUCOM</div>
-                <div style={{ fontSize: '11px', marginTop: '8px' }}>
-                  <strong>{dadosOrcamento.vendedor || 'Vendedor'}</strong><br/>
-                  {dadosOrcamento.vendedor_telefone && <span>📞 {dadosOrcamento.vendedor_telefone}</span>}
-                  {dadosOrcamento.vendedor_telefone && dadosOrcamento.vendedor_email && <br/>}
-                  {dadosOrcamento.vendedor_email && <span>📧 {dadosOrcamento.vendedor_email}</span>}
-                </div>
-              </div>
-              <div style={styles.validadeBox}>
-                <div style={styles.validadeDias}>{dadosOrcamento.validade_dias || 15}</div>
-                <div style={styles.validadeTexto}>dias de validade</div>
-              </div>
-            </div>
-
-          </div>
           )}
         </div>
 
         {/* Ações */}
-        <div style={{ backgroundColor: '#f0f0f0', padding: '12px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #ddd' }}>
-          <button onClick={onClose} style={{ padding: '10px 20px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-            Fechar
-          </button>
-          <button 
-            onClick={imprimir} 
-            disabled={loading}
-            style={{ padding: '10px 20px', backgroundColor: '#4c7f8a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', opacity: loading ? 0.5 : 1 }}
-          >
-            <Printer size={18} />
-            Imprimir / Salvar PDF
-          </button>
+        <div style={{ backgroundColor: '#f8fafc', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '11px', color: '#64748b' }}>
+            💡 Dica: Salve como PDF para enviar pelo WhatsApp
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={onClose} style={{ padding: '10px 20px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', color: '#475569' }}>
+              Fechar
+            </button>
+            <button 
+              onClick={imprimir} 
+              disabled={loading}
+              style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', opacity: loading ? 0.5 : 1 }}
+            >
+              <Printer size={16} />
+              Gerar PDF
+            </button>
+          </div>
         </div>
       </div>
     </div>
