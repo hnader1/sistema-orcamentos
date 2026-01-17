@@ -71,12 +71,28 @@ export default function PropostaComercial({
     return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
 
-  // Mensagem do tipo de frete
+  // ✅ CORREÇÃO: Usar nomes padronizados
+  const getTipoFreteExibicao = () => {
+    const modalidade = dadosFrete?.modalidade || 'FOB'
+    if (modalidade === 'FOB') return 'FOB'
+    if (modalidade === 'CIF_SEM_DESCARGA') return 'CIF - Sem Descarga'
+    if (modalidade === 'CIF_COM_DESCARGA') return 'CIF - Com Descarga'
+    return modalidade
+  }
+
+  // ✅ CORREÇÃO: Mensagem do tipo de frete usando nome padronizado
   const getMensagemFrete = () => {
-    const tipo = dadosFrete?.tipo_frete || 'FOB'
-    if (tipo === 'FOB') return 'FRETE POR CONTA DO CLIENTE'
-    if (tipo.includes('SEM DESCARGA') || tipo === 'CIF') return 'DESCARGA POR CONTA DO CLIENTE'
-    return 'FRETE COM DESCARGA INCLUSA'
+    const modalidade = dadosFrete?.modalidade || 'FOB'
+    if (modalidade === 'FOB') return 'FRETE POR CONTA DO CLIENTE'
+    if (modalidade === 'CIF_SEM_DESCARGA') return 'DESCARGA POR CONTA DO CLIENTE'
+    if (modalidade === 'CIF_COM_DESCARGA') return 'FRETE COM DESCARGA INCLUSA'
+    return 'FRETE POR CONTA DO CLIENTE'
+  }
+
+  // ✅ CORREÇÃO: Verificar se é CIF usando nome padronizado
+  const isCIF = () => {
+    const modalidade = dadosFrete?.modalidade || 'FOB'
+    return modalidade === 'CIF_SEM_DESCARGA' || modalidade === 'CIF_COM_DESCARGA'
   }
 
   // Imprimir
@@ -174,14 +190,14 @@ export default function PropostaComercial({
               <div style={styles.headerRight}>
                 <div style={styles.titulo}>PROPOSTA COMERCIAL</div>
                 <div style={styles.numero}>
-  {dadosOrcamento.numero_proposta ? (
-    <span style={{ color: '#9333ea', fontWeight: 'bold' }}>
-      PROPOSTA: {dadosOrcamento.numero_proposta}
-    </span>
-  ) : (
-    dadosOrcamento.numero
-  )}
-</div>
+                  {dadosOrcamento.numero_proposta ? (
+                    <span style={{ color: '#9333ea', fontWeight: 'bold' }}>
+                      PROPOSTA: {dadosOrcamento.numero_proposta}
+                    </span>
+                  ) : (
+                    dadosOrcamento.numero
+                  )}
+                </div>
                 <div style={styles.dataLocal}>{formatarData(dadosOrcamento.data_orcamento)} | Pedro Leopoldo - MG</div>
               </div>
             </div>
@@ -246,22 +262,22 @@ export default function PropostaComercial({
               </table>
             </div>
 
-            {/* Frete */}
+            {/* Frete - ✅ CORRIGIDO */}
             <div style={styles.secao}>
               <div style={styles.secaoTitulo}>02. FRETE</div>
               <div style={styles.freteBox}>
                 <div style={styles.freteGrid}>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>TIPO</div>
-                    <div style={styles.freteValor}>{dadosFrete?.tipo_frete || 'FOB'}</div>
+                    <div style={styles.freteValor}>{getTipoFreteExibicao()}</div>
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>VIAGENS</div>
-                    <div style={styles.freteValor}>{dadosFrete?.qtd_viagens || dadosFrete?.viagens_necessarias || 0}</div>
+                    <div style={styles.freteValor}>{dadosFrete?.viagens_necessarias || 0}</div>
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>VALOR/VIAGEM</div>
-                   <div style={styles.freteValor}>{formatarValor(dadosFrete?.valor_por_viagem || dadosFrete?.valor_unitario_viagem)}</div>
+                    <div style={styles.freteValor}>{formatarValor(dadosFrete?.valor_unitario_viagem)}</div>
                   </div>
                   <div style={styles.freteItem}>
                     <div style={styles.freteLabel}>TOTAL FRETE</div>
@@ -269,22 +285,24 @@ export default function PropostaComercial({
                   </div>
                 </div>
                 <div style={styles.freteAviso}>⚠️ {getMensagemFrete()}</div>
-             {dadosFrete?.tipo_frete && dadosFrete.tipo_frete !== 'FOB' && (
-  <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9', padding: '10px', marginTop: '10px', borderRadius: '6px' }}>
-    <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#0369a1', marginBottom: '4px' }}>
-      📍 ENDEREÇO DE ENTREGA
-    </div>
-    <div style={{ fontSize: '10px', color: '#0c4a6e' }}>
-      {dadosOrcamento.obra_logradouro && `${dadosOrcamento.obra_logradouro}, `}
-      {dadosOrcamento.obra_numero && `${dadosOrcamento.obra_numero}`}
-      {dadosOrcamento.obra_complemento && ` - ${dadosOrcamento.obra_complemento}`}
-      <br />
-      {dadosOrcamento.obra_bairro && `${dadosOrcamento.obra_bairro}, `}
-      {dadosOrcamento.obra_cidade}
-      {dadosOrcamento.obra_cep && ` - CEP: ${dadosOrcamento.obra_cep}`}
-    </div>
-  </div>
-)}
+                
+                {/* ✅ CORREÇÃO: Usar função isCIF() */}
+                {isCIF() && (
+                  <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9', padding: '10px', marginTop: '10px', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '9px', fontWeight: 'bold', color: '#0369a1', marginBottom: '4px' }}>
+                      📍 ENDEREÇO DE ENTREGA
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#0c4a6e' }}>
+                      {dadosOrcamento.obra_logradouro && `${dadosOrcamento.obra_logradouro}, `}
+                      {dadosOrcamento.obra_numero && `${dadosOrcamento.obra_numero}`}
+                      {dadosOrcamento.obra_complemento && ` - ${dadosOrcamento.obra_complemento}`}
+                      <br />
+                      {dadosOrcamento.obra_bairro && `${dadosOrcamento.obra_bairro}, `}
+                      {dadosOrcamento.obra_cidade}
+                      {dadosOrcamento.obra_cep && ` - CEP: ${dadosOrcamento.obra_cep}`}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -358,15 +376,14 @@ export default function PropostaComercial({
                 </div>
               </div>
 
-              {/* ===== FORMA DE PAGAMENTO ATUALIZADA ===== */}
               <div style={styles.clausula}>
-  <div style={styles.clausulaTitulo}>09. CONDIÇÕES DE PAGAMENTO</div>
-  <div style={styles.destaque}>
-    <div style={styles.destaqueValor}>
-      {formaPagamento?.descricao || dadosOrcamento.condicoes_pagamento || 'A DEFINIR'}
-    </div>
-  </div>
-</div>
+                <div style={styles.clausulaTitulo}>09. CONDIÇÕES DE PAGAMENTO</div>
+                <div style={styles.destaque}>
+                  <div style={styles.destaqueValor}>
+                    {formaPagamento?.descricao || dadosOrcamento.condicoes_pagamento || 'A DEFINIR'}
+                  </div>
+                </div>
+              </div>
 
               <div style={styles.clausula}>
                 <div style={styles.clausulaTitulo}>10. CARREGAMENTO E DESCARGA</div>
