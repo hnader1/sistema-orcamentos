@@ -702,11 +702,13 @@ if (orc.frete_cidade || orc.frete_modalidade) {
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
         frete: frete,
-        frete_modalidade: dadosFrete?.tipo_frete || 'FOB',
-        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-        frete_cidade: dadosFrete?.localidade || null,
-        frete_tipo_caminhao: dadosFrete?.tipo_caminhao || null,
+        frete_modalidade: dadosFrete?.modalidade || dadosFrete?.tipo_frete || 'FOB',
+frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+frete_cidade: dadosFrete?.localidade || null,
+frete_tipo_caminhao: dadosFrete?.tipo_veiculo || dadosFrete?.tipo_caminhao || null,
+
+
         total,
         observacoes: formData.observacoes,
         status: formData.status,
