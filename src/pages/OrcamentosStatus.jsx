@@ -349,7 +349,13 @@ export default function OrcamentosStatus() {
                     {/* Linha 1: Número • Nome do Cliente */}
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h3 className="text-base font-bold text-gray-900">
-                        #{orc.numero}
+                        <h3 className="text-base font-bold text-gray-900">
+  {orc.numero_proposta ? (
+    <span className="text-purple-700">{orc.numero_proposta}</span>
+  ) : (
+    <span className="text-gray-400">#{orc.numero}</span>
+  )}
+</h3>
                       </h3>
                       <span className="text-blue-600 font-semibold">•</span>
                       <span className="text-gray-700 font-medium truncate">

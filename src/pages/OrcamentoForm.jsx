@@ -943,21 +943,18 @@ function OrcamentoForm() {
           </div>
         </div>
       </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+<div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Dados do Orçamento</h2>
-            {formData.numero_proposta && (
-              <div className="text-xs text-gray-400">
-                Proposta: <span className="font-mono font-semibold text-purple-600">{formData.numero_proposta}</span>
-              </div>
-            )}
-            {!formData.numero_proposta && !id && (
-              <div className="text-xs text-gray-400 italic">
-                Número da proposta será gerado ao salvar
-              </div>
-            )}
+            <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg shadow-sm">
+              <span className="text-sm font-semibold text-purple-700">📋 Proposta:</span>
+              {formData.numero_proposta ? (
+                <span className="text-2xl font-bold text-purple-900 tracking-wider">{formData.numero_proposta}</span>
+              ) : (
+                <span className="text-sm italic text-purple-600">Será gerado ao salvar</span>
+              )}
+            </div>  
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
