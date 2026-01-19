@@ -8,72 +8,31 @@ export default function ResetPassword() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
-  const [initializing, setInitializing] = useState(true)
   const [success, setSuccess] = useState(false)
   const [erro, setErro] = useState('')
   const [senha, setSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
-  const [sessionReady, setSessionReady] = useState(false)
+  const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
-    const setupSession = async () => {
-      try {
-        // Check for error in URL
-        const urlError = searchParams.get('error_description')
-        if (urlError) {
-          setErro(urlError.replace(/\+/g, ' '))
-          setInitializing(false)
-          return
-        }
-
-        // Check for code in URL (PKCE flow)
-        const code = searchParams.get('code')
-        if (code) {
-          console.log('Found code, exchanging...')
-          const { error } = await supabase.auth.exchangeCodeForSession(code)
-          if (error) {
-            console.error('Exchange error:', error)
-            setErro('Link expirado. Solicite um novo.')
-            setInitializing(false)
-            return
-          }
-          setSessionReady(true)
-          setInitializing(false)
-          return
-        }
-
-        // Check for access_token in hash (implicit flow)
-        const hash = window.location.hash
-        if (hash && hash.includes('access_token')) {
-          console.log('Found access_token in hash')
-          // Supabase auto-handles this, just wait a bit
-          await new Promise(r => setTimeout(r, 1000))
-          const { data } = await supabase.auth.getSession()
-          if (data?.session) {
-            setSessionReady(true)
-          } else {
-            setErro('Link expirado. Solicite um novo.')
-          }
-          setInitializing(false)
-          return
-        }
-
-        // No code or token - check existing session
-        const { data } = await supabase.auth.getSession()
-        if (data?.session) {
-          setSessionReady(true)
-        } else {
-          setErro('Acesse esta página através do link enviado por email.')
-        }
-        setInitializing(false)
-      } catch (e) {
-        console.error('Setup error:', e)
-        setErro('Erro ao processar link.')
-        setInitializing(false)
-      }
+    // Check for error in URL
+    const hash = window.location.hash
+    if (hash.includes('error=')) {
+      const params = new URLSearchParams(hash.substring(1))
+      const errorDesc = params.get('error_description')
+      setErro(errorDesc?.replace(/\+/g, ' ') || 'Link inválido')
+      return
     }
 
-    setupSession()
+    // If we have token or code, show the form
+    const code = searchParams.get('code')
+    if (hash.includes('access_token') || hash.includes('type=recovery') || code) {
+      setShowForm(true)
+      return
+    }
+
+    // No token - invalid access
+    setErro('Acesse através do link enviado por email.')
   }, [searchParams])
 
   const handleReset = async (e) => {
@@ -93,11 +52,24 @@ export default function ResetPassword() {
     setLoading(true)
 
     try {
+      // Try to exchange code first if present
+      const code = searchParams.get('code')
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code)
+      }
+
+      // Wait a moment for session to establish
+      await new Promise(r => setTimeout(r, 500))
+
+      // Try to update password
       const { error } = await supabase.auth.updateUser({ password: senha })
 
       if (error) {
+        console.error('Update error:', error)
         if (error.message.includes('different')) {
           setErro('A nova senha deve ser diferente da anterior')
+        } else if (error.message.includes('session') || error.message.includes('Auth')) {
+          setErro('Link expirado. Solicite um novo.')
         } else {
           setErro(error.message)
         }
@@ -105,6 +77,7 @@ export default function ResetPassword() {
         return
       }
 
+      // Success!
       await supabase.auth.signOut()
       setSuccess(true)
 
@@ -113,23 +86,26 @@ export default function ResetPassword() {
       }, 2000)
     } catch (error) {
       console.error('Reset error:', error)
-      setErro('Erro ao redefinir senha.')
+      if (error.message?.includes('aborted')) {
+        // Retry once without waiting
+        try {
+          const { error: retryError } = await supabase.auth.updateUser({ password: senha })
+          if (!retryError) {
+            await supabase.auth.signOut()
+            setSuccess(true)
+            setTimeout(() => { window.location.href = '/login' }, 2000)
+            return
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      setErro('Erro ao redefinir. Tente solicitar novo link.')
       setLoading(false)
     }
   }
 
-  if (initializing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Verificando link...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (erro && !sessionReady) {
+  if (erro && !showForm) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
