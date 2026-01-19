@@ -204,9 +204,14 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     // Se precisa 2 viagens por peso mas 3 por pallets, usa 3 viagens!
     const viagensNecessarias = Math.max(viagensPorPeso, viagensPorPallets, 1)
     
-    // ✨ NOVO: Identificar qual é o limitante
-    const limitantePeso = viagensPorPeso >= viagensPorPallets
-    const limitantePallets = viagensPorPallets > viagensPorPeso
+    // ✨ NOVO: Calcular percentual de utilização (quanto enche do caminhão)
+    const percentualPeso = pesoTotalKg > 0 && capacidadeKg > 0 
+      ? Math.min((pesoTotalKg / (viagensNecessarias * capacidadeKg)) * 100, 100)
+      : 0
+    
+    const percentualPallets = totalPallets > 0 && capacidadePallets > 0
+      ? Math.min((totalPallets / (viagensNecessarias * capacidadePallets)) * 100, 100)
+      : 0
     
     console.log('📊 Cálculo de viagens:', {
       pesoTotalKg,
@@ -216,8 +221,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       viagensPorPeso,
       viagensPorPallets,
       viagensNecessarias,
-      limitantePeso,
-      limitantePallets
+      percentualPeso,
+      percentualPallets
     })
 
     let viagensCompletas = 0
@@ -250,12 +255,12 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       viagens_necessarias: viagensNecessarias,
       viagens_por_peso: viagensPorPeso,
       viagens_por_pallets: viagensPorPallets,
+      percentual_utilizacao_peso: percentualPeso,
+      percentual_utilizacao_pallets: percentualPallets,
       viagens_completas: viagensCompletas,
       ultima_viagem_percentual: ultimaViagemPercentual,
       valor_unitario_viagem: valorUnitarioViagem,
       valor_total_frete: valorTotalFrete,
-      limitante_peso: limitantePeso,
-      limitante_pallets: limitantePallets,
       frete_manual: false
     }
 
@@ -341,74 +346,72 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <span className="text-xs text-gray-500">{tipoVeiculo}</span>
             </div>
           )}
+        </div>
 
-          {/* ✨ NOVO: Viagens Necessárias com Detalhamento */}
-          {calculoFrete && calculoFrete.viagens_necessarias > 0 && (
-            <div className="col-span-2 md:col-span-4 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-orange-700">Viagens Necessárias</span>
-                <span className="text-3xl font-bold text-orange-600">{calculoFrete.viagens_necessarias} viagens</span>
-              </div>
-              
-              {/* Detalhamento de Peso e Pallets */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Por Peso */}
-                <div className={`p-3 rounded-lg border-2 ${
-                  calculoFrete.limitante_peso 
-                    ? 'bg-red-50 border-red-300' 
-                    : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Weight size={16} className={calculoFrete.limitante_peso ? 'text-red-600' : 'text-gray-500'} />
-                    <span className={`text-xs font-medium ${
-                      calculoFrete.limitante_peso ? 'text-red-700' : 'text-gray-600'
-                    }`}>
-                      Por Peso
-                    </span>
-                  </div>
-                  <div className="text-lg font-bold text-gray-900">
-                    {calculoFrete.viagens_por_peso} {calculoFrete.viagens_por_peso === 1 ? 'viagem' : 'viagens'}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {((pesoTotal || 0) / 1000).toFixed(2)} ton ÷ {(calculoFrete.capacidade_kg / 1000).toFixed(1)} ton
-                  </div>
-                  {calculoFrete.limitante_peso && (
-                    <div className="mt-2 text-xs font-semibold text-red-600">
-                      ⚠️ LIMITANTE
-                    </div>
-                  )}
+        {/* ✨ NOVO: Viagens Necessárias com Barras de Progresso */}
+        {calculoFrete && calculoFrete.viagens_necessarias > 0 && (
+          <div className="mt-4 bg-white border-2 border-orange-300 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-semibold text-orange-700">Viagens Necessárias</span>
+              <span className="text-2xl font-bold text-orange-600">{calculoFrete.viagens_necessarias} {calculoFrete.viagens_necessarias === 1 ? 'viagem' : 'viagens'}</span>
+            </div>
+            
+            {/* Barra de Peso */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Weight size={16} className="text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">Peso</span>
                 </div>
-
-                {/* Por Pallets */}
-                <div className={`p-3 rounded-lg border-2 ${
-                  calculoFrete.limitante_pallets 
-                    ? 'bg-red-50 border-red-300' 
-                    : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Package size={16} className={calculoFrete.limitante_pallets ? 'text-red-600' : 'text-gray-500'} />
-                    <span className={`text-xs font-medium ${
-                      calculoFrete.limitante_pallets ? 'text-red-700' : 'text-gray-600'
-                    }`}>
-                      Por Pallets
+                <span className="text-sm font-bold text-gray-900">
+                  {calculoFrete.percentual_utilizacao_peso.toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-end pr-2 transition-all duration-500"
+                  style={{ width: `${calculoFrete.percentual_utilizacao_peso}%` }}
+                >
+                  {calculoFrete.percentual_utilizacao_peso > 15 && (
+                    <span className="text-xs font-bold text-white">
+                      {((pesoTotal || 0) / 1000).toFixed(2)} ton
                     </span>
-                  </div>
-                  <div className="text-lg font-bold text-gray-900">
-                    {calculoFrete.viagens_por_pallets} {calculoFrete.viagens_por_pallets === 1 ? 'viagem' : 'viagens'}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {(totalPallets || 0).toFixed(2)} ÷ {calculoFrete.capacidade_pallets} pallets
-                  </div>
-                  {calculoFrete.limitante_pallets && (
-                    <div className="mt-2 text-xs font-semibold text-red-600">
-                      ⚠️ LIMITANTE
-                    </div>
                   )}
                 </div>
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Barra de Pallets */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Package size={16} className="text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">Pallets</span>
+                </div>
+                <span className="text-sm font-bold text-gray-900">
+                  {calculoFrete.percentual_utilizacao_pallets.toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-end pr-2 transition-all duration-500"
+                  style={{ width: `${calculoFrete.percentual_utilizacao_pallets}%` }}
+                >
+                  {calculoFrete.percentual_utilizacao_pallets > 15 && (
+                    <span className="text-xs font-bold text-white">
+                      {(totalPallets || 0).toFixed(2)} pallets
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Explicação */}
+            <div className="mt-3 text-xs text-gray-500 italic">
+              O número de viagens é definido pelo limitante que atinge 100% primeiro
+            </div>
+          </div>
+        )}
 
         {/* Indicador de Pedido Grande */}
         {isPedidoGrande && (
