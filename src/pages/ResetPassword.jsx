@@ -47,6 +47,9 @@ export default function ResetPassword() {
       if (error) {
         if (error.message.includes('different')) {
           setErro('A nova senha deve ser diferente da senha anterior')
+        } else if (error.message.includes('aborted') || error.message.includes('session')) {
+          setLinkValido(false)
+          setErro('Sessão expirada. Solicite um novo link.')
         } else {
           setErro(error.message)
         }
@@ -61,7 +64,12 @@ export default function ResetPassword() {
         window.location.href = '/login'
       }, 2000)
     } catch (error) {
-      setErro(error.message || 'Erro ao redefinir senha')
+      if (error.message?.includes('aborted') || error.message?.includes('session')) {
+        setLinkValido(false)
+        setErro('Sessão expirada. Solicite um novo link.')
+      } else {
+        setErro(error.message || 'Erro ao redefinir senha')
+      }
       setLoading(false)
     }
   }
