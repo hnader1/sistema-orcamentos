@@ -401,27 +401,56 @@ function OrcamentoForm() {
     setErroSenha(false)
 
     try {
-      // Buscar usuário pelo nome ou email
+      console.log('🔐 Tentando validar usuário:', usuarioLiberacao)
+      
+      // Buscar usuário pelo nome ou email (busca exata ou parcial)
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select('id, nome, email, senha, perfil')
-        .or(`nome.ilike.%${usuarioLiberacao}%,email.ilike.%${usuarioLiberacao}%`)
-        .in('perfil', ['admin', 'comercial']) // Apenas admin ou comercial podem liberar
         .eq('ativo', true)
-        .limit(1)
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Erro na busca:', error)
+        throw error
+      }
 
-      if (!usuarios || usuarios.length === 0) {
+      console.log('📋 Usuários encontrados:', usuarios?.length)
+
+      // Filtrar manualmente para encontrar o usuário
+      const usuarioEncontrado = usuarios?.find(u => {
+        const inputLower = usuarioLiberacao.toLowerCase().trim()
+        const nomeMatch = u.nome?.toLowerCase().includes(inputLower)
+        const emailMatch = u.email?.toLowerCase().includes(inputLower)
+        return nomeMatch || emailMatch
+      })
+
+      if (!usuarioEncontrado) {
+        console.log('❌ Usuário não encontrado')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      const usuarioEncontrado = usuarios[0]
+      console.log('✅ Usuário encontrado:', usuarioEncontrado.nome, '| Perfil:', usuarioEncontrado.perfil)
 
-      // Verificar senha (comparação simples - em produção deveria ser hash)
+      // Verificar se tem permissão (admin, administrador, comercial, comercial_interno)
+      const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
+      const perfilLower = usuarioEncontrado.perfil?.toLowerCase() || ''
+      
+      if (!perfisPermitidos.includes(perfilLower)) {
+        console.log('❌ Perfil sem permissão:', usuarioEncontrado.perfil)
+        setErroSenha(true)
+        setValidandoSenha(false)
+        return
+      }
+
+      console.log('✅ Perfil autorizado:', usuarioEncontrado.perfil)
+
+      // Verificar senha (comparação direta - case sensitive)
       if (usuarioEncontrado.senha !== senhaLiberacao) {
+        console.log('❌ Senha incorreta')
+        console.log('   Senha esperada:', usuarioEncontrado.senha)
+        console.log('   Senha digitada:', senhaLiberacao)
         setErroSenha(true)
         setValidandoSenha(false)
         return
@@ -454,7 +483,7 @@ function OrcamentoForm() {
       console.log(`✅ Desconto liberado por ${usuarioEncontrado.nome} em ${dataHora}`)
 
     } catch (error) {
-      console.error('Erro ao validar senha:', error)
+      console.error('❌ Erro ao validar senha:', error)
       setErroSenha(true)
     } finally {
       setValidandoSenha(false)
