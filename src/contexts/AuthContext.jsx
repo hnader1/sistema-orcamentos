@@ -21,18 +21,28 @@ export function AuthProvider({ children }) {
   }, [])
 
   const checkUser = () => {
-    try {
-      const savedUser = localStorage.getItem('user')
-      if (savedUser) {
-        setUser(JSON.parse(savedUser))
-      }
-    } catch (error) {
-      console.error('Erro ao verificar usuário:', error)
+  try {
+    const savedUser = localStorage.getItem('user')
+    const sessionCreated = localStorage.getItem('session_created')
+    
+    // Session expires after 8 hours
+    if (sessionCreated && Date.now() - parseInt(sessionCreated) > 8 * 60 * 60 * 1000) {
       localStorage.removeItem('user')
-    } finally {
+      localStorage.removeItem('session_created')
       setLoading(false)
+      return
     }
+    
+    if (savedUser) {
+      setUser(JSON.parse(savedUser))
+    }
+  } catch (error) {
+    console.error('Erro ao verificar usuário:', error)
+    localStorage.removeItem('user')
+  } finally {
+    setLoading(false)
   }
+}
 
   const login = async (email, senha) => {
     try {
@@ -68,6 +78,7 @@ export function AuthProvider({ children }) {
 
       setUser(userData)
       localStorage.setItem('user', JSON.stringify(userData))
+      localStorage.setItem('session_created', Date.now().toString())
 
       return { success: true, user: userData }
     } catch (error) {

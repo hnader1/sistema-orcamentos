@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import OrcamentosStatus from './pages/OrcamentosStatus'
@@ -11,8 +12,8 @@ import AdminProdutos from './pages/AdminProdutos'
 import AdminUsuarios from './pages/AdminUsuarios'
 import AdminFrete from './pages/AdminFrete'
 import AdminDashboard from './pages/AdminDashboard'
-import RelatorioOrcamentos from './pages/RelatorioOrcamentos' // ✨ NOVO
-import Conflitos from './pages/Conflitos';
+import RelatorioOrcamentos from './pages/RelatorioOrcamentos'
+import Conflitos from './pages/Conflitos'
 import FormasPagamentoAdmin from './pages/FormasPagamentoAdmin'
 import GerenciarCodigosVendedores from './pages/GerenciarCodigosVendedores'
 
@@ -24,91 +25,25 @@ function App() {
           {/* Rota pública - Login */}
           <Route path="/login" element={<Login />} />
 
-          {/* Rotas protegidas - Dashboard */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/conflitos" element={
-            <ProtectedRoute>
-              <Conflitos />
-            </ProtectedRoute>
-          } />
+          {/* Rotas protegidas - Usuários logados */}
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/conflitos" element={<ProtectedRoute><Conflitos /></ProtectedRoute>} />
+          <Route path="/orcamentos/status/:status" element={<ProtectedRoute><OrcamentosStatus /></ProtectedRoute>} />
+          <Route path="/orcamentos" element={<ProtectedRoute><Orcamentos /></ProtectedRoute>} />
+          <Route path="/orcamentos/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
+          <Route path="/orcamentos/editar/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
+          <Route path="/relatorios/orcamentos" element={<ProtectedRoute><RelatorioOrcamentos /></ProtectedRoute>} />
 
-          <Route path="/orcamentos/status/:status" element={
-            <ProtectedRoute>
-              <OrcamentosStatus />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/orcamentos" element={
-            <ProtectedRoute>
-              <Orcamentos />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/orcamentos/novo" element={
-            <ProtectedRoute>
-              <OrcamentoForm />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/orcamentos/editar/:id" element={
-            <ProtectedRoute>
-              <OrcamentoForm />
-            </ProtectedRoute>
-          } />
+          {/* Rotas Admin - APENAS ADMINISTRADORES */}
+          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+          <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/admin/produtos" element={<AdminRoute><AdminProdutos /></AdminRoute>} />
+          <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
+          <Route path="/admin/frete" element={<AdminRoute><AdminFrete /></AdminRoute>} />
+          <Route path="/admin/codigos-vendedores" element={<AdminRoute><GerenciarCodigosVendedores /></AdminRoute>} />
+          <Route path="/admin/formas-pagamento" element={<AdminRoute><FormasPagamentoAdmin /></AdminRoute>} />
 
-          <Route path="/relatorios/orcamentos" element={
-            <ProtectedRoute>
-              <RelatorioOrcamentos />
-            </ProtectedRoute>
-          } />
-
-          {/* Rotas protegidas - Admin */}
-          <Route path="/admin" element={
-            <ProtectedRoute>
-              <Admin />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/dashboard" element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/produtos" element={
-            <ProtectedRoute>
-              <AdminProdutos />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/usuarios" element={
-            <ProtectedRoute>
-              <AdminUsuarios />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/frete" element={
-            <ProtectedRoute>
-              <AdminFrete />
-            </ProtectedRoute>
-          } />
-<Route path="/admin/codigos-vendedores" element={<GerenciarCodigosVendedores />} />   
-
-
-
-          {/* ===== ADICIONAR AQUI ===== */}
-          <Route path="/admin/formas-pagamento" element={
-            <ProtectedRoute>
-              <FormasPagamentoAdmin />
-            </ProtectedRoute>
-          } />
-          
-          {/* Redirecionar qualquer rota não encontrada para login */}
+          {/* Rota não encontrada */}
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </AuthProvider>
