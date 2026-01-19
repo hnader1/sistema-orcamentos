@@ -16,49 +16,54 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    checkUser()
+    let mounted = true
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await loadUserData(session.user.id)
-      } else {
-        setUser(null)
+    const initialize = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user && mounted) {
+          const { data } = await supabase
+            .from('usuarios')
+            .select('id, email, nome, telefone, tipo')
+            .eq('auth_id', session.user.id)
+            .eq('ativo', true)
+            .single()
+          
+          if (mounted) setUser(data)
+        }
+      } catch (error) {
+        console.error('Init error:', error)
+      } finally {
+        if (mounted) setLoading(false)
       }
-      setLoading(false)
-    })
+    }
 
-    return () => subscription.unsubscribe()
+    initialize()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user && mounted) {
+          const { data } = await supabase
+            .from('usuarios')
+            .select('id, email, nome, telefone, tipo')
+            .eq('auth_id', session.user.id)
+            .eq('ativo', true)
+            .single()
+          
+          if (mounted) setUser(data)
+        } else if (mounted) {
+          setUser(null)
+        }
+        if (mounted) setLoading(false)
+      }
+    )
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
-
-  const checkUser = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        await loadUserData(session.user.id)
-      }
-    } catch (error) {
-      console.error('Erro ao verificar sessao:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadUserData = async (authId) => {
-    try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('id, email, nome, telefone, tipo')
-        .eq('auth_id', authId)
-        .eq('ativo', true)
-        .single()
-
-      if (error) throw error
-      setUser(data)
-    } catch (error) {
-      console.error('Erro ao carregar usuario:', error)
-      setUser(null)
-    }
-  }
 
   const login = async (email, senha) => {
     try {
@@ -66,7 +71,6 @@ export function AuthProvider({ children }) {
         email,
         password: senha
       })
-
       if (error) throw error
       return { success: true }
     } catch (error) {
