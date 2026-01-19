@@ -401,10 +401,11 @@ function OrcamentoForm() {
     setErroSenha(false)
 
     try {
-      console.log('🔐 Tentando validar usuário:', usuarioLiberacao)
+      console.log('🔐 ========== INICIANDO VALIDAÇÃO ==========')
+      console.log('🔐 Usuário digitado:', `"${usuarioLiberacao}"`)
+      console.log('🔐 Senha digitada:', `"${senhaLiberacao}"`)
       
       // Buscar usuário pelo nome ou email
-      // NOTA: O campo de senha é 'senha_hash', não 'senha'
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select('id, nome, email, senha, senha_hash, tipo')
@@ -415,55 +416,86 @@ function OrcamentoForm() {
         throw error
       }
 
-      console.log('📋 Usuários encontrados:', usuarios?.length)
-      console.log('📋 Dados:', usuarios)
+      console.log('📋 Total de usuários ativos:', usuarios?.length)
+      
+      // Log de todos os usuários para debug
+      usuarios?.forEach((u, i) => {
+        console.log(`   [${i}] Nome: "${u.nome}" | Email: "${u.email}" | Tipo: "${u.tipo}"`)
+      })
 
-      // Filtrar manualmente para encontrar o usuário
+      // Filtrar para encontrar o usuário - busca mais flexível
+      const inputLower = usuarioLiberacao.toLowerCase().trim()
+      console.log('🔍 Buscando por:', `"${inputLower}"`)
+      
       const usuarioEncontrado = usuarios?.find(u => {
-        const inputLower = usuarioLiberacao.toLowerCase().trim()
-        const nomeMatch = u.nome?.toLowerCase().includes(inputLower)
-        const emailMatch = u.email?.toLowerCase().includes(inputLower)
-        return nomeMatch || emailMatch
+        const nomeLower = (u.nome || '').toLowerCase().trim()
+        const emailLower = (u.email || '').toLowerCase().trim()
+        
+        // Busca exata ou parcial
+        const nomeExato = nomeLower === inputLower
+        const emailExato = emailLower === inputLower
+        const nomeContem = nomeLower.includes(inputLower)
+        const emailContem = emailLower.includes(inputLower)
+        
+        const match = nomeExato || emailExato || nomeContem || emailContem
+        
+        if (match) {
+          console.log(`   ✓ Match encontrado: "${u.nome}" (${u.email})`)
+        }
+        
+        return match
       })
 
       if (!usuarioEncontrado) {
-        console.log('❌ Usuário não encontrado')
+        console.log('❌ Nenhum usuário encontrado com esse nome/email')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      console.log('✅ Usuário encontrado:', usuarioEncontrado.nome, '| Tipo:', usuarioEncontrado.tipo)
+      console.log('✅ Usuário encontrado:', usuarioEncontrado.nome)
+      console.log('   Tipo:', usuarioEncontrado.tipo)
+      console.log('   senha_hash:', usuarioEncontrado.senha_hash)
+      console.log('   senha:', usuarioEncontrado.senha)
 
-      // Verificar se tem permissão (admin, administrador, comercial, comercial_interno)
+      // Verificar se tem permissão
       const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
-      const tipoLower = usuarioEncontrado.tipo?.toLowerCase() || ''
+      const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
+      
+      console.log('🔒 Verificando permissão...')
+      console.log('   Tipo do usuário:', `"${tipoLower}"`)
+      console.log('   Tipos permitidos:', perfisPermitidos)
       
       if (!perfisPermitidos.includes(tipoLower)) {
-        console.log('❌ Tipo sem permissão:', usuarioEncontrado.tipo)
+        console.log('❌ Tipo sem permissão!')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      console.log('✅ Tipo autorizado:', usuarioEncontrado.tipo)
+      console.log('✅ Tipo autorizado!')
 
-      // Verificar senha - pode estar em 'senha' ou 'senha_hash'
-      const senhaCorreta = usuarioEncontrado.senha_hash || usuarioEncontrado.senha
+      // Verificar senha - PRIORIZA senha_hash, depois senha
+      // IMPORTANTE: senha_hash é o campo correto!
+      const senhaCorreta = usuarioEncontrado.senha_hash ? usuarioEncontrado.senha_hash : usuarioEncontrado.senha
       
       console.log('🔑 Verificando senha...')
-      console.log('   Senha no banco (senha_hash):', usuarioEncontrado.senha_hash)
-      console.log('   Senha no banco (senha):', usuarioEncontrado.senha)
-      console.log('   Senha digitada:', senhaLiberacao)
+      console.log('   Campo senha_hash:', `"${usuarioEncontrado.senha_hash}"`)
+      console.log('   Campo senha:', `"${usuarioEncontrado.senha}"`)
+      console.log('   Usando:', `"${senhaCorreta}"`)
+      console.log('   Digitada:', `"${senhaLiberacao}"`)
+      console.log('   São iguais?', senhaCorreta === senhaLiberacao)
       
-      if (senhaCorreta !== senhaLiberacao) {
-        console.log('❌ Senha incorreta')
+      if (!senhaCorreta || senhaCorreta !== senhaLiberacao) {
+        console.log('❌ Senha incorreta!')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      // ✅ Senha correta - liberar desconto
+      console.log('✅ Senha correta!')
+
+      // ✅ Tudo ok - liberar desconto
       const agora = new Date()
       const dataHora = agora.toLocaleString('pt-BR')
       
@@ -487,7 +519,9 @@ function OrcamentoForm() {
       setUsuarioLiberacao('')
       setSenhaLiberacao('')
       
-      console.log(`✅ Desconto liberado por ${usuarioEncontrado.nome} em ${dataHora}`)
+      console.log('🎉 ========== DESCONTO LIBERADO ==========')
+      console.log(`   Por: ${usuarioEncontrado.nome}`)
+      console.log(`   Data/Hora: ${dataHora}`)
 
     } catch (error) {
       console.error('❌ Erro ao validar senha:', error)
