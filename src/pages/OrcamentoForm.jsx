@@ -39,6 +39,7 @@ function OrcamentoForm() {
   const [senhaLiberacao, setSenhaLiberacao] = useState('')
   const [validandoSenha, setValidandoSenha] = useState(false)
   const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
+  const [descontoTravado, setDescontoTravado] = useState(false) // ✅ Novo: trava o campo após liberação
   const LIMITE_DESCONTO = 5
   
   const [formData, setFormData] = useState({
@@ -74,7 +75,13 @@ function OrcamentoForm() {
     obra_logradouro: '',
     obra_numero: '',
     obra_complemento: '',
-    obra_endereco_validado: false
+    obra_endereco_validado: false,
+    // ✅ Campos de controle de liberação de desconto
+    desconto_liberado: false,
+    desconto_liberado_por: null,
+    desconto_liberado_por_id: null,
+    desconto_liberado_em: null,
+    desconto_valor_liberado: null
   })
 
   const carregarVendedores = async () => {
@@ -292,7 +299,13 @@ function OrcamentoForm() {
         obra_logradouro: orc.obra_logradouro || '',
         obra_numero: orc.obra_numero || '',
         obra_complemento: orc.obra_complemento || '',
-        obra_endereco_validado: orc.obra_endereco_validado || false
+        obra_endereco_validado: orc.obra_endereco_validado || false,
+        // ✅ Campos de controle de liberação de desconto
+        desconto_liberado: orc.desconto_liberado || false,
+        desconto_liberado_por: orc.desconto_liberado_por || null,
+        desconto_liberado_por_id: orc.desconto_liberado_por_id || null,
+        desconto_liberado_em: orc.desconto_liberado_em || null,
+        desconto_valor_liberado: orc.desconto_valor_liberado || null
       })
 
       setDadosCNPJCPF({
@@ -317,6 +330,17 @@ function OrcamentoForm() {
 
       if (orc.desconto_geral > LIMITE_DESCONTO) {
         setDescontoLiberado(true)
+        setDescontoTravado(true) // ✅ Trava o campo se já foi liberado
+        
+        // Carregar dados de quem liberou do banco
+        if (orc.desconto_liberado_por) {
+          setDescontoLiberadoPor({
+            nome: orc.desconto_liberado_por,
+            data: orc.desconto_liberado_em ? new Date(orc.desconto_liberado_em).toLocaleString('pt-BR') : '',
+            valor: orc.desconto_valor_liberado
+          })
+          console.log('📋 Desconto foi liberado por:', orc.desconto_liberado_por, 'em', orc.desconto_liberado_em)
+        }
       }
 
       // ✅ CORREÇÃO: Carregar frete com nomes PADRONIZADOS
@@ -383,6 +407,13 @@ function OrcamentoForm() {
   const handleDescontoChange = (valor) => {
     const novoValor = parseFloat(valor) || 0
     
+    // ✅ Se o desconto está travado (já foi liberado e salvo), precisa de nova autorização
+    if (descontoTravado && novoValor !== parseFloat(formData.desconto_geral)) {
+      setMostrarModalSenha(true)
+      return
+    }
+    
+    // Se tentar colocar desconto acima do limite sem estar liberado
     if (novoValor > LIMITE_DESCONTO && !descontoLiberado) {
       setMostrarModalSenha(true)
       return
@@ -500,19 +531,20 @@ function OrcamentoForm() {
       const dataHora = agora.toLocaleString('pt-BR')
       
       setDescontoLiberado(true)
+      setDescontoTravado(false) // ✅ Destrava temporariamente para permitir edição
       setDescontoLiberadoPor({
+        id: usuarioEncontrado.id,
         nome: usuarioEncontrado.nome,
         data: dataHora
       })
       
-      // Adicionar observação interna sobre a liberação
-      const obsLiberacao = `\n\n🔓 DESCONTO ACIMA DE ${LIMITE_DESCONTO}% LIBERADO\n` +
-        `Por: ${usuarioEncontrado.nome}\n` +
-        `Data/Hora: ${dataHora}`
-      
+      // ✅ Salvar dados de liberação no formData para persistir no banco
       setFormData(prev => ({
         ...prev,
-        observacoes_internas: (prev.observacoes_internas || '') + obsLiberacao
+        desconto_liberado: true,
+        desconto_liberado_por: usuarioEncontrado.nome,
+        desconto_liberado_por_id: usuarioEncontrado.id,
+        desconto_liberado_em: agora.toISOString()
       }))
 
       setMostrarModalSenha(false)
@@ -747,7 +779,13 @@ function OrcamentoForm() {
         obra_logradouro: dadosEndereco?.obra_logradouro || formData.obra_logradouro || null,
         obra_numero: dadosEndereco?.obra_numero || formData.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || formData.obra_complemento || null,
-        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false
+        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false,
+        // ✅ NÃO copia liberação de desconto - nova proposta precisa de nova autorização
+        desconto_liberado: false,
+        desconto_liberado_por: null,
+        desconto_liberado_por_id: null,
+        desconto_liberado_em: null,
+        desconto_valor_liberado: null
       }
 
       console.log('🚚 [DUPLICAR] Dados de frete:', {
@@ -907,7 +945,13 @@ function OrcamentoForm() {
         obra_logradouro: dadosEndereco?.obra_logradouro || null,
         obra_numero: dadosEndereco?.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || null,
-        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false
+        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false,
+        // ✅ Campos de controle de liberação de desconto
+        desconto_liberado: formData.desconto_liberado || false,
+        desconto_liberado_por: formData.desconto_liberado_por || null,
+        desconto_liberado_por_id: formData.desconto_liberado_por_id || null,
+        desconto_liberado_em: formData.desconto_liberado_em || null,
+        desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null
       }
 
       // ✅ LOG para debug
@@ -1520,15 +1564,20 @@ function OrcamentoForm() {
 
 
                 <div className="flex justify-between items-center">
-                  <label className="text-sm text-gray-600 flex items-center gap-1">
+                  <label className="text-sm text-gray-600 flex items-center gap-1 flex-wrap">
                     Desconto (%):
-                    {!descontoLiberado && (
+                    {!descontoLiberado && !descontoTravado && (
                       <span className="text-xs text-yellow-600 flex items-center gap-0.5">
                         <Lock size={10} /> máx {LIMITE_DESCONTO}%
                       </span>
                     )}
-                    {descontoLiberado && descontoLiberadoPor && (
-                      <span className="text-xs text-green-600" title={`Liberado por ${descontoLiberadoPor.nome} em ${descontoLiberadoPor.data}`}>
+                    {descontoTravado && descontoLiberadoPor && (
+                      <span className="text-xs text-blue-600 flex items-center gap-0.5" title={`Liberado por ${descontoLiberadoPor.nome} em ${descontoLiberadoPor.data}\nPara alterar, clique no campo.`}>
+                        🔒 {descontoLiberadoPor.nome} ({descontoLiberadoPor.data})
+                      </span>
+                    )}
+                    {descontoLiberado && !descontoTravado && descontoLiberadoPor && (
+                      <span className="text-xs text-green-600">
                         ✓ liberado por {descontoLiberadoPor.nome}
                       </span>
                     )}
@@ -1536,19 +1585,33 @@ function OrcamentoForm() {
                       <span className="text-xs text-green-600">✓ liberado</span>
                     )}
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    max={descontoLiberado ? 100 : LIMITE_DESCONTO}
-                    value={formData.desconto_geral}
-                    onChange={(e) => handleDescontoChange(e.target.value)}
-                    disabled={isReadOnly}
-                    className={`w-20 px-2 py-1 border rounded text-center text-sm ${
-                      formData.desconto_geral > LIMITE_DESCONTO 
-                        ? 'border-yellow-400 bg-yellow-50' 
-                        : 'border-gray-300'
-                    }`}
-                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      max={descontoLiberado ? 100 : LIMITE_DESCONTO}
+                      value={formData.desconto_geral}
+                      onChange={(e) => handleDescontoChange(e.target.value)}
+                      disabled={isReadOnly}
+                      className={`w-20 px-2 py-1 border rounded text-center text-sm ${
+                        descontoTravado 
+                          ? 'border-blue-400 bg-blue-50 cursor-pointer' 
+                          : formData.desconto_geral > LIMITE_DESCONTO 
+                            ? 'border-yellow-400 bg-yellow-50' 
+                            : 'border-gray-300'
+                      }`}
+                    />
+                    {descontoTravado && (
+                      <button
+                        type="button"
+                        onClick={() => setMostrarModalSenha(true)}
+                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                        title="Alterar desconto (requer autorização)"
+                      >
+                        <Lock size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-between text-sm border-t pt-2">
