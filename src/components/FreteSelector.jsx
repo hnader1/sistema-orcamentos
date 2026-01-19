@@ -158,26 +158,14 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // 🔧 FIX: Mapear modalidade para o formato do banco de dados
-    // Frontend usa: "CIF" ou "CIF_COM_DESCARGA"
-    // Banco tem: "CIF_SEM_DESCARGA" ou "CIF_COM_DESCARGA"
-    const modalidadeDB = modalidade === 'CIF' ? 'CIF_SEM_DESCARGA' : modalidade
-    
-    // Construir tipo_veiculo no formato do banco: "Truck 14t - SEM DESCARGA"
-    const modalidadeBusca = modalidade === 'CIF_COM_DESCARGA' 
-      ? 'COM DESCARGA' 
-      : 'SEM DESCARGA'
-    
-    const veiculoBusca = `${tipoVeiculo} - ${modalidadeBusca}`
-    
-    // Buscar frete verificando cidade, tipo_veiculo E modalidade
+    // 🔧 FIX: Buscar frete APENAS por cidade e tipo_veiculo (como na versão antiga que funcionava)
+    // NÃO buscar por modalidade porque o formato pode não bater
     const frete = fretes.find(f => 
       f.cidade === cidadeSelecionada && 
-      f.tipo_veiculo === veiculoBusca &&
-      f.modalidade === modalidadeDB  // 🔧 FIX: Usar modalidadeDB mapeada
+      f.tipo_veiculo === tipoVeiculo
     )
 
-    console.log('Buscando frete:', { cidadeSelecionada, veiculoBusca, modalidade: modalidadeDB })
+    console.log('Buscando frete:', { cidadeSelecionada, tipoVeiculo })
     console.log('Frete encontrado:', frete)
 
     if (!frete) {
@@ -203,8 +191,14 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         : 100
     }
 
-    // Usar preco_fixo - valor fixo por viagem (do banco de dados)
-    const valorUnitarioViagem = frete.preco_fixo || frete.preco_por_kg || 0
+    // 🔧 FIX: Usar preco_fixo (novo nome do campo) ao invés de "valor"
+    let valorUnitarioViagem = frete.preco_fixo || 0
+
+    // 🔧 FIX: Aplicar descarga se CIF_COM_DESCARGA
+    if (modalidade === 'CIF_COM_DESCARGA') {
+      valorUnitarioViagem = valorUnitarioViagem * 1.15
+    }
+
     const valorTotalFrete = valorUnitarioViagem * viagensNecessarias
 
     const resultado = {
