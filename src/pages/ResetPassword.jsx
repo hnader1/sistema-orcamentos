@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { Lock, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
 import logoConstrucom from '../assets/logo-construcom.png'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [initializing, setInitializing] = useState(true)
   const [success, setSuccess] = useState(false)
@@ -17,60 +18,57 @@ export default function ResetPassword() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Check for stored hash from main.jsx
-        const storedHash = sessionStorage.getItem('supabase-auth-hash')
-        const currentHash = window.location.hash
-        const hash = storedHash || currentHash
+        const code = searchParams.get('code')
+        const errorParam = searchParams.get('error')
+        const errorDesc = searchParams.get('error_description')
 
-        console.log('Stored hash:', storedHash)
-        console.log('Current hash:', currentHash)
-
-        // Clear stored hash
-        sessionStorage.removeItem('supabase-auth-hash')
+        console.log('Code:', code)
+        console.log('Error:', errorParam, errorDesc)
 
         // Check for error in URL
-        if (hash && hash.includes('error=')) {
-          const params = new URLSearchParams(hash.substring(1))
-          const errorDesc = params.get('error_description')
+        if (errorParam) {
           setLinkValido(false)
-          setErro(errorDesc?.replace(/\+/g, ' ') || 'Link inválido')
+          setErro(errorDesc || 'Link inválido')
           setInitializing(false)
           return
         }
 
-        // If we have a hash with token, restore it to URL for Supabase to process
-        if (hash && hash.includes('access_token') && !currentHash) {
-          window.location.hash = hash
-          await new Promise(resolve => setTimeout(resolve, 500))
+        // If we have a code, exchange it for a session
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          console.log('Exchange result:', data, error)
+          
+          if (error) {
+            setLinkValido(false)
+            setErro('Link expirado ou inválido. Solicite um novo.')
+            setInitializing(false)
+            return
+          }
+          
+          setLinkValido(true)
+          setInitializing(false)
+          return
         }
 
-        // Wait for Supabase to process
-        await new Promise(resolve => setTimeout(resolve, 1000))
-
-        // Check session
-        const { data, error } = await supabase.auth.getSession()
-        console.log('Session:', data?.session ? 'Found' : 'Not found', error)
-
-        if (data?.session) {
-          setLinkValido(true)
-        } else if (hash && (hash.includes('access_token') || hash.includes('type=recovery'))) {
-          // Has token in URL - let it proceed
+        // No code - check for existing session
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
           setLinkValido(true)
         } else {
           setLinkValido(false)
-          setErro('Link inválido ou expirado.')
+          setErro('Link inválido. Use o link enviado por email.')
         }
       } catch (e) {
         console.error('Check session error:', e)
-        // Don't block - let user try anyway
-        setLinkValido(true)
+        setLinkValido(false)
+        setErro('Erro ao verificar link.')
       } finally {
         setInitializing(false)
       }
     }
 
     checkSession()
-  }, [])
+  }, [searchParams])
 
   const handleReset = async (e) => {
     e.preventDefault()
@@ -89,15 +87,11 @@ export default function ResetPassword() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.updateUser({ password: senha })
+      const { error } = await supabase.auth.updateUser({ password: senha })
 
       if (error) {
-        console.error('Update error:', error)
         if (error.message.includes('different')) {
           setErro('A nova senha deve ser diferente da anterior')
-        } else if (error.message.includes('session') || error.message.includes('aborted') || error.message.includes('Auth session')) {
-          setLinkValido(false)
-          setErro('Sessão expirada. Solicite um novo link.')
         } else {
           setErro(error.message)
         }
@@ -105,7 +99,6 @@ export default function ResetPassword() {
         return
       }
 
-      console.log('Password updated successfully')
       await supabase.auth.signOut()
       setSuccess(true)
 
@@ -113,7 +106,6 @@ export default function ResetPassword() {
         window.location.href = '/login'
       }, 2000)
     } catch (error) {
-      console.error('Reset catch error:', error)
       setErro(error.message || 'Erro ao redefinir senha')
       setLoading(false)
     }
