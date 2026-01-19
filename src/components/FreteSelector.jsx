@@ -158,7 +158,12 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // Buscar frete na tabela
+    // 🔧 FIX: Mapear modalidade para o formato do banco de dados
+    // Frontend usa: "CIF" ou "CIF_COM_DESCARGA"
+    // Banco tem: "CIF_SEM_DESCARGA" ou "CIF_COM_DESCARGA"
+    const modalidadeDB = modalidade === 'CIF' ? 'CIF_SEM_DESCARGA' : modalidade
+    
+    // Construir tipo_veiculo no formato do banco: "Truck 14t - SEM DESCARGA"
     const modalidadeBusca = modalidade === 'CIF_COM_DESCARGA' 
       ? 'COM DESCARGA' 
       : 'SEM DESCARGA'
@@ -169,10 +174,10 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     const frete = fretes.find(f => 
       f.cidade === cidadeSelecionada && 
       f.tipo_veiculo === veiculoBusca &&
-      f.modalidade === modalidade
+      f.modalidade === modalidadeDB  // 🔧 FIX: Usar modalidadeDB mapeada
     )
 
-    console.log('Buscando frete:', { cidadeSelecionada, veiculoBusca, modalidade })
+    console.log('Buscando frete:', { cidadeSelecionada, veiculoBusca, modalidade: modalidadeDB })
     console.log('Frete encontrado:', frete)
 
     if (!frete) {
