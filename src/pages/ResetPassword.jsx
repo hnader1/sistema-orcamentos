@@ -13,34 +13,40 @@ export default function ResetPassword() {
   const [confirmarSenha, setConfirmarSenha] = useState('')
 
   const handleReset = async (e) => {
-    e.preventDefault()
-    setErro('')
+  e.preventDefault()
+  setErro('')
 
-    if (senha.length < 6) {
-      setErro('Senha deve ter pelo menos 6 caracteres')
-      return
-    }
-
-    if (senha !== confirmarSenha) {
-      setErro('Senhas não conferem')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const { error } = await supabase.auth.updateUser({ password: senha })
-
-      if (error) throw error
-
-      setSuccess(true)
-      setTimeout(() => navigate('/login'), 3000)
-    } catch (error) {
-      setErro(error.message || 'Erro ao redefinir senha')
-    } finally {
-      setLoading(false)
-    }
+  if (senha.length < 6) {
+    setErro('Senha deve ter pelo menos 6 caracteres')
+    return
   }
+
+  if (senha !== confirmarSenha) {
+    setErro('Senhas não conferem')
+    return
+  }
+
+  setLoading(true)
+
+  try {
+    const { error } = await supabase.auth.updateUser({ password: senha })
+
+    if (error) throw error
+
+    // Sign out after password change
+    await supabase.auth.signOut()
+    
+    setSuccess(true)
+    setTimeout(() => {
+      window.location.href = '/login'
+    }, 2000)
+  } catch (error) {
+    console.error('Reset error:', error)
+    setErro(error.message || 'Erro ao redefinir senha')
+  } finally {
+    setLoading(false)
+  }
+}
 
   if (success) {
     return (
