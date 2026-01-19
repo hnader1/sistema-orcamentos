@@ -403,10 +403,11 @@ function OrcamentoForm() {
     try {
       console.log('🔐 Tentando validar usuário:', usuarioLiberacao)
       
-      // Buscar usuário pelo nome ou email (busca exata ou parcial)
+      // Buscar usuário pelo nome ou email
+      // NOTA: O campo de tipo/perfil pode ser 'tipo', 'tipo_usuario' ou 'perfil'
       const { data: usuarios, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, senha, perfil')
+        .select('id, nome, email, senha, tipo')
         .eq('ativo', true)
 
       if (error) {
@@ -415,6 +416,7 @@ function OrcamentoForm() {
       }
 
       console.log('📋 Usuários encontrados:', usuarios?.length)
+      console.log('📋 Dados:', usuarios)
 
       // Filtrar manualmente para encontrar o usuário
       const usuarioEncontrado = usuarios?.find(u => {
@@ -431,20 +433,20 @@ function OrcamentoForm() {
         return
       }
 
-      console.log('✅ Usuário encontrado:', usuarioEncontrado.nome, '| Perfil:', usuarioEncontrado.perfil)
+      console.log('✅ Usuário encontrado:', usuarioEncontrado.nome, '| Tipo:', usuarioEncontrado.tipo)
 
       // Verificar se tem permissão (admin, administrador, comercial, comercial_interno)
       const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
-      const perfilLower = usuarioEncontrado.perfil?.toLowerCase() || ''
+      const tipoLower = usuarioEncontrado.tipo?.toLowerCase() || ''
       
-      if (!perfisPermitidos.includes(perfilLower)) {
-        console.log('❌ Perfil sem permissão:', usuarioEncontrado.perfil)
+      if (!perfisPermitidos.includes(tipoLower)) {
+        console.log('❌ Tipo sem permissão:', usuarioEncontrado.tipo)
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      console.log('✅ Perfil autorizado:', usuarioEncontrado.perfil)
+      console.log('✅ Tipo autorizado:', usuarioEncontrado.tipo)
 
       // Verificar senha (comparação direta - case sensitive)
       if (usuarioEncontrado.senha !== senhaLiberacao) {
