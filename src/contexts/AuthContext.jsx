@@ -16,112 +16,85 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Verificar se há usuário logado no localStorage
     checkUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await loadUserData(session.user.id)
+      } else {
+        setUser(null)
+      }
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  const checkUser = () => {
-  try {
-    const savedUser = localStorage.getItem('user')
-    const sessionCreated = localStorage.getItem('session_created')
-    
-    // Session expires after 8 hours
-    if (sessionCreated && Date.now() - parseInt(sessionCreated) > 8 * 60 * 60 * 1000) {
-      localStorage.removeItem('user')
-      localStorage.removeItem('session_created')
-      setLoading(false)
-      return
-    }
-    
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
-    }
-  } catch (error) {
-    console.error('Erro ao verificar usuário:', error)
-    localStorage.removeItem('user')
-  } finally {
-    setLoading(false)
-  }
-}
-
-  const login = async (email, senha) => {
+  const checkUser = async () => {
     try {
-      console.log('🔐 Tentando login:', email)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        await loadUserData(session.user.id)
+      }
+    } catch (error) {
+      console.error('Erro ao verificar sessao:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
+  const loadUserData = async (authId) => {
+    try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('*')
-        .eq('email', email)
-        .eq('senha_hash', senha)
+        .select('id, email, nome, telefone, tipo')
+        .eq('auth_id', authId)
         .eq('ativo', true)
         .single()
 
-      if (error) {
-        console.error('❌ Erro ao buscar usuário:', error)
-        throw new Error('Email ou senha incorretos')
-      }
-
-      if (!data) {
-        throw new Error('Email ou senha incorretos')
-      }
-
-      console.log('✅ Login bem-sucedido:', data.nome)
-
-      // Salvar usuário no estado e localStorage
-      const userData = {
-        id: data.id,
-        email: data.email,
-        nome: data.nome,
-        telefone: data.telefone,
-        tipo: data.tipo
-      }
-
-      setUser(userData)
-      localStorage.setItem('user', JSON.stringify(userData))
-      localStorage.setItem('session_created', Date.now().toString())
-
-      return { success: true, user: userData }
+      if (error) throw error
+      setUser(data)
     } catch (error) {
-      console.error('❌ Erro no login:', error)
-      return { success: false, error: error.message }
+      console.error('Erro ao carregar usuario:', error)
+      setUser(null)
     }
   }
 
-  const logout = () => {
-    console.log('👋 Fazendo logout')
+  const login = async (email, senha) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: senha
+      })
+
+      if (error) throw error
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: 'Email ou senha incorretos' }
+    }
+  }
+
+  const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    localStorage.removeItem('user')
   }
 
-  const isAdmin = () => {
-    return user?.tipo === 'admin'
-  }
-
-  const isVendedor = () => {
-    return user?.tipo === 'vendedor'
-  }
-
-  const isComercialInterno = () => {
-    return user?.tipo === 'comercial_interno'
-  }
-
-  const podeAcessarLancamento = () => {
-    return user?.tipo === 'admin' || user?.tipo === 'comercial_interno'
-  }
-
-  const value = {
-    user,
-    loading,
-    login,
-    logout,
-    isAdmin,
-    isVendedor,
-    isComercialInterno,
-    podeAcessarLancamento
-  }
+  const isAdmin = () => user?.tipo === 'admin'
+  const isVendedor = () => user?.tipo === 'vendedor'
+  const isComercialInterno = () => user?.tipo === 'comercial_interno'
+  const podeAcessarLancamento = () => user?.tipo === 'admin' || user?.tipo === 'comercial_interno'
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
+      logout,
+      isAdmin,
+      isVendedor,
+      isComercialInterno,
+      podeAcessarLancamento
+    }}>
       {!loading && children}
     </AuthContext.Provider>
   )

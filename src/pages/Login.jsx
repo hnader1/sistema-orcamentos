@@ -136,7 +136,7 @@ export default function Login() {
               💡 Usuários de teste:
             </p>
             <div className="space-y-1 text-xs text-gray-600">
-              <p>👑 Admin: nader@construcom.com.br / Nader@123</p>
+              <p>👑 Admin: nader@.....
               <p>👤 Vendedor: vendedor@construcom.com.br / vendedor123</p>
               <p>💼 Comercial: comercial@construcom.com.br / comercial123</p>
             </div>
