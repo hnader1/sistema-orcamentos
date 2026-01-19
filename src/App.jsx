@@ -16,8 +16,7 @@ import RelatorioOrcamentos from './pages/RelatorioOrcamentos'
 import Conflitos from './pages/Conflitos'
 import FormasPagamentoAdmin from './pages/FormasPagamentoAdmin'
 import GerenciarCodigosVendedores from './pages/GerenciarCodigosVendedores'
-import ResetPassword from './pages/ResetPassword'
-import ForgotPassword from './pages/ForgotPassword'
+
 
 function App() {
   return (
@@ -35,8 +34,7 @@ function App() {
           <Route path="/orcamentos/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
           <Route path="/orcamentos/editar/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
           <Route path="/relatorios/orcamentos" element={<ProtectedRoute><RelatorioOrcamentos /></ProtectedRoute>} />
-<Route path="/reset-password" element={<ResetPassword />} />
-<Route path="/forgot-password" element={<ForgotPassword />} />
+
           {/* Rotas Admin - APENAS ADMINISTRADORES */}
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

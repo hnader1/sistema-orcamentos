@@ -101,11 +101,7 @@ export default function Login() {
                 />
               </div>
             </div>
-<div className="text-right">
-  <a href="/forgot-password" className="text-sm text-blue-600 hover:underline">
-    Esqueci minha senha
-  </a>
-</div>
+
             {/* Erro */}
             {erro && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
