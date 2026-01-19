@@ -13,12 +13,10 @@ export function AuthProvider({ children }) {
     const savedUser = localStorage.getItem('user')
     if (savedUser) {
       const userData = JSON.parse(savedUser)
-      // Check if session is still valid (8 hours)
       const loginTime = localStorage.getItem('loginTime')
       if (loginTime) {
         const hoursElapsed = (Date.now() - parseInt(loginTime)) / (1000 * 60 * 60)
         if (hoursElapsed > 8) {
-          // Session expired
           localStorage.removeItem('user')
           localStorage.removeItem('loginTime')
           setUser(null)
@@ -33,6 +31,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = async (email, senha) => {
+    console.log('Login attempt:', email)
+    
     try {
       const { data, error } = await supabase
         .from('usuarios')
@@ -41,10 +41,21 @@ export function AuthProvider({ children }) {
         .eq('ativo', true)
         .single()
 
-      if (error || !data) {
+      console.log('Query result - data:', data)
+      console.log('Query result - error:', error)
+
+      if (error) {
+        console.error('Supabase error:', error)
         return { success: false, error: 'Usuário não encontrado' }
       }
 
+      if (!data) {
+        console.log('No data returned')
+        return { success: false, error: 'Usuário não encontrado' }
+      }
+
+      console.log('Comparing passwords:', data.senha, '===', senha)
+      
       if (data.senha !== senha) {
         return { success: false, error: 'Senha incorreta' }
       }
@@ -63,6 +74,7 @@ export function AuthProvider({ children }) {
 
       return { success: true }
     } catch (e) {
+      console.error('Login exception:', e)
       return { success: false, error: 'Erro ao fazer login' }
     }
   }
