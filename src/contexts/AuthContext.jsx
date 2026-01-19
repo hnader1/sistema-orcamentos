@@ -28,13 +28,20 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('getSession error:', error)
+          setLoading(false)
+          return
+        }
+        
         if (session?.user) {
           const userData = await loadUser(session.user.id)
           setUser(userData)
         }
       } catch (e) {
-        console.error('getSession error:', e)
+        console.error('Init error:', e)
       } finally {
         setLoading(false)
       }
