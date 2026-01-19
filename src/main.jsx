@@ -6,7 +6,6 @@ import './index.css'
 // Handle Supabase auth hash BEFORE React renders
 const hash = window.location.hash
 if (hash && hash.includes('access_token')) {
-  // Store the hash temporarily
   sessionStorage.setItem('supabase-auth-hash', hash)
 }
 
