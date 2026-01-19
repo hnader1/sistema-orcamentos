@@ -10,23 +10,37 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   const loadUser = async (authId) => {
-    const { data } = await supabase
-      .from('usuarios')
-      .select('id, email, nome, telefone, tipo')
-      .eq('auth_id', authId)
-      .eq('ativo', true)
-      .single()
-    return data
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, email, nome, telefone, tipo')
+        .eq('auth_id', authId)
+        .eq('ativo', true)
+        .single()
+      if (error) throw error
+      return data
+    } catch (e) {
+      console.error('loadUser error:', e)
+      return null
+    }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const userData = await loadUser(session.user.id)
-        setUser(userData)
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          const userData = await loadUser(session.user.id)
+          setUser(userData)
+        }
+      } catch (e) {
+        console.error('getSession error:', e)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
-    })
+    }
+
+    init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -36,7 +50,6 @@ export function AuthProvider({ children }) {
         } else {
           setUser(null)
         }
-        setLoading(false)
       }
     )
 
@@ -44,12 +57,16 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = async (email, senha) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha
-    })
-    if (error) return { success: false, error: 'Email ou senha incorretos' }
-    return { success: true }
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: senha
+      })
+      if (error) return { success: false, error: error.message }
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: 'Email ou senha incorretos' }
+    }
   }
 
   const logout = async () => {
