@@ -43,7 +43,16 @@ export default function ResetPassword() {
 
     try {
       const { error } = await supabase.auth.updateUser({ password: senha })
-      if (error) throw error
+      
+      if (error) {
+        if (error.message.includes('different')) {
+          setErro('A nova senha deve ser diferente da senha anterior')
+        } else {
+          setErro(error.message)
+        }
+        setLoading(false)
+        return
+      }
 
       await supabase.auth.signOut()
       setSuccess(true)
@@ -53,7 +62,6 @@ export default function ResetPassword() {
       }, 2000)
     } catch (error) {
       setErro(error.message || 'Erro ao redefinir senha')
-    } finally {
       setLoading(false)
     }
   }
