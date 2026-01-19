@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { Lock, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
@@ -8,14 +8,74 @@ export default function ResetPassword() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
+  const [initializing, setInitializing] = useState(true)
   const [success, setSuccess] = useState(false)
   const [erro, setErro] = useState('')
   const [senha, setSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
+  const [sessionReady, setSessionReady] = useState(false)
 
-  // Check if there's an error in URL
-  const urlError = searchParams.get('error_description')
-  
+  useEffect(() => {
+    const setupSession = async () => {
+      try {
+        // Check for error in URL
+        const urlError = searchParams.get('error_description')
+        if (urlError) {
+          setErro(urlError.replace(/\+/g, ' '))
+          setInitializing(false)
+          return
+        }
+
+        // Check for code in URL (PKCE flow)
+        const code = searchParams.get('code')
+        if (code) {
+          console.log('Found code, exchanging...')
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) {
+            console.error('Exchange error:', error)
+            setErro('Link expirado. Solicite um novo.')
+            setInitializing(false)
+            return
+          }
+          setSessionReady(true)
+          setInitializing(false)
+          return
+        }
+
+        // Check for access_token in hash (implicit flow)
+        const hash = window.location.hash
+        if (hash && hash.includes('access_token')) {
+          console.log('Found access_token in hash')
+          // Supabase auto-handles this, just wait a bit
+          await new Promise(r => setTimeout(r, 1000))
+          const { data } = await supabase.auth.getSession()
+          if (data?.session) {
+            setSessionReady(true)
+          } else {
+            setErro('Link expirado. Solicite um novo.')
+          }
+          setInitializing(false)
+          return
+        }
+
+        // No code or token - check existing session
+        const { data } = await supabase.auth.getSession()
+        if (data?.session) {
+          setSessionReady(true)
+        } else {
+          setErro('Acesse esta página através do link enviado por email.')
+        }
+        setInitializing(false)
+      } catch (e) {
+        console.error('Setup error:', e)
+        setErro('Erro ao processar link.')
+        setInitializing(false)
+      }
+    }
+
+    setupSession()
+  }, [searchParams])
+
   const handleReset = async (e) => {
     e.preventDefault()
     setErro('')
@@ -33,26 +93,11 @@ export default function ResetPassword() {
     setLoading(true)
 
     try {
-      // First try to exchange code if present
-      const code = searchParams.get('code')
-      if (code) {
-        const { error: codeError } = await supabase.auth.exchangeCodeForSession(code)
-        if (codeError) {
-          console.error('Code exchange error:', codeError)
-          setErro('Link expirado. Solicite um novo link.')
-          setLoading(false)
-          return
-        }
-      }
-
-      // Now update the password
       const { error } = await supabase.auth.updateUser({ password: senha })
 
       if (error) {
         if (error.message.includes('different')) {
           setErro('A nova senha deve ser diferente da anterior')
-        } else if (error.message.includes('session') || error.message.includes('logged in')) {
-          setErro('Link expirado. Solicite um novo link.')
         } else {
           setErro(error.message)
         }
@@ -68,19 +113,29 @@ export default function ResetPassword() {
       }, 2000)
     } catch (error) {
       console.error('Reset error:', error)
-      setErro('Link expirado. Solicite um novo link.')
+      setErro('Erro ao redefinir senha.')
       setLoading(false)
     }
   }
 
-  // Show error if URL has error
-  if (urlError) {
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verificando link...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (erro && !sessionReady) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <AlertCircle className="mx-auto text-red-500 mb-4" size={64} />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Expirado</h1>
-          <p className="text-gray-600 mb-6">{urlError.replace(/\+/g, ' ')}</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Inválido</h1>
+          <p className="text-gray-600 mb-6">{erro}</p>
           <button
             onClick={() => navigate('/forgot-password')}
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
