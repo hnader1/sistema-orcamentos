@@ -58,6 +58,7 @@ function OrcamentoForm() {
     prazo_entrega: '',
     desconto_geral: 0,
     observacoes: '',
+    observacoes_internas: '',
     status: 'rascunho',
     numero_lancamento_erp: '',
     usuario_id_original: null,
@@ -276,6 +277,7 @@ function OrcamentoForm() {
         prazo_entrega: orc.prazo_entrega || '',
         desconto_geral: orc.desconto_geral || 0,
         observacoes: orc.observacoes || '',
+        observacoes_internas: orc.observacoes_internas || '',
         status: orc.status || 'rascunho',
         numero_lancamento_erp: orc.numero_lancamento_erp || '',
         usuario_id_original: orc.usuario_id,
@@ -591,6 +593,7 @@ function OrcamentoForm() {
         frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
         total,
         observacoes: formData.observacoes,
+        observacoes_internas: formData.observacoes_internas, 
         status: 'rascunho',
         numero_lancamento_erp: null,
         usuario_id: user?.id || null,
@@ -1317,6 +1320,7 @@ function OrcamentoForm() {
                   </span>
                 </div>
 
+
                 <div className="flex justify-between items-center">
                   <label className="text-sm text-gray-600 flex items-center gap-1">
                     Desconto (%):
@@ -1377,8 +1381,28 @@ function OrcamentoForm() {
                 </div>
               </div>
             </div>
-
           </div>
+{/* OBSERVAÇÕES INTERNAS - NÃO APARECE NA PROPOSTA */}
+<div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mt-6">
+  <div className="flex items-center gap-2 mb-3">
+    <span className="text-xl">🔒</span>
+    <h2 className="text-lg font-semibold text-yellow-800">Observações Internas</h2>
+    <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded-full">
+      NÃO aparece na proposta
+    </span>
+  </div>
+  <p className="text-sm text-yellow-700 mb-3">
+    Use este campo para anotações da equipe (ex: negociação, pendências, alertas sobre o cliente).
+  </p>
+  <textarea
+    value={formData.observacoes_internas}
+    onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
+    rows="4"
+    disabled={isReadOnly}
+    className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
+    placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
+  />
+</div>
         </div>
       </div>
 
