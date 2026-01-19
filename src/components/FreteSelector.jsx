@@ -51,6 +51,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     carregarFretes()
   }, [])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     calcularFrete()
   }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, fretes])
