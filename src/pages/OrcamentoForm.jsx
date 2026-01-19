@@ -404,10 +404,10 @@ function OrcamentoForm() {
       console.log('🔐 Tentando validar usuário:', usuarioLiberacao)
       
       // Buscar usuário pelo nome ou email
-      // NOTA: O campo de tipo/perfil pode ser 'tipo', 'tipo_usuario' ou 'perfil'
+      // NOTA: O campo de senha é 'senha_hash', não 'senha'
       const { data: usuarios, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, senha, tipo')
+        .select('id, nome, email, senha, senha_hash, tipo')
         .eq('ativo', true)
 
       if (error) {
@@ -448,11 +448,16 @@ function OrcamentoForm() {
 
       console.log('✅ Tipo autorizado:', usuarioEncontrado.tipo)
 
-      // Verificar senha (comparação direta - case sensitive)
-      if (usuarioEncontrado.senha !== senhaLiberacao) {
+      // Verificar senha - pode estar em 'senha' ou 'senha_hash'
+      const senhaCorreta = usuarioEncontrado.senha_hash || usuarioEncontrado.senha
+      
+      console.log('🔑 Verificando senha...')
+      console.log('   Senha no banco (senha_hash):', usuarioEncontrado.senha_hash)
+      console.log('   Senha no banco (senha):', usuarioEncontrado.senha)
+      console.log('   Senha digitada:', senhaLiberacao)
+      
+      if (senhaCorreta !== senhaLiberacao) {
         console.log('❌ Senha incorreta')
-        console.log('   Senha esperada:', usuarioEncontrado.senha)
-        console.log('   Senha digitada:', senhaLiberacao)
         setErroSenha(true)
         setValidandoSenha(false)
         return
