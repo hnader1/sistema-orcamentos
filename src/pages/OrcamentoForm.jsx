@@ -733,6 +733,7 @@ function OrcamentoForm() {
         frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
         total,
         observacoes: formData.observacoes,
+        observacoes_internas: formData.observacoes_internas,
         status: formData.status,
         numero_lancamento_erp: formData.status === 'lancado' ? formData.numero_lancamento_erp : null,
         cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
