@@ -20,7 +20,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   
   const [calculoFrete, setCalculoFrete] = useState(null)
 
-  // Capacidades dos veículos em KG
+  // Capacidades dos veículos em KG (fallback se não vier do banco)
   const capacidadesVeiculo = {
     'Toco 8t': 8000,
     'Truck 14t': 14000,
@@ -190,16 +190,40 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // Calcular número de viagens
+    // 🔧 FIX: Calcular viagens baseado no MAIOR limitante (peso OU pallets)
+    // Usa capacidades do banco de dados (capacidade_kg e capacidade_pallets)
     const pesoTotalKg = pesoTotal || 0
-    const capacidadeKg = frete.capacidade_kg || capacidadesVeiculo[tipoVeiculo]
+    const capacidadeKg = frete.capacidade_kg || capacidadesVeiculo[tipoVeiculo] || 1
+    const capacidadePallets = frete.capacidade_pallets || 1
     
-    let viagensNecessarias = 1
+    // Calcular viagens por peso
+    const viagensPorPeso = pesoTotalKg > 0 && capacidadeKg > 0 
+      ? Math.ceil(pesoTotalKg / capacidadeKg) 
+      : 1
+    
+    // Calcular viagens por pallets
+    const viagensPorPallets = totalPallets > 0 && capacidadePallets > 0
+      ? Math.ceil(totalPallets / capacidadePallets)
+      : 0
+    
+    // 🔧 CRITICAL: Usar o MAIOR entre peso e pallets!
+    // Se precisa 2 viagens por peso mas 3 por pallets, usa 3 viagens!
+    const viagensNecessarias = Math.max(viagensPorPeso, viagensPorPallets, 1)
+    
+    console.log('📊 Cálculo de viagens:', {
+      pesoTotalKg,
+      totalPallets,
+      capacidadeKg,
+      capacidadePallets,
+      viagensPorPeso,
+      viagensPorPallets,
+      viagensNecessarias
+    })
+
     let viagensCompletas = 0
     let ultimaViagemPercentual = 0
 
     if (pesoTotalKg > 0 && capacidadeKg > 0) {
-      viagensNecessarias = Math.ceil(pesoTotalKg / capacidadeKg)
       viagensCompletas = Math.floor(pesoTotalKg / capacidadeKg)
       const pesoUltimaViagem = pesoTotalKg % capacidadeKg
       ultimaViagemPercentual = pesoUltimaViagem > 0 
@@ -220,8 +244,12 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       localidade: cidadeSelecionada,
       cidade: cidadeSelecionada,
       capacidade_kg: capacidadeKg,
+      capacidade_pallets: capacidadePallets,
       peso_total_kg: pesoTotalKg,
+      total_pallets: totalPallets,
       viagens_necessarias: viagensNecessarias,
+      viagens_por_peso: viagensPorPeso,
+      viagens_por_pallets: viagensPorPallets,
       viagens_completas: viagensCompletas,
       ultima_viagem_percentual: ultimaViagemPercentual,
       valor_unitario_viagem: valorUnitarioViagem,
@@ -307,9 +335,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <p className="text-xl font-bold text-orange-600">
                 {calculoFrete.viagens_necessarias} viagens
               </p>
-              {calculoFrete.viagens_completas > 0 && (
+              {calculoFrete.viagens_por_peso > 0 && calculoFrete.viagens_por_pallets > 0 && (
                 <span className="text-xs text-gray-500">
-                  {calculoFrete.viagens_completas} x 100%
+                  Peso: {calculoFrete.viagens_por_peso} | Pallets: {calculoFrete.viagens_por_pallets}
                 </span>
               )}
             </div>
@@ -353,7 +381,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <option value="">Selecione...</option>
               <option value="FOB">FOB - Cliente retira</option>
               <option value="CIF">CIF - Sem Descarga</option>
-              <option value="CIF_COM_DESCARGA">CIF - Com Descarga (+15%)</option>
+              <option value="CIF_COM_DESCARGA">CIF - Com Descarga</option>
             </select>
           </div>
 
