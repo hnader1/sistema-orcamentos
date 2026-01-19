@@ -344,18 +344,29 @@ function OrcamentoForm() {
       }
 
       // ✅ CORREÇÃO: Carregar frete com nomes PADRONIZADOS
-      if (orc.frete_cidade || orc.frete_modalidade) {
-        const dadosFreteCarregados = {
-          modalidade: orc.frete_modalidade || 'FOB',
-          tipo_veiculo: orc.frete_tipo_caminhao || '',
-          localidade: orc.frete_cidade || '',
-          viagens_necessarias: orc.frete_qtd_viagens || 0,
-          valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
-          valor_total_frete: parseFloat(orc.frete) || 0
-        }
-        console.log('🚚 [CARREGAR] setDadosFrete com:', dadosFreteCarregados)
-        setDadosFrete(dadosFreteCarregados)
-      }
+    
+// ✅ CORREÇÃO: Carregar frete com suporte a FRETE MANUAL
+if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
+  const dadosFreteCarregados = {
+    modalidade: orc.frete_modalidade || 'FOB',
+    tipo_frete: orc.frete_modalidade || 'FOB',
+    tipo_veiculo: orc.frete_tipo_caminhao || '',
+    tipo_caminhao: orc.frete_tipo_caminhao || '',
+    localidade: orc.frete_cidade || '',
+    cidade: orc.frete_cidade || '',
+    viagens_necessarias: orc.frete_qtd_viagens || 0,
+    valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
+    valor_total_frete: parseFloat(orc.frete) || 0,
+    // ✅ NOVOS CAMPOS PARA FRETE MANUAL
+    frete_manual: orc.frete_manual || false,
+    manual: orc.frete_manual || false,
+    valor_manual_viagem: parseFloat(orc.frete_valor_manual_viagem) || parseFloat(orc.frete_valor_viagem) || 0,
+    qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1
+  }
+  console.log('🚚 [CARREGAR] setDadosFrete com:', dadosFreteCarregados)
+  setDadosFrete(dadosFreteCarregados)
+}
+
 
       console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
 
@@ -754,12 +765,19 @@ function OrcamentoForm() {
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral) || 0,
         subtotal: subtotalComDesconto,
-        frete: frete,
-        frete_modalidade: dadosFrete?.modalidade || 'FOB',
-        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-        frete_cidade: dadosFrete?.localidade || null,
-        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+       frete: frete,
+frete_modalidade: dadosFrete?.modalidade || 'FOB',
+frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+frete_cidade: dadosFrete?.localidade || null,
+frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+// ✅ NOVOS CAMPOS PARA FRETE MANUAL
+frete_manual: dadosFrete?.frete_manual || false,
+frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
+frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
+
+
+
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas, 
@@ -924,12 +942,16 @@ function OrcamentoForm() {
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
-        frete: frete,
-        frete_modalidade: dadosFrete?.modalidade || 'FOB',
-        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-        frete_cidade: dadosFrete?.localidade || null,
-        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+       frete: frete,
+frete_modalidade: dadosFrete?.modalidade || 'FOB',
+frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+frete_cidade: dadosFrete?.localidade || null,
+frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+// ✅ NOVOS CAMPOS PARA FRETE MANUAL
+frete_manual: dadosFrete?.frete_manual || false,
+frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
+frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas,
