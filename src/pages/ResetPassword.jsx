@@ -13,46 +13,57 @@ export default function ResetPassword() {
   const [senha, setSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
   const [linkValido, setLinkValido] = useState(true)
-  const [hasSession, setHasSession] = useState(false)
 
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const hash = window.location.hash
-        console.log('URL hash:', hash)
+        // Check for stored hash from main.jsx
+        const storedHash = sessionStorage.getItem('supabase-auth-hash')
+        const currentHash = window.location.hash
+        const hash = storedHash || currentHash
+
+        console.log('Stored hash:', storedHash)
+        console.log('Current hash:', currentHash)
+
+        // Clear stored hash
+        sessionStorage.removeItem('supabase-auth-hash')
 
         // Check for error in URL
-        if (hash.includes('error=')) {
+        if (hash && hash.includes('error=')) {
           const params = new URLSearchParams(hash.substring(1))
           const errorDesc = params.get('error_description')
-          console.log('Error in URL:', errorDesc)
           setLinkValido(false)
           setErro(errorDesc?.replace(/\+/g, ' ') || 'Link inválido')
           setInitializing(false)
           return
         }
 
-        // Wait for Supabase to process the URL hash
+        // If we have a hash with token, restore it to URL for Supabase to process
+        if (hash && hash.includes('access_token') && !currentHash) {
+          window.location.hash = hash
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+
+        // Wait for Supabase to process
         await new Promise(resolve => setTimeout(resolve, 1000))
 
         // Check session
         const { data, error } = await supabase.auth.getSession()
-        console.log('Session data:', data)
-        console.log('Session error:', error)
+        console.log('Session:', data?.session ? 'Found' : 'Not found', error)
 
         if (data?.session) {
-          setHasSession(true)
           setLinkValido(true)
-        } else if (hash.includes('access_token') || hash.includes('type=recovery')) {
-          // Has token but no session - might still work
-          setHasSession(true)
+        } else if (hash && (hash.includes('access_token') || hash.includes('type=recovery'))) {
+          // Has token in URL - let it proceed
           setLinkValido(true)
         } else {
           setLinkValido(false)
-          setErro('Nenhuma sessão encontrada. Use o link do email.')
+          setErro('Link inválido ou expirado.')
         }
       } catch (e) {
         console.error('Check session error:', e)
+        // Don't block - let user try anyway
+        setLinkValido(true)
       } finally {
         setInitializing(false)
       }
@@ -78,13 +89,15 @@ export default function ResetPassword() {
     setLoading(true)
 
     try {
-      console.log('Attempting password update...')
       const { data, error } = await supabase.auth.updateUser({ password: senha })
-      console.log('Update result:', data, error)
 
       if (error) {
+        console.error('Update error:', error)
         if (error.message.includes('different')) {
           setErro('A nova senha deve ser diferente da anterior')
+        } else if (error.message.includes('session') || error.message.includes('aborted') || error.message.includes('Auth session')) {
+          setLinkValido(false)
+          setErro('Sessão expirada. Solicite um novo link.')
         } else {
           setErro(error.message)
         }
@@ -92,6 +105,7 @@ export default function ResetPassword() {
         return
       }
 
+      console.log('Password updated successfully')
       await supabase.auth.signOut()
       setSuccess(true)
 
@@ -99,7 +113,7 @@ export default function ResetPassword() {
         window.location.href = '/login'
       }, 2000)
     } catch (error) {
-      console.error('Reset error:', error)
+      console.error('Reset catch error:', error)
       setErro(error.message || 'Erro ao redefinir senha')
       setLoading(false)
     }
