@@ -299,6 +299,10 @@ function OrcamentoForm() {
         cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null
       })
 
+      // ✅ CORREÇÃO: Definir cnpjCpfValido ao carregar orçamento existente
+      const cnpjValido = orc.cnpj_cpf || orc.cnpj_cpf_nao_informado
+      setCnpjCpfValido(cnpjValido)
+
       setDadosEndereco({
         obra_cep: orc.obra_cep || '',
         obra_cidade: orc.obra_cidade || '',
@@ -566,9 +570,10 @@ function OrcamentoForm() {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
-      // ✅ CORREÇÃO: Usar nomes PADRONIZADOS
+      // ✅ CORREÇÃO: Incluir TODOS os campos necessários (CNPJ/CPF, endereço obra, forma_pagamento)
       const novoOrcamento = {
         numero: novoNumero,
+        numero_proposta: null, // Será gerado novo ao salvar
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
         cliente_email: formData.cliente_email,
@@ -579,11 +584,11 @@ function OrcamentoForm() {
         vendedor_telefone: user?.telefone || formData.vendedor_telefone,
         vendedor_email: user?.email || formData.vendedor_email,
         data_orcamento: new Date().toISOString().split('T')[0],
-        validade_dias: parseInt(formData.validade_dias),
+        validade_dias: parseInt(formData.validade_dias) || 15,
         data_validade: formData.data_validade,
-        condicoes_pagamento: formData.condicoes_pagamento,
+        forma_pagamento_id: formData.forma_pagamento_id || null,
         prazo_entrega: formData.prazo_entrega,
-        desconto_geral: parseFloat(formData.desconto_geral),
+        desconto_geral: parseFloat(formData.desconto_geral) || 0,
         subtotal: subtotalComDesconto,
         frete: frete,
         frete_modalidade: dadosFrete?.modalidade || 'FOB',
@@ -596,8 +601,21 @@ function OrcamentoForm() {
         observacoes_internas: formData.observacoes_internas, 
         status: 'rascunho',
         numero_lancamento_erp: null,
-        usuario_id: user?.id || null,
-        excluido: false
+        usuario_id: user?.id,
+        excluido: false,
+        // ✅ Campos de CNPJ/CPF
+        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || formData.cnpj_cpf || null,
+        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || formData.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || formData.cnpj_cpf_nao_informado_aceite_data || null,
+        cnpj_cpf_nao_informado_aceite_ip: null,
+        // ✅ Campos de endereço da obra
+        obra_cep: dadosEndereco?.obra_cep || formData.obra_cep || null,
+        obra_cidade: dadosEndereco?.obra_cidade || formData.obra_cidade || null,
+        obra_bairro: dadosEndereco?.obra_bairro || formData.obra_bairro || null,
+        obra_logradouro: dadosEndereco?.obra_logradouro || formData.obra_logradouro || null,
+        obra_numero: dadosEndereco?.obra_numero || formData.obra_numero || null,
+        obra_complemento: dadosEndereco?.obra_complemento || formData.obra_complemento || null,
+        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false
       }
 
       console.log('🚚 [DUPLICAR] Dados de frete:', {
@@ -649,6 +667,12 @@ function OrcamentoForm() {
 
   const salvar = async () => {
     try {
+      // ✅ VALIDAÇÃO CNPJ/CPF OBRIGATÓRIO - BLOQUEIO DE SALVAMENTO
+      if (!cnpjCpfValido) {
+        alert('CNPJ/CPF é obrigatório!\n\nPreencha um CNPJ ou CPF válido, ou marque a opção "Não informar".')
+        return
+      }
+
       if (!formData.cliente_nome) {
         alert('Preencha os campos obrigatórios!')
         return
