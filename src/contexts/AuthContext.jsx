@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from '../services/supabase'
 
 const AuthContext = createContext({})
@@ -14,15 +14,17 @@ export const useAuth = () => {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const initialized = useRef(false)
 
   useEffect(() => {
-    let mounted = true
+    if (initialized.current) return
+    initialized.current = true
 
     const initialize = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
-        if (session?.user && mounted) {
+        if (session?.user) {
           const { data } = await supabase
             .from('usuarios')
             .select('id, email, nome, telefone, tipo')
@@ -30,12 +32,12 @@ export function AuthProvider({ children }) {
             .eq('ativo', true)
             .single()
           
-          if (mounted) setUser(data)
+          setUser(data)
         }
       } catch (error) {
         console.error('Init error:', error)
       } finally {
-        if (mounted) setLoading(false)
+        setLoading(false)
       }
     }
 
@@ -43,7 +45,7 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user && mounted) {
+        if (event === 'SIGNED_IN' && session?.user) {
           const { data } = await supabase
             .from('usuarios')
             .select('id, email, nome, telefone, tipo')
@@ -51,16 +53,15 @@ export function AuthProvider({ children }) {
             .eq('ativo', true)
             .single()
           
-          if (mounted) setUser(data)
-        } else if (mounted) {
+          setUser(data)
+        } else if (event === 'SIGNED_OUT') {
           setUser(null)
         }
-        if (mounted) setLoading(false)
+        setLoading(false)
       }
     )
 
     return () => {
-      mounted = false
       subscription.unsubscribe()
     }
   }, [])
@@ -103,4 +104,3 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   )
 }
-export default AuthProvider
