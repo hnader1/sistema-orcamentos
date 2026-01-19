@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { Lock, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
@@ -8,68 +8,14 @@ export default function ResetPassword() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
-  const [initializing, setInitializing] = useState(true)
   const [success, setSuccess] = useState(false)
   const [erro, setErro] = useState('')
   const [senha, setSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
-  const [linkValido, setLinkValido] = useState(true)
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const code = searchParams.get('code')
-        const errorParam = searchParams.get('error')
-        const errorDesc = searchParams.get('error_description')
-
-        console.log('Code:', code)
-        console.log('Error:', errorParam, errorDesc)
-
-        // Check for error in URL
-        if (errorParam) {
-          setLinkValido(false)
-          setErro(errorDesc || 'Link inválido')
-          setInitializing(false)
-          return
-        }
-
-        // If we have a code, exchange it for a session
-        if (code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-          console.log('Exchange result:', data, error)
-          
-          if (error) {
-            setLinkValido(false)
-            setErro('Link expirado ou inválido. Solicite um novo.')
-            setInitializing(false)
-            return
-          }
-          
-          setLinkValido(true)
-          setInitializing(false)
-          return
-        }
-
-        // No code - check for existing session
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          setLinkValido(true)
-        } else {
-          setLinkValido(false)
-          setErro('Link inválido. Use o link enviado por email.')
-        }
-      } catch (e) {
-        console.error('Check session error:', e)
-        setLinkValido(false)
-        setErro('Erro ao verificar link.')
-      } finally {
-        setInitializing(false)
-      }
-    }
-
-    checkSession()
-  }, [searchParams])
-
+  // Check if there's an error in URL
+  const urlError = searchParams.get('error_description')
+  
   const handleReset = async (e) => {
     e.preventDefault()
     setErro('')
@@ -87,11 +33,26 @@ export default function ResetPassword() {
     setLoading(true)
 
     try {
+      // First try to exchange code if present
+      const code = searchParams.get('code')
+      if (code) {
+        const { error: codeError } = await supabase.auth.exchangeCodeForSession(code)
+        if (codeError) {
+          console.error('Code exchange error:', codeError)
+          setErro('Link expirado. Solicite um novo link.')
+          setLoading(false)
+          return
+        }
+      }
+
+      // Now update the password
       const { error } = await supabase.auth.updateUser({ password: senha })
 
       if (error) {
         if (error.message.includes('different')) {
           setErro('A nova senha deve ser diferente da anterior')
+        } else if (error.message.includes('session') || error.message.includes('logged in')) {
+          setErro('Link expirado. Solicite um novo link.')
         } else {
           setErro(error.message)
         }
@@ -106,29 +67,20 @@ export default function ResetPassword() {
         window.location.href = '/login'
       }, 2000)
     } catch (error) {
-      setErro(error.message || 'Erro ao redefinir senha')
+      console.error('Reset error:', error)
+      setErro('Link expirado. Solicite um novo link.')
       setLoading(false)
     }
   }
 
-  if (initializing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Verificando link...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!linkValido) {
+  // Show error if URL has error
+  if (urlError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <AlertCircle className="mx-auto text-red-500 mb-4" size={64} />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Expirado</h1>
-          <p className="text-gray-600 mb-6">{erro || 'O link expirou ou é inválido.'}</p>
+          <p className="text-gray-600 mb-6">{urlError.replace(/\+/g, ' ')}</p>
           <button
             onClick={() => navigate('/forgot-password')}
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
