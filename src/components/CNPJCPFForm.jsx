@@ -1,33 +1,60 @@
 // src/components/CNPJCPFForm.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 function CNPJCPFForm({ valores, onChange, onValidacao }) {
-  const [cnpjCpf, setCnpjCpf] = useState(valores?.cnpj_cpf || '');
-  const [naoInformar, setNaoInformar] = useState(valores?.cnpj_cpf_nao_informado || false);
+  const [cnpjCpf, setCnpjCpf] = useState('');
+  const [naoInformar, setNaoInformar] = useState(false);
   const [aceiteTermos, setAceiteTermos] = useState(false);
   const [erroValidacao, setErroValidacao] = useState('');
+  const inicializado = useRef(false);
 
+  // ✅ Carregar valores iniciais apenas uma vez
+  useEffect(() => {
+    if (!inicializado.current && valores) {
+      setCnpjCpf(valores.cnpj_cpf || '');
+      setNaoInformar(valores.cnpj_cpf_nao_informado || false);
+      
+      // Se já tinha aceite salvo, marcar como aceito
+      if (valores.cnpj_cpf_nao_informado && valores.cnpj_cpf_nao_informado_aceite_data) {
+        setAceiteTermos(true);
+      }
+      
+      inicializado.current = true;
+    }
+  }, [valores]);
+
+  // ✅ Validar e notificar sempre que os dados mudarem
   useEffect(() => {
     const dadosValidos = validarDados();
     
-    onChange({
-      cnpj_cpf: naoInformar ? null : cnpjCpf,
-      cnpj_cpf_nao_informado: naoInformar,
-      cnpj_cpf_nao_informado_aceite_data: naoInformar && aceiteTermos ? new Date().toISOString() : null
-    });
+    // Só notifica onChange se já foi inicializado
+    if (inicializado.current) {
+      onChange({
+        cnpj_cpf: naoInformar ? null : cnpjCpf,
+        cnpj_cpf_nao_informado: naoInformar,
+        cnpj_cpf_nao_informado_aceite_data: naoInformar && aceiteTermos ? new Date().toISOString() : null
+      });
+    }
 
     if (onValidacao) {
       onValidacao(dadosValidos);
     }
-  }, [cnpjCpf, naoInformar, aceiteTermos]);
+  }, [cnpjCpf, naoInformar, aceiteTermos, erroValidacao]);
 
   const validarDados = () => {
+    // Se marcou "não informar", precisa aceitar os termos
     if (naoInformar) {
       return aceiteTermos;
     }
     
-    return cnpjCpf.trim() !== '' && erroValidacao === '';
+    // Se não marcou "não informar", precisa ter CNPJ/CPF válido
+    const apenasNumeros = cnpjCpf.replace(/\D/g, '');
+    
+    // Precisa ter 11 (CPF) ou 14 (CNPJ) dígitos E não ter erro de validação
+    const tamanhoValido = apenasNumeros.length === 11 || apenasNumeros.length === 14;
+    
+    return tamanhoValido && erroValidacao === '';
   };
 
   const formatarCNPJCPF = (valor) => {
@@ -51,7 +78,7 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
     const apenasNumeros = valor.replace(/\D/g, '');
     
     if (apenasNumeros.length === 0) {
-      return '';
+      return 'CNPJ/CPF é obrigatório';
     }
     
     if (apenasNumeros.length === 11) {

@@ -34,9 +34,11 @@ function OrcamentoForm() {
   const [mostrarAlertaConcorrencia, setMostrarAlertaConcorrencia] = useState(false)
   const [descontoLiberado, setDescontoLiberado] = useState(false)
   const [mostrarModalSenha, setMostrarModalSenha] = useState(false)
-  const [senhaDigitada, setSenhaDigitada] = useState('')
   const [erroSenha, setErroSenha] = useState(false)
-  const SENHA_DESCONTO = 'Nader@123'
+  const [usuarioLiberacao, setUsuarioLiberacao] = useState('')
+  const [senhaLiberacao, setSenhaLiberacao] = useState('')
+  const [validandoSenha, setValidandoSenha] = useState(false)
+  const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
   const LIMITE_DESCONTO = 5
   
   const [formData, setFormData] = useState({
@@ -389,20 +391,80 @@ function OrcamentoForm() {
     setFormData({ ...formData, desconto_geral: valor })
   }
 
-  const validarSenha = () => {
-    if (senhaDigitada === SENHA_DESCONTO) {
-      setDescontoLiberado(true)
-      setMostrarModalSenha(false)
-      setSenhaDigitada('')
-      setErroSenha(false)
-    } else {
+  const validarSenha = async () => {
+    if (!usuarioLiberacao || !senhaLiberacao) {
       setErroSenha(true)
+      return
+    }
+
+    setValidandoSenha(true)
+    setErroSenha(false)
+
+    try {
+      // Buscar usuário pelo nome ou email
+      const { data: usuarios, error } = await supabase
+        .from('usuarios')
+        .select('id, nome, email, senha, perfil')
+        .or(`nome.ilike.%${usuarioLiberacao}%,email.ilike.%${usuarioLiberacao}%`)
+        .in('perfil', ['admin', 'comercial']) // Apenas admin ou comercial podem liberar
+        .eq('ativo', true)
+        .limit(1)
+
+      if (error) throw error
+
+      if (!usuarios || usuarios.length === 0) {
+        setErroSenha(true)
+        setValidandoSenha(false)
+        return
+      }
+
+      const usuarioEncontrado = usuarios[0]
+
+      // Verificar senha (comparação simples - em produção deveria ser hash)
+      if (usuarioEncontrado.senha !== senhaLiberacao) {
+        setErroSenha(true)
+        setValidandoSenha(false)
+        return
+      }
+
+      // ✅ Senha correta - liberar desconto
+      const agora = new Date()
+      const dataHora = agora.toLocaleString('pt-BR')
+      
+      setDescontoLiberado(true)
+      setDescontoLiberadoPor({
+        nome: usuarioEncontrado.nome,
+        data: dataHora
+      })
+      
+      // Adicionar observação interna sobre a liberação
+      const obsLiberacao = `\n\n🔓 DESCONTO ACIMA DE ${LIMITE_DESCONTO}% LIBERADO\n` +
+        `Por: ${usuarioEncontrado.nome}\n` +
+        `Data/Hora: ${dataHora}`
+      
+      setFormData(prev => ({
+        ...prev,
+        observacoes_internas: (prev.observacoes_internas || '') + obsLiberacao
+      }))
+
+      setMostrarModalSenha(false)
+      setUsuarioLiberacao('')
+      setSenhaLiberacao('')
+      
+      console.log(`✅ Desconto liberado por ${usuarioEncontrado.nome} em ${dataHora}`)
+
+    } catch (error) {
+      console.error('Erro ao validar senha:', error)
+      setErroSenha(true)
+    } finally {
+      setValidandoSenha(false)
     }
   }
 
   const cancelarSenha = () => {
     setMostrarModalSenha(false)
-    setSenhaDigitada('')
+    setUsuarioLiberacao('')
+    setSenhaLiberacao('')
     setErroSenha(false)
   }
 
@@ -668,7 +730,12 @@ function OrcamentoForm() {
   const salvar = async () => {
     try {
       // ✅ VALIDAÇÃO CNPJ/CPF OBRIGATÓRIO - BLOQUEIO DE SALVAMENTO
-      if (!cnpjCpfValido) {
+      // Verifica tanto o estado cnpjCpfValido quanto os dados diretamente
+      const temCnpjCpfPreenchido = dadosCNPJCPF?.cnpj_cpf && dadosCNPJCPF.cnpj_cpf.trim() !== ''
+      const marcouNaoInformar = dadosCNPJCPF?.cnpj_cpf_nao_informado === true
+      const cnpjCpfOk = cnpjCpfValido || temCnpjCpfPreenchido || marcouNaoInformar
+
+      if (!cnpjCpfOk) {
         alert('CNPJ/CPF é obrigatório!\n\nPreencha um CNPJ ou CPF válido, ou marque a opção "Não informar".')
         return
       }
@@ -900,41 +967,77 @@ function OrcamentoForm() {
               </div>
               <div>
                 <h3 className="font-bold text-gray-900">Desconto acima de {LIMITE_DESCONTO}%</h3>
-                <p className="text-sm text-gray-500">Digite a senha para liberar</p>
+                <p className="text-sm text-gray-500">Requer autorização de um administrador</p>
               </div>
             </div>
             
-            <input
-              type="password"
-              value={senhaDigitada}
-              onChange={(e) => {
-                setSenhaDigitada(e.target.value)
-                setErroSenha(false)
-              }}
-              onKeyPress={(e) => e.key === 'Enter' && validarSenha()}
-              placeholder="Digite a senha..."
-              className={`w-full px-4 py-3 border rounded-lg mb-3 ${
-                erroSenha ? 'border-red-500 bg-red-50' : 'border-gray-300'
-              }`}
-              autoFocus
-            />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Usuário (Admin/Comercial)
+                </label>
+                <input
+                  type="text"
+                  value={usuarioLiberacao}
+                  onChange={(e) => {
+                    setUsuarioLiberacao(e.target.value)
+                    setErroSenha(false)
+                  }}
+                  placeholder="Nome ou email do autorizador..."
+                  className={`w-full px-4 py-3 border rounded-lg ${
+                    erroSenha ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Senha
+                </label>
+                <input
+                  type="password"
+                  value={senhaLiberacao}
+                  onChange={(e) => {
+                    setSenhaLiberacao(e.target.value)
+                    setErroSenha(false)
+                  }}
+                  onKeyPress={(e) => e.key === 'Enter' && validarSenha()}
+                  placeholder="Senha do autorizador..."
+                  className={`w-full px-4 py-3 border rounded-lg ${
+                    erroSenha ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
+                />
+              </div>
+            </div>
             
             {erroSenha && (
-              <p className="text-red-600 text-sm mb-3">Senha incorreta!</p>
+              <p className="text-red-600 text-sm mt-3">
+                ❌ Usuário ou senha inválidos, ou sem permissão para liberar desconto.
+              </p>
             )}
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-4">
               <button
                 onClick={cancelarSenha}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={validandoSenha}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={validarSenha}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                disabled={validandoSenha || !usuarioLiberacao || !senhaLiberacao}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Confirmar
+                {validandoSenha ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    Validando...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
               </button>
             </div>
           </div>
@@ -1354,7 +1457,12 @@ function OrcamentoForm() {
                         <Lock size={10} /> máx {LIMITE_DESCONTO}%
                       </span>
                     )}
-                    {descontoLiberado && (
+                    {descontoLiberado && descontoLiberadoPor && (
+                      <span className="text-xs text-green-600" title={`Liberado por ${descontoLiberadoPor.nome} em ${descontoLiberadoPor.data}`}>
+                        ✓ liberado por {descontoLiberadoPor.nome}
+                      </span>
+                    )}
+                    {descontoLiberado && !descontoLiberadoPor && (
                       <span className="text-xs text-green-600">✓ liberado</span>
                     )}
                   </label>

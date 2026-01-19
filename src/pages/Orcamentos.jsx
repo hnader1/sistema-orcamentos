@@ -112,6 +112,7 @@ export default function Orcamentos() {
     // Filtro de busca por texto (número, nome do cliente ou empresa)
     const matchBusca = !busca || 
       orc.numero?.toLowerCase().includes(busca.toLowerCase()) ||
+      orc.numero_proposta?.toLowerCase().includes(busca.toLowerCase()) ||
       orc.cliente_nome?.toLowerCase().includes(busca.toLowerCase()) ||
       orc.cliente_empresa?.toLowerCase().includes(busca.toLowerCase())
     
@@ -156,8 +157,9 @@ export default function Orcamentos() {
     }
   }
 
-  // DUPLICAR ORÇAMENTO
-  // Cria uma cópia completa do orçamento incluindo todos os itens
+  // ====================================================================================
+  // DUPLICAR ORÇAMENTO - CORRIGIDO
+  // ====================================================================================
   const duplicar = async (id) => {
     try {
       console.log('📋 Duplicando orçamento ID:', id)
@@ -197,21 +199,57 @@ export default function Orcamentos() {
 
       console.log('📝 Novo número gerado:', novoNumero)
 
-      // Cria o novo orçamento
+      // ✅ CORREÇÃO: Criar objeto novo explicitamente, sem usar spread do original
       const novoOrcamento = {
-        ...original,
-        id: undefined,
         numero: novoNumero,
+        numero_proposta: null, // Será gerado novo ao salvar
+        cliente_nome: original.cliente_nome,
+        cliente_empresa: original.cliente_empresa,
+        cliente_email: original.cliente_email,
+        cliente_telefone: original.cliente_telefone,
+        cliente_cpf_cnpj: original.cliente_cpf_cnpj,
+        endereco_entrega: original.endereco_entrega,
+        vendedor: user?.nome || original.vendedor,
+        vendedor_telefone: user?.telefone || original.vendedor_telefone,
+        vendedor_email: user?.email || original.vendedor_email,
+        data_orcamento: new Date().toISOString().split('T')[0],
+        validade_dias: original.validade_dias || 15,
+        data_validade: original.data_validade,
+        forma_pagamento_id: original.forma_pagamento_id,
+        prazo_entrega: original.prazo_entrega,
+        desconto_geral: original.desconto_geral || 0,
+        subtotal: original.subtotal,
+        frete: original.frete,
+        frete_modalidade: original.frete_modalidade || 'FOB',
+        frete_qtd_viagens: original.frete_qtd_viagens || 0,
+        frete_valor_viagem: original.frete_valor_viagem || 0,
+        frete_cidade: original.frete_cidade,
+        frete_tipo_caminhao: original.frete_tipo_caminhao,
+        total: original.total,
+        observacoes: original.observacoes,
+        observacoes_internas: original.observacoes_internas,
         status: 'rascunho',
         excluido: false,
-        data_exclusao: null,
         numero_lancamento_erp: null,
         data_lancamento: null,
         lancado_por: null,
         usuario_id: user?.id || null,
-        created_at: undefined,
-        updated_at: undefined
+        // Campos de CNPJ/CPF
+        cnpj_cpf: original.cnpj_cpf,
+        cnpj_cpf_nao_informado: original.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: original.cnpj_cpf_nao_informado_aceite_data,
+        cnpj_cpf_nao_informado_aceite_ip: null,
+        // Campos de endereço da obra
+        obra_cep: original.obra_cep,
+        obra_cidade: original.obra_cidade,
+        obra_bairro: original.obra_bairro,
+        obra_logradouro: original.obra_logradouro,
+        obra_numero: original.obra_numero,
+        obra_complemento: original.obra_complemento,
+        obra_endereco_validado: original.obra_endereco_validado || false
       }
+
+      console.log('📦 Dados do novo orçamento:', novoOrcamento)
 
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
@@ -219,17 +257,28 @@ export default function Orcamentos() {
         .select()
         .single()
 
-      if (errorCriar) throw errorCriar
+      if (errorCriar) {
+        console.error('❌ Erro ao criar orçamento:', errorCriar)
+        throw errorCriar
+      }
 
       console.log('✅ Orçamento duplicado com ID:', orcCriado.id)
 
       // Copia os itens para o novo orçamento
       if (itens && itens.length > 0) {
         const novosItens = itens.map(item => ({
-          ...item,
-          id: undefined,
           orcamento_id: orcCriado.id,
-          created_at: undefined
+          produto_id: item.produto_id,
+          produto_codigo: item.produto_codigo,
+          produto: item.produto,
+          classe: item.classe,
+          mpa: item.mpa,
+          quantidade: item.quantidade,
+          preco_unitario: item.preco_unitario,
+          peso_unitario: item.peso_unitario,
+          qtd_por_pallet: item.qtd_por_pallet,
+          subtotal: item.subtotal,
+          ordem: item.ordem
         }))
 
         console.log(`📦 Copiando ${novosItens.length} produtos...`)
@@ -238,12 +287,15 @@ export default function Orcamentos() {
           .from('orcamentos_itens')
           .insert(novosItens)
 
-        if (errorItensNovos) throw errorItensNovos
+        if (errorItensNovos) {
+          console.error('❌ Erro ao copiar itens:', errorItensNovos)
+          throw errorItensNovos
+        }
         
         console.log('✅ Produtos copiados!')
       }
 
-      alert('Orçamento duplicado com sucesso!')
+      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}`)
       carregarOrcamentos()
     } catch (error) {
       console.error('❌ Erro ao duplicar:', error)
@@ -376,8 +428,7 @@ export default function Orcamentos() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
        
-
-       javascriptreact{/* ==================================================================== */}
+        {/* ==================================================================== */}
         {/* CARDS DE STATUS - DASHBOARD */}
         {/* ==================================================================== */}
         <div className="mb-8">
@@ -437,13 +488,11 @@ export default function Orcamentos() {
                       {/* Linha 1: Número • Nome do Cliente */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <h3 className="text-base font-bold text-gray-900">
-                          <h3 className="text-base font-bold text-gray-900">
-  {orc.numero_proposta ? (
-    <span className="text-purple-700">{orc.numero_proposta}</span>
-  ) : (
-    <span className="text-gray-400">#{orc.numero}</span>
-  )}
-</h3>
+                          {orc.numero_proposta ? (
+                            <span className="text-purple-700">{orc.numero_proposta}</span>
+                          ) : (
+                            <span className="text-gray-400">#{orc.numero}</span>
+                          )}
                         </h3>
                         <span className="text-blue-600 font-semibold">•</span>
                         <span className="text-gray-700 font-medium truncate">
@@ -453,11 +502,11 @@ export default function Orcamentos() {
                       
                       {/* Linha 2: Cidade | Valor | Data | Vendedor */}
                       <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-                        {orc.cidade && (
+                        {orc.obra_cidade && (
                           <>
                             <div className="flex items-center gap-1">
                               <MapPin size={14} className="text-gray-400" />
-                              <span>{orc.cidade}</span>
+                              <span>{orc.obra_cidade}</span>
                             </div>
                             <span className="text-gray-300">|</span>
                           </>
@@ -542,7 +591,7 @@ export default function Orcamentos() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar por número, cliente ou empresa..."
+              placeholder="Buscar por número, proposta, cliente ou empresa..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -588,13 +637,11 @@ export default function Orcamentos() {
                       {/* Linha 1: Número • Nome do Cliente */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <h3 className="text-base font-bold text-gray-900">
-                        <h3 className="text-base font-bold text-gray-900">
-  {orc.numero_proposta ? (
-    <span className="text-purple-700">{orc.numero_proposta}</span>
-  ) : (
-    <span className="text-gray-400">#{orc.numero}</span>
-  )}
-</h3>
+                          {orc.numero_proposta ? (
+                            <span className="text-purple-700">{orc.numero_proposta}</span>
+                          ) : (
+                            <span className="text-gray-400">#{orc.numero}</span>
+                          )}
                         </h3>
                         <span className="text-blue-600 font-semibold">•</span>
                         <span className="text-gray-700 font-medium truncate">
@@ -604,11 +651,11 @@ export default function Orcamentos() {
                       
                       {/* Linha 2: Cidade | Valor | Data | Vendedor */}
                       <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-                        {orc.cidade && (
+                        {orc.obra_cidade && (
                           <>
                             <div className="flex items-center gap-1">
                               <MapPin size={14} className="text-gray-400" />
-                              <span>{orc.cidade}</span>
+                              <span>{orc.obra_cidade}</span>
                             </div>
                             <span className="text-gray-300">|</span>
                           </>
@@ -688,55 +735,3 @@ export default function Orcamentos() {
     </div>
   )
 }
-
-// ====================================================================================
-// NOTAS IMPORTANTES PARA FUTURAS MODIFICAÇÕES:
-// ====================================================================================
-//
-// 1. ESTRUTURA DO LAYOUT:
-//    - Cards organizados em 2 linhas por orçamento
-//    - Linha 1: #Número • Nome do Cliente
-//    - Linha 2: 📍 Cidade | 💰 Valor | 📅 Data | 👤 Vendedor
-//    - Badge de status posicionado acima dos botões de ação (lado direito)
-//
-// 2. FILTROS:
-//    - Busca por texto: número, nome do cliente ou empresa
-//    - Filtro por status: todos, rascunho, enviado, aprovado, lançado, cancelado
-//    - Ambos podem ser combinados
-//
-// 3. PERMISSÕES:
-//    - Vendedor: vê apenas seus orçamentos (filtro por usuario_id)
-//    - Outros usuários: veem todos os orçamentos
-//
-// 4. SOFT DELETE:
-//    - Ao cancelar, muda status para 'cancelado'
-//    - Não exclui fisicamente do banco (excluido = false sempre)
-//    - Mantém numeração sequencial íntegra
-//
-// 5. CAMPOS NECESSÁRIOS NO BANCO (tabela orcamentos):
-//    - numero (string) - Número do orçamento formato ORC-0001
-//    - cliente_nome (string) - Nome do cliente
-//    - cliente_empresa (string) - Nome da empresa (não usado neste layout)
-//    - cidade (string) - Cidade do cadastro (IMPORTANTE: garantir que está sendo buscado)
-//    - total (decimal) - Valor total do orçamento
-//    - data_orcamento (date) - Data de criação
-//    - vendedor (string) - Nome do vendedor (pode vir de join com tabela usuarios)
-//    - status (enum) - rascunho, enviado, aprovado, lancado, rejeitado, cancelado
-//    - excluido (boolean) - Sempre false nesta listagem
-//    - usuario_id (uuid) - ID do vendedor responsável
-//
-// 6. QUERIES DO SUPABASE:
-//    Certifique-se que a query está buscando TODOS os campos necessários:
-//    .select('*, cidade, vendedor, usuarios!orcamentos_usuario_id_fkey!inner(nome)')
-//
-// 7. RESPONSIVIDADE:
-//    - Mobile: Badge e botões empilham verticalmente
-//    - Desktop: Badge e botões ficam lado a lado na direita
-//    - Informações sempre em 2 linhas (compacto)
-//
-// 8. ÍCONES USADOS:
-//    - MapPin (cidade), DollarSign (valor), Calendar (data), User (vendedor)
-//    - Edit2 (editar), Copy (duplicar), Ban (cancelar)
-//    - Todos do lucide-react
-//
-// ====================================================================================
