@@ -1,82 +1,55 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../services/supabase'
 
 const AuthContext = createContext({})
 
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de AuthProvider')
-  }
-  return context
-}
+export const useAuth = () => useContext(AuthContext)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const initialized = useRef(false)
+
+  const loadUser = async (authId) => {
+    const { data } = await supabase
+      .from('usuarios')
+      .select('id, email, nome, telefone, tipo')
+      .eq('auth_id', authId)
+      .eq('ativo', true)
+      .single()
+    return data
+  }
 
   useEffect(() => {
-    if (initialized.current) return
-    initialized.current = true
-
-    const initialize = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (session?.user) {
-          const { data } = await supabase
-            .from('usuarios')
-            .select('id, email, nome, telefone, tipo')
-            .eq('auth_id', session.user.id)
-            .eq('ativo', true)
-            .single()
-          
-          setUser(data)
-        }
-      } catch (error) {
-        console.error('Init error:', error)
-      } finally {
-        setLoading(false)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const userData = await loadUser(session.user.id)
+        setUser(userData)
       }
-    }
-
-    initialize()
+      setLoading(false)
+    })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          const { data } = await supabase
-            .from('usuarios')
-            .select('id, email, nome, telefone, tipo')
-            .eq('auth_id', session.user.id)
-            .eq('ativo', true)
-            .single()
-          
-          setUser(data)
-        } else if (event === 'SIGNED_OUT') {
+        if (session?.user) {
+          const userData = await loadUser(session.user.id)
+          setUser(userData)
+        } else {
           setUser(null)
         }
         setLoading(false)
       }
     )
 
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
   const login = async (email, senha) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: senha
-      })
-      if (error) throw error
-      return { success: true }
-    } catch (error) {
-      return { success: false, error: 'Email ou senha incorretos' }
-    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: senha
+    })
+    if (error) return { success: false, error: 'Email ou senha incorretos' }
+    return { success: true }
   }
 
   const logout = async () => {
@@ -87,20 +60,19 @@ export function AuthProvider({ children }) {
   const isAdmin = () => user?.tipo === 'admin'
   const isVendedor = () => user?.tipo === 'vendedor'
   const isComercialInterno = () => user?.tipo === 'comercial_interno'
-  const podeAcessarLancamento = () => user?.tipo === 'admin' || user?.tipo === 'comercial_interno'
+  const podeAcessarLancamento = () => ['admin', 'comercial_interno'].includes(user?.tipo)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      login,
-      logout,
-      isAdmin,
-      isVendedor,
-      isComercialInterno,
-      podeAcessarLancamento
-    }}>
-      {!loading && children}
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isVendedor, isComercialInterno, podeAcessarLancamento }}>
+      {children}
     </AuthContext.Provider>
   )
 }
