@@ -11,56 +11,62 @@ export function AuthProvider({ children }) {
 
   const loadUser = async (authId) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('usuarios')
         .select('id, email, nome, telefone, tipo')
         .eq('auth_id', authId)
         .eq('ativo', true)
         .single()
-      if (error) throw error
       return data
     } catch (e) {
-      console.error('loadUser error:', e)
       return null
     }
   }
 
   useEffect(() => {
+    let isMounted = true
+
     const init = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
+        const { data: { session } } = await supabase.auth.getSession()
         
-        if (error) {
-          console.error('getSession error:', error)
-          setLoading(false)
-          return
-        }
-        
-        if (session?.user) {
+        if (session?.user && isMounted) {
           const userData = await loadUser(session.user.id)
-          setUser(userData)
+          if (isMounted) setUser(userData)
         }
       } catch (e) {
-        console.error('Init error:', e)
-      } finally {
+        // Ignore errors, just show login
+      }
+      if (isMounted) setLoading(false)
+    }
+
+    // Set a timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      if (isMounted && loading) {
         setLoading(false)
       }
-    }
+    }, 3000)
 
     init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return
+        
         if (session?.user) {
           const userData = await loadUser(session.user.id)
-          setUser(userData)
+          if (isMounted) setUser(userData)
         } else {
-          setUser(null)
+          if (isMounted) setUser(null)
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const login = async (email, senha) => {
