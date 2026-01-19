@@ -20,13 +20,6 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   
   const [calculoFrete, setCalculoFrete] = useState(null)
 
-  // Capacidades dos veículos em KG (fallback se não vier do banco)
-  const capacidadesVeiculo = {
-    'Toco 8t': 8000,
-    'Truck 14t': 14000,
-    'Carreta 32t': 32000
-  }
-
   // ✅ CORREÇÃO: Inicialização com dados do freteAtual (ao reabrir orçamento)
   useEffect(() => {
     if (freteAtual) {
@@ -131,7 +124,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         tipo_caminhao: tipoVeiculo,
         localidade: cidadeSelecionada,
         cidade: cidadeSelecionada,
-        capacidade_kg: capacidadesVeiculo[tipoVeiculo] || 0,
+        capacidade_kg: 0,
+        capacidade_pallets: 0,
         peso_total_kg: pesoTotal || 0,
         viagens_necessarias: qtdViagens,
         viagens_completas: qtdViagens,
@@ -191,9 +185,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     }
 
     // 🔧 FIX: Calcular viagens baseado no MAIOR limitante (peso OU pallets)
-    // Usa capacidades do banco de dados (capacidade_kg e capacidade_pallets)
+    // Usa capacidades DIRETO do banco (capacidade_kg e capacidade_pallets)
     const pesoTotalKg = pesoTotal || 0
-    const capacidadeKg = frete.capacidade_kg || capacidadesVeiculo[tipoVeiculo] || 1
+    const capacidadeKg = frete.capacidade_kg || 1
     const capacidadePallets = frete.capacidade_pallets || 1
     
     // Calcular viagens por peso
@@ -277,11 +271,12 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     setQtdManualViagens(1)
   }
 
-  // Tipos de veículos disponíveis
+  // ✅ REMOVIDO: Hardcoded pallet capacities - vem do banco agora!
+  // Tipos de veículos disponíveis (SEM informação de pallets)
   const tiposVeiculo = [
-    { valor: 'Toco 8t', nome: 'Toco', capacidade: '8 ton', pallets: 12, icon: '🚚' },
-    { valor: 'Truck 14t', nome: 'Truck', capacidade: '14 ton', pallets: 20, icon: '🚛' },
-    { valor: 'Carreta 32t', nome: 'Carreta', capacidade: '32 ton', pallets: 28, icon: '🚛' }
+    { valor: 'Toco 8t', nome: 'Toco', capacidade: '8 ton', icon: '🚚' },
+    { valor: 'Truck 14t', nome: 'Truck', capacidade: '14 ton', icon: '🚛' },
+    { valor: 'Carreta 32t', nome: 'Carreta', capacidade: '32 ton', icon: '🚛' }
   ]
 
   // Verificar se é um pedido grande
@@ -317,14 +312,25 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             </p>
           </div>
 
-          {/* Capacidade do Veículo */}
-          {tipoVeiculo && (
+          {/* Capacidade do Veículo - PESO */}
+          {calculoFrete && calculoFrete.capacidade_kg > 0 && (
             <div className="bg-white rounded-lg p-3 border border-purple-100">
-              <span className="text-xs text-purple-600 block mb-1">Capacidade do Veículo</span>
+              <span className="text-xs text-purple-600 block mb-1">Capacidade - Peso</span>
               <p className="text-xl font-bold text-gray-900">
-                {(capacidadesVeiculo[tipoVeiculo] / 1000).toFixed(0)} ton
+                {(calculoFrete.capacidade_kg / 1000).toFixed(1)} ton
               </p>
-              <span className="text-xs text-gray-500">{tipoVeiculo.toUpperCase()}</span>
+              <span className="text-xs text-gray-500">{tipoVeiculo}</span>
+            </div>
+          )}
+
+          {/* Capacidade do Veículo - PALLETS */}
+          {calculoFrete && calculoFrete.capacidade_pallets > 0 && (
+            <div className="bg-white rounded-lg p-3 border border-purple-100">
+              <span className="text-xs text-purple-600 block mb-1">Capacidade - Pallets</span>
+              <p className="text-xl font-bold text-purple-600">
+                {calculoFrete.capacidade_pallets} pallets
+              </p>
+              <span className="text-xs text-gray-500">{tipoVeiculo}</span>
             </div>
           )}
 
@@ -399,7 +405,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <option value="">Selecione...</option>
               {tiposVeiculo.map(v => (
                 <option key={v.valor} value={v.valor}>
-                  {v.icon} {v.nome} ({v.capacidade} / {v.pallets} pallets)
+                  {v.icon} {v.nome} ({v.capacidade})
                 </option>
               ))}
             </select>
