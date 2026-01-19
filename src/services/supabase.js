@@ -8,7 +8,8 @@ const options = {
     persistSession: true,
     storageKey: 'construcom-auth',
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce'
   }
 }
 

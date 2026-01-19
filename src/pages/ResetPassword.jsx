@@ -7,22 +7,58 @@ import logoConstrucom from '../assets/logo-construcom.png'
 export default function ResetPassword() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [initializing, setInitializing] = useState(true)
   const [success, setSuccess] = useState(false)
   const [erro, setErro] = useState('')
   const [senha, setSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
   const [linkValido, setLinkValido] = useState(true)
+  const [hasSession, setHasSession] = useState(false)
 
   useEffect(() => {
-    const hash = window.location.hash
-    if (hash.includes('error=')) {
-      const params = new URLSearchParams(hash.substring(1))
-      const errorDesc = params.get('error_description')
-      if (errorDesc) {
-        setLinkValido(false)
-        setErro(errorDesc.replace(/\+/g, ' '))
+    const checkSession = async () => {
+      try {
+        const hash = window.location.hash
+        console.log('URL hash:', hash)
+
+        // Check for error in URL
+        if (hash.includes('error=')) {
+          const params = new URLSearchParams(hash.substring(1))
+          const errorDesc = params.get('error_description')
+          console.log('Error in URL:', errorDesc)
+          setLinkValido(false)
+          setErro(errorDesc?.replace(/\+/g, ' ') || 'Link inválido')
+          setInitializing(false)
+          return
+        }
+
+        // Wait for Supabase to process the URL hash
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Check session
+        const { data, error } = await supabase.auth.getSession()
+        console.log('Session data:', data)
+        console.log('Session error:', error)
+
+        if (data?.session) {
+          setHasSession(true)
+          setLinkValido(true)
+        } else if (hash.includes('access_token') || hash.includes('type=recovery')) {
+          // Has token but no session - might still work
+          setHasSession(true)
+          setLinkValido(true)
+        } else {
+          setLinkValido(false)
+          setErro('Nenhuma sessão encontrada. Use o link do email.')
+        }
+      } catch (e) {
+        console.error('Check session error:', e)
+      } finally {
+        setInitializing(false)
       }
     }
+
+    checkSession()
   }, [])
 
   const handleReset = async (e) => {
@@ -42,14 +78,13 @@ export default function ResetPassword() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: senha })
-      
+      console.log('Attempting password update...')
+      const { data, error } = await supabase.auth.updateUser({ password: senha })
+      console.log('Update result:', data, error)
+
       if (error) {
         if (error.message.includes('different')) {
-          setErro('A nova senha deve ser diferente da senha anterior')
-        } else if (error.message.includes('aborted') || error.message.includes('session')) {
-          setLinkValido(false)
-          setErro('Sessão expirada. Solicite um novo link.')
+          setErro('A nova senha deve ser diferente da anterior')
         } else {
           setErro(error.message)
         }
@@ -59,19 +94,26 @@ export default function ResetPassword() {
 
       await supabase.auth.signOut()
       setSuccess(true)
-      
+
       setTimeout(() => {
         window.location.href = '/login'
       }, 2000)
     } catch (error) {
-      if (error.message?.includes('aborted') || error.message?.includes('session')) {
-        setLinkValido(false)
-        setErro('Sessão expirada. Solicite um novo link.')
-      } else {
-        setErro(error.message || 'Erro ao redefinir senha')
-      }
+      console.error('Reset error:', error)
+      setErro(error.message || 'Erro ao redefinir senha')
       setLoading(false)
     }
+  }
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verificando link...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!linkValido) {
@@ -80,7 +122,7 @@ export default function ResetPassword() {
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <AlertCircle className="mx-auto text-red-500 mb-4" size={64} />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Expirado</h1>
-          <p className="text-gray-600 mb-6">{erro || 'O link de redefinição expirou ou é inválido.'}</p>
+          <p className="text-gray-600 mb-6">{erro || 'O link expirou ou é inválido.'}</p>
           <button
             onClick={() => navigate('/forgot-password')}
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
