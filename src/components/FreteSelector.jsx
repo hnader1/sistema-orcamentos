@@ -158,17 +158,33 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // 🔧 FIX: Buscar frete APENAS por cidade e tipo_veiculo (como na versão antiga que funcionava)
-    // NÃO buscar por modalidade porque o formato pode não bater
+    // 🔧 FIX: Mapear modalidade e tipo_veiculo para o formato do banco
+    // Frontend: modalidade = "CIF" ou "CIF_COM_DESCARGA"
+    // Banco: modalidade = "CIF_SEM_DESCARGA" ou "CIF_COM_DESCARGA"
+    const modalidadeDB = modalidade === 'CIF' ? 'CIF_SEM_DESCARGA' : modalidade
+    
+    // Frontend: tipo_veiculo = "Truck 14t"
+    // Banco: tipo_veiculo = "Truck 14t - SEM DESCARGA" ou "Truck 14t - COM DESCARGA"
+    const sufixo = modalidade === 'CIF_COM_DESCARGA' ? 'COM DESCARGA' : 'SEM DESCARGA'
+    const tipoVeiculoDB = `${tipoVeiculo} - ${sufixo}`
+    
+    // 🔧 FIX: Buscar frete com TODOS os 3 campos (cidade, tipo_veiculo, modalidade)
+    // Cada combinação é uma linha diferente no banco com seu próprio preço!
     const frete = fretes.find(f => 
       f.cidade === cidadeSelecionada && 
-      f.tipo_veiculo === tipoVeiculo
+      f.tipo_veiculo === tipoVeiculoDB &&
+      f.modalidade === modalidadeDB
     )
 
-    console.log('Buscando frete:', { cidadeSelecionada, tipoVeiculo })
-    console.log('Frete encontrado:', frete)
+    console.log('🔍 Buscando frete:', { 
+      cidadeSelecionada, 
+      tipoVeiculoDB, 
+      modalidadeDB 
+    })
+    console.log('✅ Frete encontrado:', frete)
 
     if (!frete) {
+      console.log('❌ Frete não encontrado - verifique os valores no banco')
       setCalculoFrete(null)
       notificarFrete(null)
       return
@@ -191,14 +207,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         : 100
     }
 
-    // 🔧 FIX: Usar preco_fixo (novo nome do campo) ao invés de "valor"
-    let valorUnitarioViagem = frete.preco_fixo || 0
-
-    // 🔧 FIX: Aplicar descarga se CIF_COM_DESCARGA
-    if (modalidade === 'CIF_COM_DESCARGA') {
-      valorUnitarioViagem = valorUnitarioViagem * 1.15
-    }
-
+    // 🔧 FIX: Usar preco_fixo DIRETAMENTE do banco (sem cálculos adicionais)
+    // O preço já está correto no banco para cada combinação!
+    const valorUnitarioViagem = frete.preco_fixo || 0
     const valorTotalFrete = valorUnitarioViagem * viagensNecessarias
 
     const resultado = {
