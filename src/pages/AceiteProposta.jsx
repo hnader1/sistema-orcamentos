@@ -4,15 +4,7 @@ import { supabase } from '../services/supabase';
 
 // =====================================================
 // PÁGINA DE ACEITE DE PROPOSTA - VERSÃO MOBILE-FIRST
-// Com: LGPD, Validade, Tipo Descarga, Foto do Celular
-// CORREÇÕES:
-// 1. Logo da empresa no header (sem ícone emoji)
-// 2. Botão Baixar PDF funcional
-// 3. Download PDF na tela de sucesso
-// 4. Resumo com valores corretos (produtos, frete, viagens)
-// 5. Bloqueio de edições após aceite (só número ERP)
-// 6. ✅ NOVO: Salvar dados extras na tabela aceites (contribuinte, IE, tipo_cliente)
-// 7. ✅ FIX: Corrigido fallback para CPF/CNPJ (busca em todos os campos possíveis)
+// VERSÃO 4.0 - AJUSTES VISUAIS E LÓGICA DE FRETE
 // =====================================================
 
 export default function AceiteProposta() {
@@ -31,7 +23,7 @@ export default function AceiteProposta() {
   // Estado para proposta expirada
   const [propostaExpirada, setPropostaExpirada] = useState(false);
   
-  // ✅ Estado para URL do PDF
+  // Estado para URL do PDF
   const [pdfUrl, setPdfUrl] = useState(null);
   const [baixandoPdf, setBaixandoPdf] = useState(false);
   
@@ -57,10 +49,10 @@ export default function AceiteProposta() {
   // Termo de aceite final
   const [termoAceito, setTermoAceito] = useState(false);
 
-  // ✅ URL do logo hospedado no Vercel
+  // URL do logo hospedado no Vercel
   const logoUrl = 'https://sistema-orcamentos-theta.vercel.app/logo-construcom.png';
 
-  // ✅ HELPER: Busca CPF/CNPJ em todos os campos possíveis
+  // HELPER: Busca CPF/CNPJ em todos os campos possíveis
   const getCpfCnpj = (dados, orcamento) => {
     return dados?.cpf_cnpj || 
            dados?.cliente_cpf_cnpj || 
@@ -111,7 +103,6 @@ export default function AceiteProposta() {
       if (propostaData.status === 'aceita') {
         setAceiteConfirmado(true);
         setProposta(propostaData);
-        // ✅ Carregar URL do PDF para download
         if (propostaData.pdf_path) {
           await carregarUrlPdf(propostaData.pdf_path);
         }
@@ -132,7 +123,6 @@ export default function AceiteProposta() {
 
       setProposta(propostaData);
       
-      // ✅ Carregar URL do PDF para o botão de download
       if (propostaData.pdf_path) {
         await carregarUrlPdf(propostaData.pdf_path);
       }
@@ -165,23 +155,20 @@ export default function AceiteProposta() {
     }
   };
 
-  // ✅ Função para carregar URL do PDF do Storage
   const carregarUrlPdf = async (pdfPath) => {
     try {
       const { data, error } = await supabase.storage
         .from('propostas-pdf')
-        .createSignedUrl(pdfPath, 604800); // 7 dias de validade
+        .createSignedUrl(pdfPath, 604800);
 
       if (!error && data?.signedUrl) {
         setPdfUrl(data.signedUrl);
-        console.log('✅ URL do PDF carregada');
       }
     } catch (e) {
       console.error('Erro ao carregar URL do PDF:', e);
     }
   };
 
-  // ✅ Função para baixar o PDF
   const handleBaixarPdf = async () => {
     if (!pdfUrl) {
       alert('PDF não disponível. Tente recarregar a página.');
@@ -190,7 +177,6 @@ export default function AceiteProposta() {
     
     setBaixandoPdf(true);
     try {
-      // Abrir em nova aba
       window.open(pdfUrl, '_blank');
     } catch (e) {
       console.error('Erro ao baixar PDF:', e);
@@ -218,12 +204,10 @@ export default function AceiteProposta() {
     }
   };
 
-  // Handlers
   const handleChange = (campo, valor) => {
     setDadosEditaveis(prev => ({ ...prev, [campo]: valor }));
   };
 
-  // Upload de arquivo
   const handleFileUpload = async (e, tipo) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -294,7 +278,6 @@ export default function AceiteProposta() {
     setDocumentos(prev => prev.filter((_, i) => i !== index));
   };
 
-  // ✅ ACEITAR PROPOSTA - ATUALIZADO PARA SALVAR DADOS EXTRAS
   const handleAceitar = async () => {
     if (!termoAceito || !lgpdAceito) {
       alert('Você precisa aceitar os termos para continuar.');
@@ -304,7 +287,6 @@ export default function AceiteProposta() {
     setEnviando(true);
 
     try {
-      // Obter IP do cliente
       let ipCliente = '';
       try {
         const ipResponse = await fetch('https://api.ipify.org?format=json');
@@ -314,12 +296,10 @@ export default function AceiteProposta() {
         ipCliente = 'não disponível';
       }
 
-      // Obter dados do cliente - ✅ CORRIGIDO: usa helper getCpfCnpj
       const dadosOriginais = proposta.dados_cliente_proposta?.[0];
       const emailCliente = dadosOriginais?.email || proposta.orcamentos?.cliente_email || '';
       const cpfCnpjCliente = getCpfCnpj(dadosOriginais, proposta.orcamentos);
 
-      // ✅ INSERIR ACEITE COM TODOS OS DADOS EXTRAS
       const { error: erroAceite } = await supabase
         .from('aceites')
         .insert({
@@ -327,13 +307,11 @@ export default function AceiteProposta() {
           tipo: proposta.valor_total <= 5000 ? 'simples' : 'assinatura_digital',
           ip_cliente: ipCliente,
           user_agent: navigator.userAgent,
-          // ✅ NOVOS CAMPOS: dados editáveis do cliente
           email_aprovador: emailCliente,
           nome_aprovador: dadosEditaveis.razao_social || dadosEditaveis.nome_fantasia,
           contribuinte_icms: dadosEditaveis.contribuinte_icms,
           inscricao_estadual: dadosEditaveis.inscricao_estadual || null,
           tipo_cliente: dadosEditaveis.tipo_cliente,
-          // Dados confirmados (backup em JSON)
           dados_confirmados: {
             ...dadosEditaveis,
             cpf_cnpj: cpfCnpjCliente,
@@ -347,7 +325,6 @@ export default function AceiteProposta() {
 
       if (erroAceite) throw erroAceite;
 
-      // Verificar se houve alteração nos dados e criar registro em dados_cliente_proposta
       const houveAlteracao = 
         dadosEditaveis.razao_social !== dadosOriginais?.razao_social ||
         dadosEditaveis.nome_fantasia !== dadosOriginais?.nome_fantasia ||
@@ -373,12 +350,10 @@ export default function AceiteProposta() {
             uf: dadosOriginais?.uf || proposta.orcamentos?.uf_entrega,
             email: emailCliente,
             telefone: dadosOriginais?.telefone || proposta.orcamentos?.cliente_telefone,
-            origem: 'cliente'  // ✅ Marca que foi preenchido pelo cliente
+            origem: 'cliente'
           });
       }
 
-      // Atualizar status da proposta para aceita
-      // O trigger no banco vai automaticamente mudar o status do orçamento para 'aprovado'
       await supabase
         .from('propostas')
         .update({ status: 'aceita', data_aceite: new Date().toISOString() })
@@ -405,17 +380,30 @@ export default function AceiteProposta() {
 
   const orcamento = proposta?.orcamentos;
   const dadosCliente = proposta?.dados_cliente_proposta?.[0] || orcamento;
-  const isFOB = proposta?.tipo_frete === 'FOB' || orcamento?.tipo_frete === 'FOB' || orcamento?.frete_modalidade === 'FOB';
   
-  // ✅ CORRIGIDO: Obter CPF/CNPJ usando helper que busca em todos os campos possíveis
+  // Lógica de frete
+  const isFOB = proposta?.tipo_frete === 'FOB' || orcamento?.tipo_frete === 'FOB' || orcamento?.frete_modalidade === 'FOB';
+  const tipoDescarga = proposta?.tipo_descarga || orcamento?.tipo_descarga || '';
+  const temDescarga = tipoDescarga && tipoDescarga.toLowerCase() !== 'sem descarga' && tipoDescarga.toLowerCase() !== 'cliente' && tipoDescarga !== '';
+  
+  // CPF/CNPJ
   const cpfCnpjExibicao = getCpfCnpj(dadosCliente, orcamento);
   
-  // ✅ CORRIGIDO: Obter valores corretos de produtos, frete e viagens
+  // Valores
   const totalProdutos = proposta?.total_produtos || orcamento?.subtotal || orcamento?.total_produtos || 0;
   const totalFrete = proposta?.total_frete || orcamento?.frete || 0;
   const valorTotal = proposta?.valor_total || orcamento?.total || (totalProdutos + totalFrete);
-  const qtdViagens = orcamento?.frete_qtd_viagens || proposta?.qtd_viagens || 0;
-  const tipoDescarga = proposta?.tipo_descarga || orcamento?.tipo_descarga || '';
+
+  // Função para obter label do frete na etapa 3
+  const getLabelFrete = () => {
+    if (isFOB) {
+      return 'Frete por conta do cliente';
+    } else if (temDescarga) {
+      return 'Total Frete e Descarga';
+    } else {
+      return 'Frete (descarga por conta do cliente)';
+    }
+  };
 
   // TELA DE CARREGAMENTO
   if (carregando) {
@@ -469,7 +457,7 @@ export default function AceiteProposta() {
     );
   }
 
-  // ✅ TELA DE SUCESSO - COM BOTÃO DE DOWNLOAD DO PDF
+  // TELA DE SUCESSO
   if (aceiteConfirmado) {
     return (
       <div style={styles.successContainer}>
@@ -482,14 +470,13 @@ export default function AceiteProposta() {
           <p><strong>Data do Aceite:</strong> {formatarData(proposta?.data_aceite || new Date())}</p>
         </div>
         
-        {/* ✅ BOTÃO DOWNLOAD PDF */}
         {pdfUrl && (
           <button 
             onClick={handleBaixarPdf} 
             disabled={baixandoPdf}
             style={styles.downloadPdfButton}
           >
-            {baixandoPdf ? '⏳ Carregando...' : '📄 Baixar Proposta em PDF'}
+            {baixandoPdf ? '⏳ Carregando...' : '📑 Baixar Proposta'}
           </button>
         )}
         
@@ -501,19 +488,22 @@ export default function AceiteProposta() {
   // PÁGINA PRINCIPAL
   return (
     <div style={styles.container}>
-      {/* ✅ HEADER COM LOGO DA EMPRESA (SEM EMOJI) */}
+      {/* HEADER COM LOGO */}
       <header style={styles.header}>
         <div style={styles.headerContent}>
           <div style={styles.logo}>
-            <img 
-              src={logoUrl} 
-              alt="Construcom" 
-              style={styles.logoImage}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.style.display = 'none';
-              }}
-            />
+            {/* Logo com fundo branco para contraste */}
+            <div style={styles.logoContainer}>
+              <img 
+                src={logoUrl} 
+                alt="Construcom" 
+                style={styles.logoImage}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
           </div>
           <div style={styles.propostaNumero}>
             <span style={styles.propostaLabel}>Proposta</span>
@@ -555,7 +545,6 @@ export default function AceiteProposta() {
                 <div style={styles.fieldGroup}>
                   <div style={styles.field}>
                     <label style={styles.label}>CPF/CNPJ</label>
-                    {/* ✅ CORRIGIDO: Usa cpfCnpjExibicao que busca em todos os campos */}
                     <div style={styles.readonlyField}>{cpfCnpjExibicao || 'Não informado'}</div>
                   </div>
                   <div style={styles.field}>
@@ -684,7 +673,7 @@ export default function AceiteProposta() {
               <h2 style={styles.cardTitle}>✅ Confirmar Aceite</h2>
             </div>
             <div style={styles.cardContent}>
-              {/* ✅ RESUMO CORRIGIDO COM VALORES REAIS */}
+              {/* RESUMO DA PROPOSTA */}
               <div style={styles.resumoBox}>
                 <h3 style={styles.resumoTitle}>📦 Resumo da Proposta</h3>
                 {orcamento?.itens_json && JSON.parse(orcamento.itens_json).map((item, i) => (
@@ -695,40 +684,34 @@ export default function AceiteProposta() {
                   </div>
                 ))}
                 
-                {/* ✅ TOTAIS CORRIGIDOS */}
+                {/* TOTAIS COM NOVA LÓGICA */}
                 <div style={styles.totaisBox}>
+                  {/* Total Produtos */}
                   <div style={styles.totalLinha}>
                     <span>Total Produtos:</span>
                     <span style={styles.totalValor}>{formatarMoeda(totalProdutos)}</span>
                   </div>
                   
-                  {/* ✅ FRETE COM VALOR CORRETO */}
-                  <div style={{...styles.totalLinha, ...styles.freteLinha, background: isFOB ? '#fef3c7' : '#f0fdf4'}}>
-                    <span style={{ color: isFOB ? '#92400e' : '#166534' }}>
-                      🚚 Frete ({isFOB ? 'FOB - Por conta do cliente' : 'CIF - Incluso'}):
+                  {/* Frete com lógica condicional */}
+                  <div style={{
+                    ...styles.totalLinha, 
+                    ...styles.freteLinha, 
+                    background: isFOB ? '#fef3c7' : '#f0fdf4'
+                  }}>
+                    <span style={{ color: isFOB ? '#92400e' : '#166534', flex: 1 }}>
+                      🚚 {getLabelFrete()}:
                     </span>
                     <span style={{ color: isFOB ? '#92400e' : '#166534', fontWeight: '600' }}>
                       {isFOB ? 'A COMBINAR' : formatarMoeda(totalFrete)}
                     </span>
                   </div>
                   
-                  {/* ✅ QUANTIDADE DE VIAGENS */}
-                  {qtdViagens > 0 && (
-                    <div style={styles.totalLinha}>
-                      <span>🚛 Quantidade de Viagens:</span>
-                      <span style={styles.totalValor}>{qtdViagens} {qtdViagens === 1 ? 'viagem' : 'viagens'}</span>
-                    </div>
+                  {/* Observação do frete se não for FOB */}
+                  {!isFOB && !temDescarga && (
+                    <p style={styles.freteObservacao}>* A descarga do material é de responsabilidade do cliente</p>
                   )}
                   
-                  {/* TIPO DE DESCARGA */}
-                  {tipoDescarga && (
-                    <div style={styles.totalLinha}>
-                      <span>🏗️ Tipo de Descarga:</span>
-                      <span style={styles.totalValor}>{tipoDescarga}</span>
-                    </div>
-                  )}
-                  
-                  {/* ✅ TOTAL GERAL */}
+                  {/* TOTAL GERAL */}
                   <div style={styles.totalGeral}>
                     <span>TOTAL DA PROPOSTA:</span>
                     <span style={styles.totalGeralValor}>{formatarMoeda(isFOB ? totalProdutos : valorTotal)}</span>
@@ -739,7 +722,6 @@ export default function AceiteProposta() {
 
               <div style={styles.dadosConfirmados}>
                 <h4 style={styles.dadosConfirmadosTitle}>✓ Dados Confirmados</h4>
-                {/* ✅ CORRIGIDO: Usa cpfCnpjExibicao */}
                 <p><strong>CNPJ:</strong> {cpfCnpjExibicao || 'Não informado'}</p>
                 <p><strong>Razão Social:</strong> {dadosEditaveis.razao_social}</p>
                 <p><strong>IE:</strong> {dadosEditaveis.inscricao_estadual || 'ISENTO'}</p>
@@ -790,25 +772,23 @@ export default function AceiteProposta() {
           </div>
         )}
 
-        {/* ✅ SIDEBAR COM BOTÃO DE DOWNLOAD PDF FUNCIONAL */}
+        {/* SIDEBAR */}
         <aside style={styles.sidebar}>
           <div style={styles.sidebarCard}>
             <div style={styles.sidebarHeader}>
-              <p style={styles.sidebarLabel}>{isFOB ? 'Total Produtos' : 'Valor Total'}</p>
+              <p style={styles.sidebarLabel}>Valor Total</p>
               <p style={styles.sidebarValue}>{formatarMoeda(isFOB ? totalProdutos : valorTotal)}</p>
-              {!isFOB && <p style={styles.sidebarDetail}>(Produtos + Frete)</p>}
+              {/* Chamada para baixar proposta ao invés de (Produtos + Frete) */}
+              <p style={styles.sidebarCTA}>📄 Baixe a proposta completa abaixo</p>
             </div>
             {isFOB && <div style={styles.fobBadge}>🚚 Frete FOB - Por conta do cliente</div>}
             <div style={styles.sidebarInfo}>
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Proposta</span><span style={styles.sidebarInfoValue}>{proposta?.numero_proposta}</span></div>
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Validade</span><span style={styles.sidebarInfoValue}>{formatarData(proposta?.data_expiracao)}</span></div>
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Vendedor</span><span style={styles.sidebarInfoValue}>{orcamento?.vendedor}</span></div>
-              {qtdViagens > 0 && (
-                <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Viagens</span><span style={styles.sidebarInfoValue}>{qtdViagens}</span></div>
-              )}
             </div>
             
-            {/* ✅ BOTÃO BAIXAR PDF FUNCIONAL */}
+            {/* BOTÃO BAIXAR PROPOSTA COM ÍCONE PDF */}
             <button 
               onClick={handleBaixarPdf} 
               disabled={!pdfUrl || baixandoPdf}
@@ -818,7 +798,7 @@ export default function AceiteProposta() {
                 cursor: pdfUrl ? 'pointer' : 'not-allowed'
               }}
             >
-              {baixandoPdf ? '⏳ Carregando...' : '📄 Baixar PDF'}
+              {baixandoPdf ? '⏳ Carregando...' : '📑 Baixar Proposta'}
             </button>
           </div>
           <div style={styles.contactCard}>
@@ -829,8 +809,9 @@ export default function AceiteProposta() {
         </aside>
       </main>
 
+      {/* RODAPÉ ATUALIZADO */}
       <footer style={styles.footer}>
-        <p>Construcom Materiais de Construção LTDA</p>
+        <p>Construcom Artefatos de Cimento LTDA</p>
         <p>Válido até {formatarData(proposta?.data_expiracao)}</p>
       </footer>
 
@@ -849,10 +830,17 @@ const styles = {
   header: { background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '15px', position: 'sticky', top: 0, zIndex: 100 },
   headerContent: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1000px', margin: '0 auto' },
   logo: { display: 'flex', alignItems: 'center', gap: '10px' },
-  logoImage: { maxHeight: '50px', width: 'auto' },
-  logoIcon: { fontSize: '28px' },
-  logoText: { color: 'white', fontSize: '18px', fontWeight: '700', margin: 0 },
-  logoSubtext: { color: 'rgba(255,255,255,0.6)', fontSize: '11px', margin: 0 },
+  // Container branco arredondado para o logo
+  logoContainer: { 
+    background: 'white', 
+    borderRadius: '12px', 
+    padding: '8px 15px', 
+    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  logoImage: { maxHeight: '40px', width: 'auto' },
   propostaNumero: { textAlign: 'right' },
   propostaLabel: { display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px' },
   propostaValue: { color: '#fbbf24', fontSize: '16px', fontWeight: '700' },
@@ -912,6 +900,7 @@ const styles = {
   totalLinha: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px' },
   totalValor: { fontWeight: '600', color: '#0a2540' },
   freteLinha: { padding: '10px', borderRadius: '8px', marginTop: '5px' },
+  freteObservacao: { fontSize: '11px', color: '#64748b', fontStyle: 'italic', margin: '5px 0 10px', paddingLeft: '10px' },
   totalGeral: { display: 'flex', justifyContent: 'space-between', padding: '15px', background: 'linear-gradient(135deg, #0a2540, #1a365d)', borderRadius: '10px', color: 'white', marginTop: '10px', fontSize: '14px', fontWeight: '600' },
   totalGeralValor: { fontSize: '20px', color: '#fbbf24' },
   fobAviso: { textAlign: 'center', fontSize: '11px', color: '#92400e', marginTop: '8px', fontStyle: 'italic' },
@@ -933,13 +922,13 @@ const styles = {
   sidebarHeader: { background: 'linear-gradient(135deg, #0a2540, #1a365d)', padding: '25px', color: 'white', textAlign: 'center' },
   sidebarLabel: { margin: 0, opacity: 0.7, fontSize: '13px' },
   sidebarValue: { margin: '5px 0 0', fontSize: '28px', fontWeight: '700', color: '#fbbf24' },
-  sidebarDetail: { margin: '5px 0 0', fontSize: '11px', opacity: 0.6 },
+  sidebarCTA: { margin: '10px 0 0', fontSize: '12px', opacity: 0.9, color: '#93c5fd' },
   fobBadge: { background: '#fef3c7', padding: '10px', textAlign: 'center', fontSize: '12px', color: '#92400e', fontWeight: '500' },
   sidebarInfo: { padding: '20px' },
   sidebarInfoItem: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #e2e8f0' },
   sidebarInfoLabel: { color: '#94a3b8', fontSize: '12px' },
   sidebarInfoValue: { color: '#0a2540', fontWeight: '600', fontSize: '13px' },
-  downloadButton: { display: 'block', margin: '0 20px 20px', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', borderRadius: '10px', textAlign: 'center', color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', width: 'calc(100% - 40px)' },
+  downloadButton: { display: 'block', margin: '0 20px 20px', padding: '14px', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', borderRadius: '10px', textAlign: 'center', color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', width: 'calc(100% - 40px)' },
   contactCard: { background: 'rgba(255,255,255,0.1)', borderRadius: '16px', padding: '20px', marginTop: '20px', color: 'white', textAlign: 'center' },
   whatsappButton: { display: 'inline-block', marginTop: '10px', padding: '12px 20px', background: '#25d366', color: 'white', borderRadius: '10px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' },
   footer: { background: 'rgba(0,0,0,0.3)', padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '12px' },
@@ -965,7 +954,7 @@ const styles = {
   successText: { opacity: 0.9, marginBottom: '25px', fontSize: '16px', maxWidth: '350px' },
   successInfo: { background: 'rgba(255,255,255,0.1)', borderRadius: '12px', padding: '20px', marginBottom: '20px' },
   successHint: { opacity: 0.6, fontSize: '13px' },
-  downloadPdfButton: { display: 'inline-block', marginBottom: '20px', padding: '16px 32px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', borderRadius: '12px', textDecoration: 'none', fontSize: '16px', fontWeight: '600', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)' },
+  downloadPdfButton: { display: 'inline-block', marginBottom: '20px', padding: '16px 32px', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', borderRadius: '12px', textDecoration: 'none', fontSize: '16px', fontWeight: '600', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(220, 38, 38, 0.4)' },
 };
 
 if (typeof window !== 'undefined' && window.innerWidth >= 768) {
