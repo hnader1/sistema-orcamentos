@@ -74,9 +74,13 @@ function OrcamentoForm() {
   const LIMITE_DESCONTO = 5
 
   // ✅ Verifica se usuário pode ver código do sistema (admin ou comercial_interno)
+  // Usa podeAcessarLancamento() que já verifica ['admin', 'comercial_interno']
   const podeVerCodigoSistema = () => {
-    const tipoUsuario = (user?.tipo || '').toLowerCase().trim()
-    return ['admin', 'administrador', 'comercial_interno'].includes(tipoUsuario)
+    // Debug log
+    console.log('🔍 [podeVerCodigoSistema] user:', user)
+    console.log('🔍 [podeVerCodigoSistema] user?.tipo:', user?.tipo)
+    console.log('🔍 [podeVerCodigoSistema] podeAcessarLancamento():', podeAcessarLancamento())
+    return podeAcessarLancamento()
   }
   
   const [formData, setFormData] = useState({
@@ -274,6 +278,8 @@ function OrcamentoForm() {
     try {
       setLoading(true)
       
+      console.log('📦 [CARREGAR] Carregando orçamento ID:', id)
+      
       const { data: orc, error: errorOrc } = await supabase
         .from('orcamentos')
         .select('*')
@@ -281,6 +287,8 @@ function OrcamentoForm() {
         .single()
 
       if (errorOrc) throw errorOrc
+
+      console.log('📦 [CARREGAR] Desconto no banco:', orc.desconto_geral)
 
       setFormData({
         numero: orc.numero,
@@ -342,6 +350,7 @@ function OrcamentoForm() {
         obra_endereco_validado: orc.obra_endereco_validado || false
       })
 
+      // ✅ Reset discount states based on loaded data
       if (orc.desconto_geral > LIMITE_DESCONTO) {
         setDescontoLiberado(true)
         setDescontoTravado(true)
@@ -353,6 +362,11 @@ function OrcamentoForm() {
             valor: orc.desconto_valor_liberado
           })
         }
+      } else {
+        // ✅ Reset discount states for quotations with discount <= 5%
+        setDescontoLiberado(false)
+        setDescontoTravado(false)
+        setDescontoLiberadoPor(null)
       }
 
       if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
@@ -704,6 +718,8 @@ function OrcamentoForm() {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotal + frete // Sem desconto
 
+      console.log('📋 [DUPLICAR] Criando novo orçamento com desconto_geral = 0')
+
       const novoOrcamento = {
         numero: novoNumero,
         numero_proposta: null,
@@ -766,6 +782,8 @@ function OrcamentoForm() {
 
       if (errorCriar) throw errorCriar
 
+      console.log('📋 [DUPLICAR] Novo orçamento criado:', orcCriado.id, 'desconto_geral:', orcCriado.desconto_geral)
+
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcCriado.id,
         produto_id: item.produto_id,
@@ -788,7 +806,9 @@ function OrcamentoForm() {
       if (errorItens) throw errorItens
 
       alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}\n\n⚠️ Desconto zerado - solicite nova autorização se necessário.`)
-      navigate(`/orcamentos/editar/${orcCriado.id}`)
+      
+      // ✅ Force page reload to ensure clean state
+      window.location.href = `/orcamentos/editar/${orcCriado.id}`
     } catch (error) {
       console.error('❌ Erro ao duplicar:', error)
       alert('Erro ao duplicar orçamento: ' + error.message)
@@ -1031,6 +1051,9 @@ function OrcamentoForm() {
       </>
     )
   }
+
+  // Debug log for codigo visibility
+  console.log('🔍 [RENDER] podeVerCodigoSistema():', podeVerCodigoSistema())
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1377,7 +1400,7 @@ function OrcamentoForm() {
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
-                    {podeVerCodigoSistema() && (
+                    {podeAcessarLancamento() && (
                       <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Cód.</th>
                     )}
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
@@ -1409,7 +1432,7 @@ function OrcamentoForm() {
                         </select>
                       </td>
 
-                      {podeVerCodigoSistema() && (
+                      {podeAcessarLancamento() && (
                         <td className="px-2 py-1 text-center">
                           {item.codigo ? (
                             <span className="inline-flex items-center justify-center bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-mono font-semibold min-w-[50px]">
