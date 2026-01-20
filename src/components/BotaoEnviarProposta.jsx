@@ -9,6 +9,8 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
   const [mensagemPersonalizada, setMensagemPersonalizada] = useState('');
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState(false);
+  const [linkAceiteCompleto, setLinkAceiteCompleto] = useState('');
+  const [copiado, setCopiado] = useState(false);
   
   // ✅ VERIFICAÇÃO DE SEGURANÇA
   const [desafio, setDesafio] = useState({ num1: 0, num2: 0, resposta: 0 });
@@ -54,6 +56,25 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
     handleEnviar();
   };
 
+  // ✅ Função para copiar link
+  const copiarLink = async () => {
+    try {
+      await navigator.clipboard.writeText(linkAceiteCompleto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (err) {
+      // Fallback para navegadores antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = linkAceiteCompleto;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }
+  };
+
   const handleEnviar = async () => {
     setEnviando(true);
     setErro('');
@@ -63,6 +84,7 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
       const dataExpiracao = new Date();
       dataExpiracao.setDate(dataExpiracao.getDate() + (orcamento.validade_dias || 15));
 
+      // 1. Criar proposta no banco
       const { data: proposta, error: erroProposta } = await supabase
         .from('propostas')
         .insert({
@@ -71,6 +93,9 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
           token_aceite: token,
           numero_proposta: orcamento.numero_proposta || orcamento.numero,
           valor_total: orcamento.total || orcamento.total_geral || orcamento.valor_total,
+          total_produtos: orcamento.subtotal || orcamento.total_produtos,
+          total_frete: orcamento.frete || 0,
+          tipo_frete: orcamento.frete_modalidade || 'FOB',
           status: 'enviada',
           data_envio: new Date().toISOString(),
           data_expiracao: dataExpiracao.toISOString()
@@ -80,7 +105,7 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
 
       if (erroProposta) throw erroProposta;
 
-      // Salvar dados do cliente
+      // 2. Salvar dados do cliente
       await supabase.from('dados_cliente_proposta').insert({
         proposta_id: proposta.id,
         cpf_cnpj: orcamento.cnpj_cpf || orcamento.cliente_cpf_cnpj,
@@ -99,24 +124,80 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
         origem: 'orcamento'
       });
 
+      // 3. Gerar link de aceite
       const linkAceite = `${window.location.origin}/aceite/${token}`;
-      
-      // Tentar enviar email via Edge Function
-      const { error: erroEmail } = await supabase.functions.invoke('enviar-proposta-email', {
-        body: { 
-          proposta_id: proposta.id, 
-          email_cliente: emailCliente, 
-          link_aceite: linkAceite, 
-          mensagem_personalizada: mensagemPersonalizada, 
-          orcamento 
-        }
-      });
+      setLinkAceiteCompleto(linkAceite);
 
-      // Log do email
+      // 4. Buscar itens do orçamento para o email
+      let itensEmail = [];
+      try {
+        const { data: itensOrc } = await supabase
+          .from('orcamentos_itens')
+          .select('*')
+          .eq('orcamento_id', orcamento.id);
+        
+        if (itensOrc) {
+          itensEmail = itensOrc.map(item => ({
+            produto: item.produto,
+            quantidade: item.quantidade,
+            unidade: 'un',
+            preco_unitario: item.preco_unitario,
+            total: item.subtotal || (item.quantidade * item.preco_unitario)
+          }));
+        }
+      } catch (e) {
+        console.log('Itens não encontrados, continuando sem eles');
+      }
+
+      // 5. Buscar dados do vendedor
+      let vendedorTelefone = orcamento.vendedor_telefone || '';
+      let vendedorEmail = orcamento.vendedor_email || '';
+      
+      // ✅ 6. ENVIAR EMAIL VIA API VERCEL (NÃO SUPABASE)
+      let erroEmail = null;
+      try {
+        const response = await fetch('/api/enviar-proposta', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            emailDestino: emailCliente,
+            numeroProposta: orcamento.numero_proposta || orcamento.numero,
+            nomeCliente: orcamento.cliente_nome,
+            nomeFantasia: orcamento.cliente_empresa || orcamento.cliente_nome,
+            valorTotal: orcamento.total || orcamento.total_geral || 0,
+            totalProdutos: orcamento.subtotal || orcamento.total_produtos || orcamento.total || 0,
+            totalFrete: orcamento.frete || 0,
+            tipoFrete: orcamento.frete_modalidade || 'FOB',
+            dataExpiracao: dataExpiracao.toISOString(),
+            vendedor: orcamento.vendedor,
+            vendedorTelefone: vendedorTelefone,
+            vendedorEmail: vendedorEmail,
+            linkAceite: linkAceite,
+            itens: itensEmail,
+            mensagemPersonalizada: mensagemPersonalizada
+          })
+        });
+
+        const resultado = await response.json();
+        
+        if (!response.ok) {
+          console.error('Erro ao enviar email:', resultado);
+          erroEmail = { message: resultado.detalhes || resultado.error || 'Erro ao enviar email' };
+        } else {
+          console.log('✅ Email enviado com sucesso:', resultado);
+        }
+      } catch (e) {
+        console.error('Erro na chamada da API de email:', e);
+        erroEmail = { message: e.message };
+      }
+
+      // 7. Log do email
       await supabase.from('log_emails_proposta').insert({
         proposta_id: proposta.id,
         tipo: 'envio_proposta',
-        de_email: 'propostas@construcom.com.br',
+        de_email: 'no-reply@unistein.com.br',
         para_email: emailCliente,
         assunto: `Proposta Comercial ${orcamento.numero_proposta || orcamento.numero} - Construcom`,
         status: erroEmail ? 'erro' : 'enviado',
@@ -124,7 +205,7 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
         data_envio: new Date().toISOString()
       });
 
-      // Atualizar status do orçamento
+      // 8. Atualizar status do orçamento
       await supabase.from('orcamentos').update({ 
         status: 'enviado', 
         proposta_enviada_em: new Date().toISOString() 
@@ -149,9 +230,10 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
     setErro('');
     setRespostaUsuario('');
     setErroVerificacao(false);
+    setCopiado(false);
   };
 
-  // ✅ TELA DE SUCESSO
+  // ✅ TELA DE SUCESSO - COM LINK COMPLETO E BOTÃO COPIAR
   if (sucesso) {
     return (
       <div style={styles.overlay}>
@@ -161,10 +243,33 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
           <p style={styles.textoSucesso}>
             Um email foi enviado para <strong>{emailCliente}</strong> com o link para aceite da proposta.
           </p>
-          <div style={styles.infoLinkBox}>
-            <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Link para aceite:</p>
-            <code style={styles.linkCode}>{window.location.origin}/aceite/...</code>
+          
+          {/* ✅ LINK COMPLETO COM BOTÃO COPIAR */}
+          <div style={styles.linkBox}>
+            <p style={styles.linkLabel}>Link para aceite:</p>
+            <div style={styles.linkContainer}>
+              <input 
+                type="text" 
+                value={linkAceiteCompleto} 
+                readOnly 
+                style={styles.linkInput}
+                onClick={(e) => e.target.select()}
+              />
+              <button 
+                onClick={copiarLink} 
+                style={{
+                  ...styles.btnCopiar,
+                  background: copiado ? '#10b981' : '#6366f1'
+                }}
+              >
+                {copiado ? '✓ Copiado!' : '📋 Copiar'}
+              </button>
+            </div>
+            <p style={styles.linkDica}>
+              💡 Você pode enviar este link manualmente pelo WhatsApp ou outro canal
+            </p>
           </div>
+
           <button onClick={fecharModal} style={styles.btnFechar}>
             Fechar
           </button>
@@ -642,12 +747,13 @@ const styles = {
     textAlign: 'left'
   },
   
-  // Sucesso
+  // ✅ SUCESSO - NOVO LAYOUT
   modalSucesso: {
     background: 'white',
     borderRadius: '20px',
     padding: '40px',
-    maxWidth: '400px',
+    maxWidth: '500px',
+    width: '100%',
     textAlign: 'center',
     boxShadow: '0 25px 80px rgba(0,0,0,0.4)'
   },
@@ -669,25 +775,60 @@ const styles = {
     fontSize: '22px'
   },
   textoSucesso: {
-    margin: '0 0 20px',
+    margin: '0 0 25px',
     color: '#64748b',
     fontSize: '15px'
   },
-  infoLinkBox: {
-    background: '#f1f5f9',
-    borderRadius: '10px',
-    padding: '12px 15px',
-    marginBottom: '25px'
+  
+  // ✅ LINK BOX - NOVO
+  linkBox: {
+    background: '#f8fafc',
+    borderRadius: '12px',
+    padding: '20px',
+    marginBottom: '25px',
+    textAlign: 'left'
   },
-  linkCode: {
-    display: 'block',
-    marginTop: '5px',
-    fontSize: '11px',
+  linkLabel: {
+    margin: '0 0 10px',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#64748b'
+  },
+  linkContainer: {
+    display: 'flex',
+    gap: '10px',
+    marginBottom: '10px'
+  },
+  linkInput: {
+    flex: 1,
+    padding: '12px 14px',
+    border: '2px solid #e2e8f0',
+    borderRadius: '8px',
+    fontSize: '13px',
     color: '#6366f1',
-    wordBreak: 'break-all'
+    background: 'white',
+    outline: 'none'
   },
+  btnCopiar: {
+    padding: '12px 18px',
+    background: '#6366f1',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'background 0.2s'
+  },
+  linkDica: {
+    margin: 0,
+    fontSize: '12px',
+    color: '#94a3b8'
+  },
+  
   btnFechar: {
-    padding: '12px 30px',
+    padding: '14px 30px',
     background: 'linear-gradient(135deg, #0a2540, #1a365d)',
     color: 'white',
     border: 'none',
