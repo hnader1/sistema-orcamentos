@@ -17,6 +17,10 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
   const [respostaUsuario, setRespostaUsuario] = useState('');
   const [erroVerificacao, setErroVerificacao] = useState(false);
 
+  // ✅ ESTADO DO PDF
+  const [temPdfSalvo, setTemPdfSalvo] = useState(false);
+  const [verificandoPdf, setVerificandoPdf] = useState(false);
+
   const podeEnviar = emailCliente && emailCliente.includes('@');
 
   // Gera novo desafio matemático
@@ -28,11 +32,41 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
     setErroVerificacao(false);
   };
 
+  // ✅ Verificar se existe proposta com PDF ao abrir modal
+  const verificarPropostaComPdf = async () => {
+    if (!orcamento?.id) return;
+    
+    setVerificandoPdf(true);
+    try {
+      const { data, error } = await supabase
+        .from('propostas')
+        .select('id, pdf_path')
+        .eq('orcamento_id', orcamento.id)
+        .not('pdf_path', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0 && data[0].pdf_path) {
+        setTemPdfSalvo(true);
+        console.log('✅ PDF encontrado:', data[0].pdf_path);
+      } else {
+        setTemPdfSalvo(false);
+        console.log('ℹ️ Nenhum PDF salvo para este orçamento');
+      }
+    } catch (e) {
+      console.error('Erro ao verificar PDF:', e);
+      setTemPdfSalvo(false);
+    } finally {
+      setVerificandoPdf(false);
+    }
+  };
+
   // Gera desafio ao abrir modal
   useEffect(() => {
     if (modalAberto) {
       gerarDesafio();
       setEtapa(1);
+      verificarPropostaComPdf();
     }
   }, [modalAberto]);
 
@@ -75,6 +109,39 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
     }
   };
 
+  // ✅ Função para buscar PDF do Storage e converter para Base64
+  const buscarPdfBase64 = async (pdfPath) => {
+    try {
+      console.log('📥 Baixando PDF do storage:', pdfPath);
+      
+      const { data, error } = await supabase.storage
+        .from('propostas-pdf')
+        .download(pdfPath);
+
+      if (error) {
+        console.error('Erro ao baixar PDF:', error);
+        return null;
+      }
+
+      // Converter Blob para Base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(data);
+      });
+
+      console.log('✅ PDF convertido para Base64');
+      return base64;
+    } catch (e) {
+      console.error('Erro ao processar PDF:', e);
+      return null;
+    }
+  };
+
   const handleEnviar = async () => {
     setEnviando(true);
     setErro('');
@@ -84,29 +151,72 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
       const dataExpiracao = new Date();
       dataExpiracao.setDate(dataExpiracao.getDate() + (orcamento.validade_dias || 15));
 
-      // 1. Criar proposta no banco
-      const { data: proposta, error: erroProposta } = await supabase
+      // ✅ 1. Verificar se já existe proposta com PDF para este orçamento
+      let propostaExistente = null;
+      let pdfBase64 = null;
+      let pdfPath = null;
+
+      const { data: propostasExistentes } = await supabase
         .from('propostas')
-        .insert({
-          orcamento_id: orcamento.id,
-          vendedor_id: orcamento.usuario_id || orcamento.usuario_id_original,
-          token_aceite: token,
-          numero_proposta: orcamento.numero_proposta || orcamento.numero,
-          valor_total: orcamento.total || orcamento.total_geral || orcamento.valor_total,
-          total_produtos: orcamento.subtotal || orcamento.total_produtos,
-          total_frete: orcamento.frete || 0,
-          tipo_frete: orcamento.frete_modalidade || 'FOB',
-          status: 'enviada',
-          data_envio: new Date().toISOString(),
-          data_expiracao: dataExpiracao.toISOString()
-        })
-        .select()
-        .single();
+        .select('id, pdf_path, token_aceite')
+        .eq('orcamento_id', orcamento.id)
+        .not('pdf_path', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (erroProposta) throw erroProposta;
+      if (propostasExistentes && propostasExistentes.length > 0) {
+        propostaExistente = propostasExistentes[0];
+        pdfPath = propostaExistente.pdf_path;
+        console.log('✅ Usando proposta existente com PDF:', propostaExistente.id);
+        
+        // Baixar e converter PDF para base64
+        pdfBase64 = await buscarPdfBase64(pdfPath);
+      }
 
-      // 2. Salvar dados do cliente
-      await supabase.from('dados_cliente_proposta').insert({
+      // 2. Criar ou atualizar proposta
+      let proposta;
+      
+      if (propostaExistente) {
+        // Atualizar proposta existente
+        const { data, error } = await supabase
+          .from('propostas')
+          .update({
+            status: 'enviada',
+            data_envio: new Date().toISOString(),
+            data_expiracao: dataExpiracao.toISOString()
+          })
+          .eq('id', propostaExistente.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        proposta = data;
+      } else {
+        // Criar nova proposta
+        const { data, error } = await supabase
+          .from('propostas')
+          .insert({
+            orcamento_id: orcamento.id,
+            vendedor_id: orcamento.usuario_id || orcamento.usuario_id_original,
+            token_aceite: token,
+            numero_proposta: orcamento.numero_proposta || orcamento.numero,
+            valor_total: orcamento.total || orcamento.total_geral || orcamento.valor_total,
+            total_produtos: orcamento.subtotal || orcamento.total_produtos,
+            total_frete: orcamento.frete || 0,
+            tipo_frete: orcamento.frete_modalidade || 'FOB',
+            status: 'enviada',
+            data_envio: new Date().toISOString(),
+            data_expiracao: dataExpiracao.toISOString()
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        proposta = data;
+      }
+
+      // 3. Salvar dados do cliente (upsert para evitar duplicatas)
+      const { error: erroCliente } = await supabase.from('dados_cliente_proposta').upsert({
         proposta_id: proposta.id,
         cpf_cnpj: orcamento.cnpj_cpf || orcamento.cliente_cpf_cnpj,
         razao_social: orcamento.cliente_nome,
@@ -122,13 +232,18 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
         email: emailCliente,
         telefone: orcamento.cliente_telefone,
         origem: 'orcamento'
-      });
+      }, { onConflict: 'proposta_id' });
 
-      // 3. Gerar link de aceite
-      const linkAceite = `${window.location.origin}/aceite/${token}`;
+      if (erroCliente) {
+        console.warn('Aviso ao salvar dados do cliente:', erroCliente);
+      }
+
+      // 4. Gerar link de aceite
+      const tokenAceite = propostaExistente?.token_aceite || proposta.token_aceite || token;
+      const linkAceite = `${window.location.origin}/aceite/${tokenAceite}`;
       setLinkAceiteCompleto(linkAceite);
 
-      // 4. Buscar itens do orçamento para o email
+      // 5. Buscar itens do orçamento para o email
       let itensEmail = [];
       try {
         const { data: itensOrc } = await supabase
@@ -149,35 +264,46 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
         console.log('Itens não encontrados, continuando sem eles');
       }
 
-      // 5. Buscar dados do vendedor
+      // 6. Buscar dados do vendedor
       let vendedorTelefone = orcamento.vendedor_telefone || '';
       let vendedorEmail = orcamento.vendedor_email || '';
       
-      // ✅ 6. ENVIAR EMAIL VIA API VERCEL (NÃO SUPABASE)
+      // ✅ 7. ENVIAR EMAIL VIA API VERCEL COM PDF ANEXADO
       let erroEmail = null;
       try {
+        const bodyEmail = {
+          emailDestino: emailCliente,
+          numeroProposta: orcamento.numero_proposta || orcamento.numero,
+          nomeCliente: orcamento.cliente_nome,
+          nomeFantasia: orcamento.cliente_empresa || orcamento.cliente_nome,
+          valorTotal: orcamento.total || orcamento.total_geral || 0,
+          totalProdutos: orcamento.subtotal || orcamento.total_produtos || orcamento.total || 0,
+          totalFrete: orcamento.frete || 0,
+          tipoFrete: orcamento.frete_modalidade || 'FOB',
+          dataExpiracao: dataExpiracao.toISOString(),
+          vendedor: orcamento.vendedor,
+          vendedorTelefone: vendedorTelefone,
+          vendedorEmail: vendedorEmail,
+          linkAceite: linkAceite,
+          itens: itensEmail,
+          mensagemPersonalizada: mensagemPersonalizada
+        };
+
+        // ✅ ADICIONAR PDF SE DISPONÍVEL
+        if (pdfBase64) {
+          bodyEmail.pdfBase64 = pdfBase64;
+          bodyEmail.pdfNome = `Proposta_${orcamento.numero_proposta || orcamento.numero}.pdf`;
+          console.log('📎 PDF será anexado ao email');
+        } else {
+          console.log('ℹ️ Email será enviado sem PDF anexado');
+        }
+
         const response = await fetch('/api/enviar-proposta', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            emailDestino: emailCliente,
-            numeroProposta: orcamento.numero_proposta || orcamento.numero,
-            nomeCliente: orcamento.cliente_nome,
-            nomeFantasia: orcamento.cliente_empresa || orcamento.cliente_nome,
-            valorTotal: orcamento.total || orcamento.total_geral || 0,
-            totalProdutos: orcamento.subtotal || orcamento.total_produtos || orcamento.total || 0,
-            totalFrete: orcamento.frete || 0,
-            tipoFrete: orcamento.frete_modalidade || 'FOB',
-            dataExpiracao: dataExpiracao.toISOString(),
-            vendedor: orcamento.vendedor,
-            vendedorTelefone: vendedorTelefone,
-            vendedorEmail: vendedorEmail,
-            linkAceite: linkAceite,
-            itens: itensEmail,
-            mensagemPersonalizada: mensagemPersonalizada
-          })
+          body: JSON.stringify(bodyEmail)
         });
 
         const resultado = await response.json();
@@ -193,7 +319,7 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
         erroEmail = { message: e.message };
       }
 
-      // 7. Log do email
+      // 8. Log do email
       await supabase.from('log_emails_proposta').insert({
         proposta_id: proposta.id,
         tipo: 'envio_proposta',
@@ -205,7 +331,7 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
         data_envio: new Date().toISOString()
       });
 
-      // 8. Atualizar status do orçamento
+      // 9. Atualizar status do orçamento
       await supabase.from('orcamentos').update({ 
         status: 'enviado', 
         proposta_enviada_em: new Date().toISOString() 
@@ -362,13 +488,32 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
                     />
                   </div>
 
-                  {/* Info do que será enviado */}
-                  <div style={styles.infoBox}>
-                    <p style={styles.infoTitulo}>📧 O que será enviado:</p>
-                    <ul style={styles.infoLista}>
+                  {/* ✅ INFO DO PDF */}
+                  <div style={{
+                    ...styles.infoBox,
+                    backgroundColor: temPdfSalvo ? '#f0fdf4' : '#fef3c7',
+                    borderColor: temPdfSalvo ? '#86efac' : '#fcd34d'
+                  }}>
+                    <p style={{
+                      ...styles.infoTitulo,
+                      color: temPdfSalvo ? '#166534' : '#92400e'
+                    }}>
+                      {verificandoPdf ? '⏳ Verificando PDF...' : 
+                       temPdfSalvo ? '✅ PDF pronto para envio' : '⚠️ PDF não salvo'}
+                    </p>
+                    <ul style={{
+                      ...styles.infoLista,
+                      color: temPdfSalvo ? '#166534' : '#92400e'
+                    }}>
                       <li>Email com resumo da proposta</li>
-                      <li>PDF da proposta comercial em anexo</li>
-                      <li>Link para o cliente revisar dados e aceitar</li>
+                      {temPdfSalvo ? (
+                        <li><strong>PDF da proposta em anexo ✓</strong></li>
+                      ) : (
+                        <li style={{ fontStyle: 'italic' }}>
+                          Para anexar PDF: abra a proposta e clique em "Salvar para Envio"
+                        </li>
+                      )}
+                      <li>Link para o cliente revisar e aceitar</li>
                     </ul>
                   </div>
 
@@ -434,10 +579,14 @@ export function BotaoEnviarProposta({ orcamento, onEnviado }) {
                       </p>
                     )}
 
-                    <div style={styles.avisoFinal}>
-                      <strong>⚠️ Atenção:</strong> Após o envio, o cliente receberá um email 
-                      com link para aceitar a proposta. O status do orçamento será alterado 
-                      para "Enviado".
+                    {/* ✅ AVISO SOBRE PDF */}
+                    <div style={{
+                      ...styles.avisoFinal,
+                      backgroundColor: temPdfSalvo ? '#f0fdf4' : '#fef3c7',
+                      borderColor: temPdfSalvo ? '#86efac' : '#fcd34d'
+                    }}>
+                      <strong>{temPdfSalvo ? '✅' : '⚠️'} Atenção:</strong> O email será enviado 
+                      {temPdfSalvo ? ' com o PDF da proposta em anexo.' : ' SEM anexo PDF. Para incluir o PDF, cancele e clique em "Salvar para Envio" na proposta comercial primeiro.'}
                     </div>
                   </div>
 
