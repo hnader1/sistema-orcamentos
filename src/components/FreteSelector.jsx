@@ -1,6 +1,6 @@
 // src/components/FreteSelector.jsx
 import { useState, useEffect } from 'react'
-import { Truck, Package, AlertCircle, CheckCircle, Search } from 'lucide-react'
+import { Truck, Package, AlertCircle, CheckCircle, Search, Scale } from 'lucide-react'
 
 export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, freteAtual }) {
   const [fretes, setFretes] = useState([])
@@ -13,19 +13,13 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   const [tipoVeiculo, setTipoVeiculo] = useState('')
   const [cidadeSelecionada, setCidadeSelecionada] = useState('')
   
-  // Frete manual - com valor por viagem e quantidade de viagens
+  // Frete manual - com valor por viagem, quantidade de viagens e observação
   const [freteManual, setFreteManual] = useState(false)
   const [valorManualViagem, setValorManualViagem] = useState('')
   const [qtdManualViagens, setQtdManualViagens] = useState(1)
+  const [observacaoFreteManual, setObservacaoFreteManual] = useState('')
   
   const [calculoFrete, setCalculoFrete] = useState(null)
-
-  // Capacidades dos veículos em KG
-  const capacidadesVeiculo = {
-    'Toco 8t': 8000,
-    'Truck 14t': 14000,
-    'Carreta 32t': 32000
-  }
 
   // ✅ CORREÇÃO: Inicialização com dados do freteAtual (ao reabrir orçamento)
   useEffect(() => {
@@ -50,6 +44,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         setFreteManual(true)
         setValorManualViagem(freteAtual.valor_manual_viagem || freteAtual.valor_unitario_viagem || '')
         setQtdManualViagens(freteAtual.qtd_manual_viagens || freteAtual.viagens_necessarias || 1)
+        setObservacaoFreteManual(freteAtual.observacao_frete_manual || '')
       }
     }
   }, [freteAtual])
@@ -58,9 +53,10 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     carregarFretes()
   }, [])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     calcularFrete()
-  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, fretes])
+  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, observacaoFreteManual, fretes])
 
   const carregarFretes = async () => {
     try {
@@ -111,7 +107,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         ultima_viagem_percentual: 0,
         valor_unitario_viagem: 0,
         valor_total_frete: 0,
-        frete_manual: false
+        frete_manual: false,
+        observacao_frete_manual: null
       }
       setCalculoFrete(resultado)
       notificarFrete(resultado)
@@ -131,7 +128,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         tipo_caminhao: tipoVeiculo,
         localidade: cidadeSelecionada,
         cidade: cidadeSelecionada,
-        capacidade_kg: capacidadesVeiculo[tipoVeiculo] || 0,
+        capacidade_kg: 0,
+        capacidade_pallets: 0,
         peso_total_kg: pesoTotal || 0,
         viagens_necessarias: qtdViagens,
         viagens_completas: qtdViagens,
@@ -142,7 +140,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         frete_manual: true,
         manual: true,
         valor_manual_viagem: valorViagem,
-        qtd_manual_viagens: qtdViagens
+        qtd_manual_viagens: qtdViagens,
+        observacao_frete_manual: observacaoFreteManual || null
       }
 
       console.log('🚚 [FreteSelector] Frete MANUAL calculado:', resultado)
@@ -158,39 +157,84 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // Buscar frete na tabela
-    const modalidadeBusca = modalidade === 'CIF_COM_DESCARGA' 
-      ? 'COM DESCARGA' 
-      : 'SEM DESCARGA'
+    // 🔧 FIX: Mapear modalidade e tipo_veiculo para o formato do banco
+    // Frontend: modalidade = "CIF" ou "CIF_COM_DESCARGA"
+    // Banco: modalidade = "CIF_SEM_DESCARGA" ou "CIF_COM_DESCARGA"
+    const modalidadeDB = modalidade === 'CIF' ? 'CIF_SEM_DESCARGA' : modalidade
     
-    const veiculoBusca = `${tipoVeiculo} - ${modalidadeBusca}`
+    // Frontend: tipo_veiculo = "Truck 14t"
+    // Banco: tipo_veiculo = "Truck 14t - SEM DESCARGA" ou "Truck 14t - COM DESCARGA"
+    const sufixo = modalidade === 'CIF_COM_DESCARGA' ? 'COM DESCARGA' : 'SEM DESCARGA'
+    const tipoVeiculoDB = `${tipoVeiculo} - ${sufixo}`
     
-    // Buscar frete verificando cidade, tipo_veiculo E modalidade
+    // 🔧 FIX: Buscar frete com TODOS os 3 campos (cidade, tipo_veiculo, modalidade)
+    // Cada combinação é uma linha diferente no banco com seu próprio preço!
     const frete = fretes.find(f => 
       f.cidade === cidadeSelecionada && 
-      f.tipo_veiculo === veiculoBusca &&
-      f.modalidade === modalidade
+      f.tipo_veiculo === tipoVeiculoDB &&
+      f.modalidade === modalidadeDB
     )
 
-    console.log('Buscando frete:', { cidadeSelecionada, veiculoBusca, modalidade })
-    console.log('Frete encontrado:', frete)
+    console.log('🔍 Buscando frete:', { 
+      cidadeSelecionada, 
+      tipoVeiculoDB, 
+      modalidadeDB 
+    })
+    console.log('✅ Frete encontrado:', frete)
 
     if (!frete) {
+      console.log('❌ Frete não encontrado - verifique os valores no banco')
       setCalculoFrete(null)
       notificarFrete(null)
       return
     }
 
-    // Calcular número de viagens
+    // 🔧 FIX: Calcular viagens baseado no MAIOR limitante (peso OU pallets)
+    // Usa capacidades DIRETO do banco (capacidade_kg e capacidade_pallets)
     const pesoTotalKg = pesoTotal || 0
-    const capacidadeKg = frete.capacidade_kg || capacidadesVeiculo[tipoVeiculo]
+    const capacidadeKg = frete.capacidade_kg || 1
+    const capacidadePallets = frete.capacidade_pallets || 1
     
-    let viagensNecessarias = 1
+    // Calcular viagens por peso
+    const viagensPorPeso = pesoTotalKg > 0 && capacidadeKg > 0 
+      ? Math.ceil(pesoTotalKg / capacidadeKg) 
+      : 1
+    
+    // Calcular viagens por pallets
+    const viagensPorPallets = totalPallets > 0 && capacidadePallets > 0
+      ? Math.ceil(totalPallets / capacidadePallets)
+      : 0
+    
+    // 🔧 CRITICAL: Usar o MAIOR entre peso e pallets!
+    // Se precisa 2 viagens por peso mas 3 por pallets, usa 3 viagens!
+    const viagensNecessarias = Math.max(viagensPorPeso, viagensPorPallets, 1)
+    
+    // ✨ Calcular percentual de utilização POR VIAGEM
+    // Se são 2 viagens, mostra quanto % de UMA viagem está usando
+    const percentualPeso = pesoTotalKg > 0 && capacidadeKg > 0 
+      ? ((pesoTotalKg / viagensNecessarias) / capacidadeKg) * 100
+      : 0
+    
+    const percentualPallets = totalPallets > 0 && capacidadePallets > 0
+      ? ((totalPallets / viagensNecessarias) / capacidadePallets) * 100
+      : 0
+    
+    console.log('📊 Cálculo de viagens:', {
+      pesoTotalKg,
+      totalPallets,
+      capacidadeKg,
+      capacidadePallets,
+      viagensPorPeso,
+      viagensPorPallets,
+      viagensNecessarias,
+      percentualPeso,
+      percentualPallets
+    })
+
     let viagensCompletas = 0
     let ultimaViagemPercentual = 0
 
     if (pesoTotalKg > 0 && capacidadeKg > 0) {
-      viagensNecessarias = Math.ceil(pesoTotalKg / capacidadeKg)
       viagensCompletas = Math.floor(pesoTotalKg / capacidadeKg)
       const pesoUltimaViagem = pesoTotalKg % capacidadeKg
       ultimaViagemPercentual = pesoUltimaViagem > 0 
@@ -198,8 +242,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         : 100
     }
 
-    // Usar preco_fixo - valor fixo por viagem (do banco de dados)
-    const valorUnitarioViagem = frete.preco_fixo || frete.preco_por_kg || 0
+    // 🔧 FIX: Usar preco_fixo DIRETAMENTE do banco (sem cálculos adicionais)
+    // O preço já está correto no banco para cada combinação!
+    const valorUnitarioViagem = frete.preco_fixo || 0
     const valorTotalFrete = valorUnitarioViagem * viagensNecessarias
 
     const resultado = {
@@ -210,13 +255,20 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       localidade: cidadeSelecionada,
       cidade: cidadeSelecionada,
       capacidade_kg: capacidadeKg,
+      capacidade_pallets: capacidadePallets,
       peso_total_kg: pesoTotalKg,
+      total_pallets: totalPallets,
       viagens_necessarias: viagensNecessarias,
+      viagens_por_peso: viagensPorPeso,
+      viagens_por_pallets: viagensPorPallets,
+      percentual_utilizacao_peso: percentualPeso,
+      percentual_utilizacao_pallets: percentualPallets,
       viagens_completas: viagensCompletas,
       ultima_viagem_percentual: ultimaViagemPercentual,
       valor_unitario_viagem: valorUnitarioViagem,
       valor_total_frete: valorTotalFrete,
-      frete_manual: false
+      frete_manual: false,
+      observacao_frete_manual: null
     }
 
     console.log('🚚 [FreteSelector] Frete AUTOMÁTICO calculado:', resultado)
@@ -237,13 +289,14 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     setFreteManual(false)
     setValorManualViagem('')
     setQtdManualViagens(1)
+    setObservacaoFreteManual('')
   }
 
   // Tipos de veículos disponíveis
   const tiposVeiculo = [
-    { valor: 'Toco 8t', nome: 'Toco', capacidade: '8 ton', pallets: 12, icon: '🚚' },
-    { valor: 'Truck 14t', nome: 'Truck', capacidade: '14 ton', pallets: 20, icon: '🚛' },
-    { valor: 'Carreta 32t', nome: 'Carreta', capacidade: '32 ton', pallets: 28, icon: '🚛' }
+    { valor: 'Toco 8t', nome: 'Toco', capacidade: '8 ton', icon: '🚚' },
+    { valor: 'Truck 14t', nome: 'Truck', capacidade: '14 ton', icon: '🚛' },
+    { valor: 'Carreta 32t', nome: 'Carreta', capacidade: '32 ton', icon: '🚛' }
   ]
 
   // Verificar se é um pedido grande
@@ -279,32 +332,88 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             </p>
           </div>
 
-          {/* Capacidade do Veículo */}
-          {tipoVeiculo && (
+          {/* Capacidade do Veículo - PESO */}
+          {calculoFrete && calculoFrete.capacidade_kg > 0 && (
             <div className="bg-white rounded-lg p-3 border border-purple-100">
-              <span className="text-xs text-purple-600 block mb-1">Capacidade do Veículo</span>
+              <span className="text-xs text-purple-600 block mb-1">Capacidade - Peso</span>
               <p className="text-xl font-bold text-gray-900">
-                {(capacidadesVeiculo[tipoVeiculo] / 1000).toFixed(0)} ton
+                {(calculoFrete.capacidade_kg / 1000).toFixed(1)} ton
               </p>
-              <span className="text-xs text-gray-500">{tipoVeiculo.toUpperCase()}</span>
+              <span className="text-xs text-gray-500">{tipoVeiculo}</span>
             </div>
           )}
 
-          {/* Viagens Necessárias */}
-          {calculoFrete && calculoFrete.viagens_necessarias > 0 && (
-            <div className="bg-white rounded-lg p-3 border border-orange-200">
-              <span className="text-xs text-orange-600 block mb-1">Viagens Necessárias</span>
-              <p className="text-xl font-bold text-orange-600">
-                {calculoFrete.viagens_necessarias} viagens
+          {/* Capacidade do Veículo - PALLETS */}
+          {calculoFrete && calculoFrete.capacidade_pallets > 0 && (
+            <div className="bg-white rounded-lg p-3 border border-purple-100">
+              <span className="text-xs text-purple-600 block mb-1">Capacidade - Pallets</span>
+              <p className="text-xl font-bold text-purple-600">
+                {calculoFrete.capacidade_pallets} pallets
               </p>
-              {calculoFrete.viagens_completas > 0 && (
-                <span className="text-xs text-gray-500">
-                  {calculoFrete.viagens_completas} x 100%
-                </span>
-              )}
+              <span className="text-xs text-gray-500">{tipoVeiculo}</span>
             </div>
           )}
         </div>
+
+        {/* ✨ Viagens Necessárias com Barras de Progresso Duplas */}
+        {calculoFrete && calculoFrete.viagens_necessarias > 0 && (
+          <div className="mt-4 bg-white border-2 border-orange-300 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-semibold text-orange-700">Viagens Necessárias</span>
+              <span className="text-2xl font-bold text-orange-600">{calculoFrete.viagens_necessarias} {calculoFrete.viagens_necessarias === 1 ? 'viagem' : 'viagens'}</span>
+            </div>
+            
+            {/* Barra de Peso */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Scale size={16} className="text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700">Peso</span>
+                </div>
+                <span className="text-sm font-bold text-blue-600">
+                  {Math.min(calculoFrete.percentual_utilizacao_peso, 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-end pr-2 transition-all duration-500"
+                  style={{ width: `${Math.min(calculoFrete.percentual_utilizacao_peso, 100)}%` }}
+                >
+                  {calculoFrete.percentual_utilizacao_peso > 20 && (
+                    <span className="text-xs font-bold text-white">
+                      {((pesoTotal || 0) / 1000).toFixed(2)} ton
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Barra de Pallets */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Package size={16} className="text-purple-600" />
+                  <span className="text-sm font-medium text-gray-700">Pallets</span>
+                </div>
+                <span className="text-sm font-bold text-purple-600">
+                  {Math.min(calculoFrete.percentual_utilizacao_pallets, 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-end pr-2 transition-all duration-500"
+                  style={{ width: `${Math.min(calculoFrete.percentual_utilizacao_pallets, 100)}%` }}
+                >
+                  {calculoFrete.percentual_utilizacao_pallets > 20 && (
+                    <span className="text-xs font-bold text-white">
+                      {(totalPallets || 0).toFixed(2)} pallets
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Indicador de Pedido Grande */}
         {isPedidoGrande && (
@@ -343,7 +452,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <option value="">Selecione...</option>
               <option value="FOB">FOB - Cliente retira</option>
               <option value="CIF">CIF - Sem Descarga</option>
-              <option value="CIF_COM_DESCARGA">CIF - Com Descarga (+15%)</option>
+              <option value="CIF_COM_DESCARGA">CIF - Com Descarga</option>
             </select>
           </div>
 
@@ -361,7 +470,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <option value="">Selecione...</option>
               {tiposVeiculo.map(v => (
                 <option key={v.valor} value={v.valor}>
-                  {v.icon} {v.nome} ({v.capacidade} / {v.pallets} pallets)
+                  {v.icon} {v.nome} ({v.capacidade})
                 </option>
               ))}
             </select>
@@ -459,6 +568,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                     // Limpar valores manuais ao desmarcar
                     setValorManualViagem('')
                     setQtdManualViagens(1)
+                    setObservacaoFreteManual('')
                   }
                 }}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -466,7 +576,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <span className="text-sm text-gray-700">Definir valor de frete manualmente</span>
             </label>
 
-            {/* ✅ LAYOUT LADO A LADO: Valor por Viagem e Quantidade de Viagens */}
+            {/* ✅ LAYOUT: Valor por Viagem, Quantidade de Viagens e Observação */}
             {freteManual && (
               <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -500,6 +610,29 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                       className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
                     />
                   </div>
+                </div>
+
+                {/* ✅ Campo de Observação (Obrigatório) */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <AlertCircle size={14} className="inline mr-1 text-orange-500" />
+                    Motivo do frete manual <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={observacaoFreteManual}
+                    onChange={(e) => setObservacaoFreteManual(e.target.value)}
+                    placeholder="Ex: Cliente negociou valor especial, frete combinado com transportadora X, desconto aprovado por gerência..."
+                    rows={2}
+                    className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      !observacaoFreteManual.trim() ? 'border-orange-400 bg-orange-50' : 'border-blue-300'
+                    }`}
+                  />
+                  {!observacaoFreteManual.trim() && (
+                    <p className="mt-1 text-xs text-orange-600 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      Obrigatório informar o motivo do frete manual
+                    </p>
+                  )}
                 </div>
 
                 {/* Valor Total (calculado) */}
