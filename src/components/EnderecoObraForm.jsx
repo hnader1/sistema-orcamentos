@@ -8,7 +8,7 @@ import {
   buscarBairrosPorCidade 
 } from '../utils/cepUtils';
 
-function EnderecoObraForm({ valores, onChange }) {
+function EnderecoObraForm({ valores, onChange, disabled = false }) {
   const [cep, setCep] = useState(valores?.obra_cep || '');
   const [cidade, setCidade] = useState(valores?.obra_cidade || '');
   const [bairro, setBairro] = useState(valores?.obra_bairro || '');
@@ -38,16 +38,18 @@ function EnderecoObraForm({ valores, onChange }) {
   }, [cidade, cepValidado]);
 
   useEffect(() => {
-    onChange({
-      obra_cep: cep,
-      obra_cidade: cidade,
-      obra_bairro: bairro,
-      obra_logradouro: logradouro,
-      obra_numero: numero,
-      obra_complemento: complemento,
-      obra_endereco_validado: cepValidado
-    });
-  }, [cep, cidade, bairro, logradouro, numero, complemento, cepValidado]);
+    if (!disabled) {
+      onChange({
+        obra_cep: cep,
+        obra_cidade: cidade,
+        obra_bairro: bairro,
+        obra_logradouro: logradouro,
+        obra_numero: numero,
+        obra_complemento: complemento,
+        obra_endereco_validado: cepValidado
+      });
+    }
+  }, [cep, cidade, bairro, logradouro, numero, complemento, cepValidado, disabled]);
 
   const carregarCidades = async () => {
     const cidades = await buscarCidadesMG();
@@ -60,6 +62,8 @@ function EnderecoObraForm({ valores, onChange }) {
   };
 
   const handleBuscarCEP = async () => {
+    if (disabled) return;
+    
     if (!cep || cep.replace(/\D/g, '').length !== 8) {
       setErroCEP('CEP inválido');
       return;
@@ -86,6 +90,8 @@ function EnderecoObraForm({ valores, onChange }) {
   };
 
   const handleCidadeChange = async (novaCidade) => {
+    if (disabled) return;
+    
     setCidade(novaCidade);
     setMostrarSugestoesCidade(false);
 
@@ -103,10 +109,13 @@ function EnderecoObraForm({ valores, onChange }) {
   };
 
   const handleCepBlur = () => {
-    if (cep && !cepValidado) {
+    if (cep && !cepValidado && !disabled) {
       handleBuscarCEP();
     }
   };
+
+  // ✅ Determinar se campos devem estar desabilitados
+  const isFieldDisabled = disabled || cepValidado;
 
   return (
     <div className="space-y-3">
@@ -126,6 +135,7 @@ function EnderecoObraForm({ valores, onChange }) {
             type="text"
             value={cep}
             onChange={(e) => {
+              if (disabled) return;
               const formatted = formatarCEP(e.target.value);
               setCep(formatted);
               setCepValidado(false);
@@ -133,9 +143,9 @@ function EnderecoObraForm({ valores, onChange }) {
             onBlur={handleCepBlur}
             placeholder="00000-000"
             maxLength={9}
-            disabled={cepValidado}
+            disabled={disabled || cepValidado}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
+              disabled || cepValidado ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
             } ${erroCEP ? 'border-red-500' : 'border-gray-300'}`}
           />
         </div>
@@ -145,8 +155,10 @@ function EnderecoObraForm({ valores, onChange }) {
           <button
             type="button"
             onClick={handleBuscarCEP}
-            disabled={buscandoCEP || cepValidado || !cep}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+            disabled={disabled || buscandoCEP || cepValidado || !cep}
+            className={`px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap ${
+              disabled ? 'opacity-60' : ''
+            }`}
           >
             {buscandoCEP ? (
               <>
@@ -159,10 +171,11 @@ function EnderecoObraForm({ valores, onChange }) {
               </>
             )}
           </button>
-          {cepValidado && (
+          {cepValidado && !disabled && (
             <button
               type="button"
               onClick={() => {
+                if (disabled) return;
                 setCep('');
                 setCidade('');
                 setBairro('');
@@ -185,21 +198,22 @@ function EnderecoObraForm({ valores, onChange }) {
             type="text"
             value={cidade}
             onChange={(e) => {
+              if (disabled) return;
               handleCidadeChange(e.target.value);
               setMostrarSugestoesCidade(true);
             }}
-            onFocus={() => setMostrarSugestoesCidade(true)}
+            onFocus={() => !disabled && !cepValidado && setMostrarSugestoesCidade(true)}
             onBlur={() => setTimeout(() => setMostrarSugestoesCidade(false), 200)}
             placeholder="Digite ou selecione a cidade"
-            disabled={cepValidado}
+            disabled={isFieldDisabled}
             required
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
+              isFieldDisabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
             } ${cepObrigatorio && cidade ? 'border-orange-500' : 'border-gray-300'}`}
           />
           
           {/* Sugestões de Cidade */}
-          {mostrarSugestoesCidade && !cepValidado && cidadesDisponiveis.length > 0 && (
+          {mostrarSugestoesCidade && !disabled && !cepValidado && cidadesDisponiveis.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
               {cidadesDisponiveis
                 .filter(c => c.nome.toLowerCase().includes(cidade.toLowerCase()))
@@ -237,20 +251,21 @@ function EnderecoObraForm({ valores, onChange }) {
             type="text"
             value={bairro}
             onChange={(e) => {
+              if (disabled) return;
               setBairro(e.target.value);
               setMostrarSugestoesBairro(true);
             }}
-            onFocus={() => setMostrarSugestoesBairro(true)}
+            onFocus={() => !disabled && !cepValidado && setMostrarSugestoesBairro(true)}
             onBlur={() => setTimeout(() => setMostrarSugestoesBairro(false), 200)}
             placeholder="Digite ou selecione o bairro"
-            disabled={cepValidado}
+            disabled={isFieldDisabled}
             className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
+              isFieldDisabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
             }`}
           />
           
           {/* Sugestões de Bairro */}
-          {mostrarSugestoesBairro && !cepValidado && bairrosDisponiveis.length > 0 && (
+          {mostrarSugestoesBairro && !disabled && !cepValidado && bairrosDisponiveis.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
               {bairrosDisponiveis
                 .filter(b => b.toLowerCase().includes(bairro.toLowerCase()))
@@ -259,6 +274,7 @@ function EnderecoObraForm({ valores, onChange }) {
                   <div
                     key={idx}
                     onClick={() => {
+                      if (disabled) return;
                       setBairro(b);
                       setMostrarSugestoesBairro(false);
                     }}
@@ -279,11 +295,14 @@ function EnderecoObraForm({ valores, onChange }) {
           <input
             type="text"
             value={logradouro}
-            onChange={(e) => setLogradouro(e.target.value)}
+            onChange={(e) => {
+              if (disabled) return;
+              setLogradouro(e.target.value);
+            }}
             placeholder="Ex: Rua das Flores"
-            disabled={cepValidado}
+            disabled={isFieldDisabled}
             className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              cepValidado ? 'bg-gray-100 cursor-not-allowed' : ''
+              isFieldDisabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
             }`}
           />
         </div>
@@ -298,9 +317,15 @@ function EnderecoObraForm({ valores, onChange }) {
           <input
             type="text"
             value={numero}
-            onChange={(e) => setNumero(e.target.value)}
+            onChange={(e) => {
+              if (disabled) return;
+              setNumero(e.target.value);
+            }}
             placeholder="123"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={disabled}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              disabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+            }`}
           />
         </div>
         <div>
@@ -310,9 +335,15 @@ function EnderecoObraForm({ valores, onChange }) {
           <input
             type="text"
             value={complemento}
-            onChange={(e) => setComplemento(e.target.value)}
+            onChange={(e) => {
+              if (disabled) return;
+              setComplemento(e.target.value);
+            }}
             placeholder="Apto 45, Bloco B"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={disabled}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              disabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+            }`}
           />
         </div>
       </div>
