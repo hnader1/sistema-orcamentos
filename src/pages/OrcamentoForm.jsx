@@ -16,6 +16,37 @@ import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaP
 
 const TABELA_ITENS = 'orcamentos_itens'
 
+// ✅ FUNÇÕES DE VALIDAÇÃO
+const validarEmail = (email) => {
+  if (!email) return false
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return regex.test(email)
+}
+
+const validarTelefone = (telefone) => {
+  if (!telefone) return false
+  // Remove tudo que não é número
+  const numeros = telefone.replace(/\D/g, '')
+  // Deve ter pelo menos 10 dígitos (DDD + 8 números) ou 11 (DDD + 9 números)
+  return numeros.length >= 10 && numeros.length <= 11
+}
+
+const formatarTelefone = (valor) => {
+  // Remove tudo que não é número
+  const numeros = valor.replace(/\D/g, '')
+  
+  // Aplica máscara
+  if (numeros.length <= 2) {
+    return numeros
+  } else if (numeros.length <= 6) {
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`
+  } else if (numeros.length <= 10) {
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 6)}-${numeros.slice(6)}`
+  } else {
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7, 11)}`
+  }
+}
+
 function OrcamentoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -39,7 +70,12 @@ function OrcamentoForm() {
   const [senhaLiberacao, setSenhaLiberacao] = useState('')
   const [validandoSenha, setValidandoSenha] = useState(false)
   const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
-  const [descontoTravado, setDescontoTravado] = useState(false) // ✅ Novo: trava o campo após liberação
+  const [descontoTravado, setDescontoTravado] = useState(false)
+  
+  // ✅ Estados de erro para validação visual
+  const [erroEmail, setErroEmail] = useState(false)
+  const [erroTelefone, setErroTelefone] = useState(false)
+  
   const LIMITE_DESCONTO = 5
   
   const [formData, setFormData] = useState({
@@ -76,7 +112,6 @@ function OrcamentoForm() {
     obra_numero: '',
     obra_complemento: '',
     obra_endereco_validado: false,
-    // ✅ Campos de controle de liberação de desconto
     desconto_liberado: false,
     desconto_liberado_por: null,
     desconto_liberado_por_id: null,
@@ -256,7 +291,6 @@ function OrcamentoForm() {
 
       console.log('✅ [CARREGAR] Orçamento carregado:', orc.numero)
       
-      // ✅ LOG para debug do frete
       console.log('🚚 [CARREGAR] Dados de frete do banco:', {
         frete_modalidade: orc.frete_modalidade,
         frete_tipo_caminhao: orc.frete_tipo_caminhao,
@@ -300,7 +334,6 @@ function OrcamentoForm() {
         obra_numero: orc.obra_numero || '',
         obra_complemento: orc.obra_complemento || '',
         obra_endereco_validado: orc.obra_endereco_validado || false,
-        // ✅ Campos de controle de liberação de desconto
         desconto_liberado: orc.desconto_liberado || false,
         desconto_liberado_por: orc.desconto_liberado_por || null,
         desconto_liberado_por_id: orc.desconto_liberado_por_id || null,
@@ -314,7 +347,6 @@ function OrcamentoForm() {
         cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null
       })
 
-      // ✅ CORREÇÃO: Definir cnpjCpfValido ao carregar orçamento existente
       const cnpjValido = orc.cnpj_cpf || orc.cnpj_cpf_nao_informado
       setCnpjCpfValido(cnpjValido)
 
@@ -330,9 +362,8 @@ function OrcamentoForm() {
 
       if (orc.desconto_geral > LIMITE_DESCONTO) {
         setDescontoLiberado(true)
-        setDescontoTravado(true) // ✅ Trava o campo se já foi liberado
+        setDescontoTravado(true)
         
-        // Carregar dados de quem liberou do banco
         if (orc.desconto_liberado_por) {
           setDescontoLiberadoPor({
             nome: orc.desconto_liberado_por,
@@ -343,30 +374,26 @@ function OrcamentoForm() {
         }
       }
 
-      // ✅ CORREÇÃO: Carregar frete com nomes PADRONIZADOS
-    
-// ✅ CORREÇÃO: Carregar frete com suporte a FRETE MANUAL
-if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
-  const dadosFreteCarregados = {
-    modalidade: orc.frete_modalidade || 'FOB',
-    tipo_frete: orc.frete_modalidade || 'FOB',
-    tipo_veiculo: orc.frete_tipo_caminhao || '',
-    tipo_caminhao: orc.frete_tipo_caminhao || '',
-    localidade: orc.frete_cidade || '',
-    cidade: orc.frete_cidade || '',
-    viagens_necessarias: orc.frete_qtd_viagens || 0,
-    valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
-    valor_total_frete: parseFloat(orc.frete) || 0,
-    // ✅ NOVOS CAMPOS PARA FRETE MANUAL
-    frete_manual: orc.frete_manual || false,
-    manual: orc.frete_manual || false,
-    valor_manual_viagem: parseFloat(orc.frete_valor_manual_viagem) || parseFloat(orc.frete_valor_viagem) || 0,
-    qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1
-  }
-  console.log('🚚 [CARREGAR] setDadosFrete com:', dadosFreteCarregados)
-  setDadosFrete(dadosFreteCarregados)
-}
-
+      if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
+        const dadosFreteCarregados = {
+          modalidade: orc.frete_modalidade || 'FOB',
+          tipo_frete: orc.frete_modalidade || 'FOB',
+          tipo_veiculo: orc.frete_tipo_caminhao || '',
+          tipo_caminhao: orc.frete_tipo_caminhao || '',
+          localidade: orc.frete_cidade || '',
+          cidade: orc.frete_cidade || '',
+          viagens_necessarias: orc.frete_qtd_viagens || 0,
+          valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
+          valor_total_frete: parseFloat(orc.frete) || 0,
+          frete_manual: orc.frete_manual || false,
+          manual: orc.frete_manual || false,
+          valor_manual_viagem: parseFloat(orc.frete_valor_manual_viagem) || parseFloat(orc.frete_valor_viagem) || 0,
+          qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1,
+          observacao_frete_manual: orc.observacao_frete_manual || ''
+        }
+        console.log('🚚 [CARREGAR] setDadosFrete com:', dadosFreteCarregados)
+        setDadosFrete(dadosFreteCarregados)
+      }
 
       console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
 
@@ -418,13 +445,11 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
   const handleDescontoChange = (valor) => {
     const novoValor = parseFloat(valor) || 0
     
-    // ✅ Se o desconto está travado (já foi liberado e salvo), precisa de nova autorização
     if (descontoTravado && novoValor !== parseFloat(formData.desconto_geral)) {
       setMostrarModalSenha(true)
       return
     }
     
-    // Se tentar colocar desconto acima do limite sem estar liberado
     if (novoValor > LIMITE_DESCONTO && !descontoLiberado) {
       setMostrarModalSenha(true)
       return
@@ -447,7 +472,6 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
       console.log('🔐 Usuário digitado:', `"${usuarioLiberacao}"`)
       console.log('🔐 Senha digitada:', `"${senhaLiberacao}"`)
       
-      // Buscar usuário pelo nome ou email
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select('id, nome, email, senha, senha_hash, tipo')
@@ -460,12 +484,10 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
 
       console.log('📋 Total de usuários ativos:', usuarios?.length)
       
-      // Log de todos os usuários para debug
       usuarios?.forEach((u, i) => {
         console.log(`   [${i}] Nome: "${u.nome}" | Email: "${u.email}" | Tipo: "${u.tipo}"`)
       })
 
-      // Filtrar para encontrar o usuário - busca mais flexível
       const inputLower = usuarioLiberacao.toLowerCase().trim()
       console.log('🔍 Buscando por:', `"${inputLower}"`)
       
@@ -473,7 +495,6 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
         const nomeLower = (u.nome || '').toLowerCase().trim()
         const emailLower = (u.email || '').toLowerCase().trim()
         
-        // Busca exata ou parcial
         const nomeExato = nomeLower === inputLower
         const emailExato = emailLower === inputLower
         const nomeContem = nomeLower.includes(inputLower)
@@ -500,7 +521,6 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
       console.log('   senha_hash:', usuarioEncontrado.senha_hash)
       console.log('   senha:', usuarioEncontrado.senha)
 
-      // Verificar se tem permissão
       const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
       const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
       
@@ -517,8 +537,6 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
 
       console.log('✅ Tipo autorizado!')
 
-      // Verificar senha - PRIORIZA senha_hash, depois senha
-      // IMPORTANTE: senha_hash é o campo correto!
       const senhaCorreta = usuarioEncontrado.senha_hash ? usuarioEncontrado.senha_hash : usuarioEncontrado.senha
       
       console.log('🔑 Verificando senha...')
@@ -537,19 +555,17 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
 
       console.log('✅ Senha correta!')
 
-      // ✅ Tudo ok - liberar desconto
       const agora = new Date()
       const dataHora = agora.toLocaleString('pt-BR')
       
       setDescontoLiberado(true)
-      setDescontoTravado(false) // ✅ Destrava temporariamente para permitir edição
+      setDescontoTravado(false)
       setDescontoLiberadoPor({
         id: usuarioEncontrado.id,
         nome: usuarioEncontrado.nome,
         data: dataHora
       })
       
-      // ✅ Salvar dados de liberação no formData para persistir no banco
       setFormData(prev => ({
         ...prev,
         desconto_liberado: true,
@@ -745,10 +761,9 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
-      // ✅ CORREÇÃO: Incluir TODOS os campos necessários (CNPJ/CPF, endereço obra, forma_pagamento)
       const novoOrcamento = {
         numero: novoNumero,
-        numero_proposta: null, // Será gerado novo ao salvar
+        numero_proposta: null,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
         cliente_email: formData.cliente_email,
@@ -765,19 +780,16 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral) || 0,
         subtotal: subtotalComDesconto,
-       frete: frete,
-frete_modalidade: dadosFrete?.modalidade || 'FOB',
-frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-frete_cidade: dadosFrete?.localidade || null,
-frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
-// ✅ NOVOS CAMPOS PARA FRETE MANUAL
-frete_manual: dadosFrete?.frete_manual || false,
-frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
-frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
-
-
-
+        frete: frete,
+        frete_modalidade: dadosFrete?.modalidade || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+        frete_manual: dadosFrete?.frete_manual || false,
+        frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
+        frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
+        observacao_frete_manual: dadosFrete?.frete_manual ? dadosFrete?.observacao_frete_manual : null,
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas, 
@@ -785,12 +797,10 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         numero_lancamento_erp: null,
         usuario_id: user?.id,
         excluido: false,
-        // ✅ Campos de CNPJ/CPF
         cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || formData.cnpj_cpf || null,
         cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || formData.cnpj_cpf_nao_informado || false,
         cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || formData.cnpj_cpf_nao_informado_aceite_data || null,
         cnpj_cpf_nao_informado_aceite_ip: null,
-        // ✅ Campos de endereço da obra
         obra_cep: dadosEndereco?.obra_cep || formData.obra_cep || null,
         obra_cidade: dadosEndereco?.obra_cidade || formData.obra_cidade || null,
         obra_bairro: dadosEndereco?.obra_bairro || formData.obra_bairro || null,
@@ -798,7 +808,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         obra_numero: dadosEndereco?.obra_numero || formData.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || formData.obra_complemento || null,
         obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false,
-        // ✅ NÃO copia liberação de desconto - nova proposta precisa de nova autorização
         desconto_liberado: false,
         desconto_liberado_por: null,
         desconto_liberado_por_id: null,
@@ -855,8 +864,7 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
 
   const salvar = async () => {
     try {
-      // ✅ VALIDAÇÃO CNPJ/CPF OBRIGATÓRIO - BLOQUEIO DE SALVAMENTO
-      // Verifica tanto o estado cnpjCpfValido quanto os dados diretamente
+      // ✅ VALIDAÇÃO CNPJ/CPF OBRIGATÓRIO
       const temCnpjCpfPreenchido = dadosCNPJCPF?.cnpj_cpf && dadosCNPJCPF.cnpj_cpf.trim() !== ''
       const marcouNaoInformar = dadosCNPJCPF?.cnpj_cpf_nao_informado === true
       const cnpjCpfOk = cnpjCpfValido || temCnpjCpfPreenchido || marcouNaoInformar
@@ -867,28 +875,54 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
       }
 
       if (!formData.cliente_nome) {
-        alert('Preencha os campos obrigatórios!')
+        alert('Preencha o nome do cliente!')
         return
       }
 
+      // ✅ VALIDAÇÃO EMAIL - FORMATO
       if (!formData.cliente_email) {
         alert('Por favor, informe o email do cliente!')
+        setErroEmail(true)
         return
       }
+      
+      if (!validarEmail(formData.cliente_email)) {
+        alert('Email inválido!\n\nPor favor, informe um email válido (ex: cliente@email.com)')
+        setErroEmail(true)
+        return
+      }
+      setErroEmail(false)
 
+      // ✅ VALIDAÇÃO TELEFONE - FORMATO
       if (!formData.cliente_telefone) {
         alert('Por favor, informe o telefone do cliente!')
+        setErroTelefone(true)
         return
       }
+      
+      if (!validarTelefone(formData.cliente_telefone)) {
+        alert('Telefone inválido!\n\nPor favor, informe um telefone válido com DDD (ex: (31) 99999-9999)')
+        setErroTelefone(true)
+        return
+      }
+      setErroTelefone(false)
 
       if (!formData.forma_pagamento_id) {
         alert('Por favor, selecione uma forma de pagamento!')
         return
       }
 
+      // ✅ VALIDAÇÃO FRETE MANUAL - OBSERVAÇÃO OBRIGATÓRIA
+      if (dadosFrete?.frete_manual) {
+        const observacaoFrete = dadosFrete.observacao_frete_manual?.trim()
+        if (!observacaoFrete) {
+          alert('Frete Manual requer justificativa!\n\nPor favor, informe o motivo do frete manual no campo de observação.')
+          return
+        }
+      }
+
       setLoading(true)
 
-      // ✨ GERAR NÚMERO DA PROPOSTA AUTOMATICAMENTE
       let numeroProposta = formData.numero_proposta
       
       if (!numeroProposta) {
@@ -922,7 +956,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
-      // ✅ CORREÇÃO: Usar nomes PADRONIZADOS (sem fallbacks confusos)
       const dadosOrcamento = {
         numero: formData.numero || 'TEMP',
         numero_proposta: numeroProposta || null,
@@ -942,16 +975,16 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
-       frete: frete,
-frete_modalidade: dadosFrete?.modalidade || 'FOB',
-frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-frete_cidade: dadosFrete?.localidade || null,
-frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
-// ✅ NOVOS CAMPOS PARA FRETE MANUAL
-frete_manual: dadosFrete?.frete_manual || false,
-frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
-frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
+        frete: frete,
+        frete_modalidade: dadosFrete?.modalidade || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+        frete_manual: dadosFrete?.frete_manual || false,
+        frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
+        frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
+        observacao_frete_manual: dadosFrete?.frete_manual ? dadosFrete?.observacao_frete_manual : null,
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas,
@@ -968,7 +1001,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         obra_numero: dadosEndereco?.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || null,
         obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false,
-        // ✅ Campos de controle de liberação de desconto
         desconto_liberado: formData.desconto_liberado || false,
         desconto_liberado_por: formData.desconto_liberado_por || null,
         desconto_liberado_por_id: formData.desconto_liberado_por_id || null,
@@ -976,14 +1008,15 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null
       }
 
-      // ✅ LOG para debug
       console.log('🚚 [SALVAR] Dados de frete a serem salvos:', {
         frete_modalidade: dadosOrcamento.frete_modalidade,
         frete_tipo_caminhao: dadosOrcamento.frete_tipo_caminhao,
         frete_cidade: dadosOrcamento.frete_cidade,
         frete_qtd_viagens: dadosOrcamento.frete_qtd_viagens,
         frete_valor_viagem: dadosOrcamento.frete_valor_viagem,
-        frete: dadosOrcamento.frete
+        frete: dadosOrcamento.frete,
+        frete_manual: dadosOrcamento.frete_manual,
+        observacao_frete_manual: dadosOrcamento.observacao_frete_manual
       })
 
       if (!id) {
@@ -1077,6 +1110,19 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
     } finally {
       setLoading(false)
     }
+  }
+
+  // ✅ Handler para telefone com máscara
+  const handleTelefoneChange = (e) => {
+    const valorFormatado = formatarTelefone(e.target.value)
+    setFormData({ ...formData, cliente_telefone: valorFormatado })
+    setErroTelefone(false)
+  }
+
+  // ✅ Handler para email com validação visual
+  const handleEmailChange = (e) => {
+    setFormData({ ...formData, cliente_email: e.target.value })
+    setErroEmail(false)
   }
 
   if (loading && id) {
@@ -1257,7 +1303,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
             </div>  
           </div>
           
-          {/* ✅ OTIMIZADO: 4 campos em uma linha - Data, Vendedor, Validade (dias), Status */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
@@ -1371,10 +1416,16 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
               <input
                 type="text"
                 value={formData.cliente_telefone}
-                onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                onChange={handleTelefoneChange}
+                placeholder="(31) 99999-9999"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  erroTelefone ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}
                 disabled={isReadOnly}
               />
+              {erroTelefone && (
+                <p className="text-red-500 text-xs mt-1">Telefone inválido. Use o formato (XX) XXXXX-XXXX</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1383,10 +1434,16 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
               <input
                 type="email"
                 value={formData.cliente_email}
-                onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                onChange={handleEmailChange}
+                placeholder="cliente@email.com"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  erroEmail ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}
                 disabled={isReadOnly}
               />
+              {erroEmail && (
+                <p className="text-red-500 text-xs mt-1">Email inválido. Use o formato nome@email.com</p>
+              )}
             </div>
           </div>
         </div>
@@ -1670,27 +1727,27 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
               </div>
             </div>
           </div>
-{/* OBSERVAÇÕES INTERNAS - NÃO APARECE NA PROPOSTA */}
-<div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mt-6">
-  <div className="flex items-center gap-2 mb-3">
-    <span className="text-xl">🔒</span>
-    <h2 className="text-lg font-semibold text-yellow-800">Observações Internas</h2>
-    <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded-full">
-      NÃO aparece na proposta
-    </span>
-  </div>
-  <p className="text-sm text-yellow-700 mb-3">
-    Use este campo para anotações da equipe (ex: negociação, pendências, alertas sobre o cliente).
-  </p>
-  <textarea
-    value={formData.observacoes_internas}
-    onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
-    rows="4"
-    disabled={isReadOnly}
-    className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
-    placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
-  />
-</div>
+
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">🔒</span>
+              <h2 className="text-lg font-semibold text-yellow-800">Observações Internas</h2>
+              <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded-full">
+                NÃO aparece na proposta
+              </span>
+            </div>
+            <p className="text-sm text-yellow-700 mb-3">
+              Use este campo para anotações da equipe (ex: negociação, pendências, alertas sobre o cliente).
+            </p>
+            <textarea
+              value={formData.observacoes_internas}
+              onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
+              rows="4"
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
+              placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
+            />
+          </div>
         </div>
       </div>
 
