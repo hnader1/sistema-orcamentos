@@ -1,7 +1,7 @@
 // src/pages/OrcamentoForm.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send, CheckCircle } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
@@ -20,7 +20,7 @@ const TABELA_ITENS = 'orcamentos_itens'
 function OrcamentoForm() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const { user, podeAcessarLancamento, isVendedor } = useAuth()
+  const { user, podeAcessarLancamento, isVendedor, isAdmin, isComercialInterno } = useAuth()
   const [loading, setLoading] = useState(false)
   const [produtos, setProdutos] = useState([])
   const [vendedores, setVendedores] = useState([])
@@ -733,6 +733,50 @@ function OrcamentoForm() {
     }
   }
 
+  // ✅ APROVAR MANUAL - Admin/Comercial Interno
+  const aprovarManual = async () => {
+    if (!id) {
+      alert('Salve o orçamento primeiro!')
+      return
+    }
+
+    if (!confirm('Deseja APROVAR MANUALMENTE este orçamento?\n\nO status será alterado para "Aprovado" e será registrado como aprovação manual.')) {
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const { error } = await supabase
+        .from('orcamentos')
+        .update({ 
+          status: 'aprovado',
+          aprovado_via: 'manual'
+        })
+        .eq('id', id)
+
+      if (error) throw error
+
+      setFormData(prev => ({ ...prev, status: 'aprovado' }))
+      
+      alert('✅ Orçamento aprovado com sucesso!')
+    } catch (error) {
+      console.error('❌ Erro ao aprovar:', error)
+      alert('Erro ao aprovar orçamento: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Verificar se pode aprovar manualmente
+  const podeAprovarManual = () => {
+    if (!id) return false
+    if (isReadOnly) return false
+    if (!isAdmin() && !isComercialInterno()) return false
+    if (['aprovado', 'lancado', 'cancelado'].includes(formData.status)) return false
+    return true
+  }
+
   const salvar = async () => {
     try {
       const temCnpjCpfPreenchido = dadosCNPJCPF?.cnpj_cpf && dadosCNPJCPF.cnpj_cpf.trim() !== ''
@@ -1117,6 +1161,19 @@ function OrcamentoForm() {
                 >
                   <Copy size={20} />
                   <span className="hidden sm:inline">Duplicar</span>
+                </button>
+              )}
+              
+              {/* ✅ BOTÃO APROVAR MANUAL - Admin/Comercial Interno */}
+              {podeAprovarManual() && (
+                <button
+                  onClick={aprovarManual}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  title="Aprovar orçamento manualmente"
+                >
+                  <CheckCircle size={20} />
+                  <span className="hidden sm:inline">Aprovar</span>
                 </button>
               )}
               
