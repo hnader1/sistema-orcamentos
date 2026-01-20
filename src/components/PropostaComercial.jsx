@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Printer } from 'lucide-react'
+import { X, Printer, Upload, Check } from 'lucide-react'
 import { supabase } from '../services/supabase'
+import { gerarESalvarPdfProposta } from '../utils/propostaPdfUtils'
 import logoConstrucom from '../assets/logo-construcom.png'
 
 export default function PropostaComercial({ 
@@ -8,11 +9,15 @@ export default function PropostaComercial({
   onClose, 
   dadosOrcamento, 
   produtos, 
-  dadosFrete 
+  dadosFrete,
+  propostaId,
+  onPdfGerado
 }) {
   const printRef = useRef()
   const [formaPagamento, setFormaPagamento] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [salvandoPdf, setSalvandoPdf] = useState(false)
+  const [pdfSalvo, setPdfSalvo] = useState(false)
 
   useEffect(() => {
     if (isOpen && dadosOrcamento?.forma_pagamento_id) {
@@ -119,6 +124,39 @@ export default function PropostaComercial({
     `)
     janela.document.close()
     setTimeout(() => { janela.print(); janela.close() }, 300)
+  }
+
+  // Salvar PDF para envio por email
+  const salvarPdfParaEnvio = async () => {
+    if (!propostaId) {
+      alert('Erro: ID da proposta não encontrado. Salve o orçamento primeiro.')
+      return
+    }
+
+    setSalvandoPdf(true)
+    try {
+      const numeroProposta = dadosOrcamento.numero_proposta || dadosOrcamento.numero
+      const resultado = await gerarESalvarPdfProposta(
+        printRef.current,
+        propostaId,
+        numeroProposta
+      )
+
+      if (resultado.sucesso) {
+        setPdfSalvo(true)
+        if (onPdfGerado) {
+          onPdfGerado(resultado.pdfUrl, resultado.pdfPath)
+        }
+        alert('✅ PDF salvo com sucesso! Agora você pode enviar a proposta por email.')
+      } else {
+        throw resultado.error || new Error('Falha ao salvar PDF')
+      }
+    } catch (error) {
+      console.error('Erro ao salvar PDF:', error)
+      alert('❌ Erro ao salvar PDF: ' + (error.message || 'Erro desconhecido'))
+    } finally {
+      setSalvandoPdf(false)
+    }
   }
 
   // Estilos
@@ -300,7 +338,7 @@ export default function PropostaComercial({
                 </div>
               </div>
 
-              {/* ========== TERMOS E CONDIÇÕES - ORIGINAIS COMPLETOS ========== */}
+              {/* ========== TERMOS E CONDIÇÕES ========== */}
               <div style={{ marginBottom: '10px' }}>
                 <div style={styles.secaoTitulo}>TERMOS E CONDIÇÕES</div>
                 
@@ -415,6 +453,42 @@ export default function PropostaComercial({
             <Printer size={18} />
             Imprimir / Salvar PDF
           </button>
+          {propostaId && (
+            <button 
+              onClick={salvarPdfParaEnvio} 
+              disabled={loading || salvandoPdf}
+              style={{ 
+                padding: '10px 20px', 
+                backgroundColor: pdfSalvo ? '#10b981' : '#9333ea', 
+                color: '#fff', 
+                border: 'none', 
+                borderRadius: '6px', 
+                cursor: (loading || salvandoPdf) ? 'not-allowed' : 'pointer', 
+                fontWeight: 'bold', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                opacity: (loading || salvandoPdf) ? 0.7 : 1 
+              }}
+            >
+              {salvandoPdf ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  Salvando...
+                </>
+              ) : pdfSalvo ? (
+                <>
+                  <Check size={18} />
+                  PDF Salvo!
+                </>
+              ) : (
+                <>
+                  <Upload size={18} />
+                  Salvar para Envio
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
