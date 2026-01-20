@@ -16,7 +16,7 @@ const createTransporter = () => {
   });
 };
 
-// Template do email HTML
+// Template do email HTML - VERSÃO CORRIGIDA COM LOGO E LINK COMPLETO
 const gerarTemplateEmail = (dados) => {
   const {
     numeroProposta,
@@ -57,6 +57,9 @@ const gerarTemplateEmail = (dados) => {
     `).join('');
   }
 
+  // URL do logo hospedado no Vercel
+  const logoUrl = 'https://sistema-orcamentos-theta.vercel.app/logo-construcom.png';
+
   return `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -68,10 +71,10 @@ const gerarTemplateEmail = (dados) => {
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
     
-    <!-- Header -->
+    <!-- Header com Logo -->
     <tr>
       <td style="background: linear-gradient(135deg, #0a2540 0%, #1a365d 100%); padding: 30px; text-align: center;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">🏗️ Construcom</h1>
+        <img src="${logoUrl}" alt="Construcom" style="max-width: 180px; height: auto; margin-bottom: 10px;" />
         <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0; font-size: 14px;">Materiais de Construção</p>
       </td>
     </tr>
@@ -158,13 +161,29 @@ const gerarTemplateEmail = (dados) => {
 
     <!-- CTA Button -->
     <tr>
-      <td style="padding: 0 30px 30px; text-align: center;">
+      <td style="padding: 0 30px 20px; text-align: center;">
         <a href="${linkAceite}" style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 18px 40px; border-radius: 12px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
           ✓ ACEITAR PROPOSTA
         </a>
-        <p style="color: #94a3b8; font-size: 12px; margin: 15px 0 0;">
-          Clique no botão acima para revisar os dados e aceitar a proposta
-        </p>
+      </td>
+    </tr>
+
+    <!-- Link Completo Visível -->
+    <tr>
+      <td style="padding: 0 30px 30px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; border-radius: 10px; border: 1px solid #e2e8f0;">
+          <tr>
+            <td style="padding: 15px;">
+              <p style="margin: 0 0 8px; font-size: 12px; color: #64748b; font-weight: 600;">🔗 Link para aceite da proposta:</p>
+              <p style="margin: 0; font-size: 12px; word-break: break-all; line-height: 1.5;">
+                <a href="${linkAceite}" style="color: #6366f1; text-decoration: underline;">${linkAceite}</a>
+              </p>
+              <p style="margin: 10px 0 0; font-size: 11px; color: #94a3b8;">
+                💡 Copie e cole este link no navegador caso o botão acima não funcione.
+              </p>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
 
@@ -190,8 +209,21 @@ const gerarTemplateEmail = (dados) => {
               <p style="color: #166534; margin: 0 0 10px; font-weight: 600;">💬 Dúvidas? Fale com seu vendedor:</p>
               <p style="color: #166534; margin: 0; font-size: 15px;">
                 <strong>${vendedor}</strong>
-                ${vendedorTelefone ? `<br><a href="https://wa.me/55${vendedorTelefone.replace(/\D/g, '')}" style="color: #25d366; text-decoration: none;">📱 WhatsApp: ${vendedorTelefone}</a>` : ''}
+                ${vendedorTelefone ? `<br><a href="https://wa.me/55${vendedorTelefone.replace(/\\D/g, '')}" style="color: #25d366; text-decoration: none;">📱 WhatsApp: ${vendedorTelefone}</a>` : ''}
               </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Aviso PDF -->
+    <tr>
+      <td style="padding: 0 30px 30px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border-radius: 10px; border: 1px solid #93c5fd;">
+          <tr>
+            <td style="padding: 15px; text-align: center;">
+              <span style="color: #1e40af; font-size: 13px;">📄 A proposta comercial completa está disponível no link acima.</span>
             </td>
           </tr>
         </table>
