@@ -970,6 +970,14 @@ function OrcamentoForm() {
     }
   }
 
+  // ✅ Função para montar dados completos para PropostaComercial (incluindo id!)
+  const getDadosOrcamentoParaProposta = () => {
+    return {
+      ...formData,
+      id: id  // ← IMPORTANTE: adicionar o id do orçamento!
+    }
+  }
+
   if (loading && id) {
     return (
       <>
@@ -1585,10 +1593,11 @@ function OrcamentoForm() {
         </div>
       </div>
 
+      {/* ✅ CORRIGIDO: Passar id junto com formData */}
       <PropostaComercial
         isOpen={mostrarProposta}
         onClose={() => setMostrarProposta(false)}
-        dadosOrcamento={formData}
+        dadosOrcamento={getDadosOrcamentoParaProposta()}
         produtos={produtosSelecionados}
         dadosFrete={dadosFrete}
       />
