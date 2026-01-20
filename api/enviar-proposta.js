@@ -16,9 +16,7 @@ const createTransporter = () => {
   });
 };
 
-// Template do email HTML - VERSÃO CORRIGIDA
-// - Logo da empresa (sem ícone + texto)
-// - Valores de frete e viagens corretos
+// Template do email HTML
 const gerarTemplateEmail = (dados) => {
   const {
     numeroProposta,
@@ -60,14 +58,19 @@ const gerarTemplateEmail = (dados) => {
     `).join('');
   }
 
-  // URL do logo hospedado no Vercel - APENAS O LOGO (sem ícone + texto)
   const logoUrl = 'https://sistema-orcamentos-theta.vercel.app/logo-construcom.png';
 
-  // HTML para viagens (se houver)
   const viagensHtml = qtdViagens && qtdViagens > 0 ? `
     <tr>
       <td style="padding: 8px 0; color: #475569;">🚛 Quantidade de Viagens:</td>
       <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #0a2540;">${qtdViagens} ${qtdViagens === 1 ? 'viagem' : 'viagens'}</td>
+    </tr>
+  ` : '';
+
+  const freteHtml = !isFOB && totalFrete > 0 ? `
+    <tr>
+      <td style="padding: 8px 0; color: #475569;">🚚 Frete:</td>
+      <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #0a2540;">${formatarMoeda(totalFrete)}</td>
     </tr>
   ` : '';
 
@@ -82,7 +85,7 @@ const gerarTemplateEmail = (dados) => {
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
     
-    <!-- Header APENAS com Logo (sem ícone + texto) -->
+    <!-- Header com Logo -->
     <tr>
       <td style="background: linear-gradient(135deg, #0a2540 0%, #1a365d 100%); padding: 30px; text-align: center;">
         <img src="${logoUrl}" alt="Construcom" style="max-width: 200px; height: auto;" />
@@ -129,4 +132,192 @@ const gerarTemplateEmail = (dados) => {
                 </thead>
                 <tbody>
                   ${itensHtml}
-                </tbody
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Totais -->
+    <tr>
+      <td style="padding: 0 30px 30px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a2540; border-radius: 12px; overflow: hidden;">
+          <tr>
+            <td style="padding: 20px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="color: #ffffff; font-size: 14px;">
+                <tr>
+                  <td style="padding: 8px 0; color: #94a3b8;">📋 Subtotal Produtos:</td>
+                  <td style="padding: 8px 0; text-align: right; font-weight: 600;">${formatarMoeda(totalProdutos)}</td>
+                </tr>
+                ${freteHtml}
+                ${viagensHtml}
+                <tr style="border-top: 1px solid #334155;">
+                  <td style="padding: 15px 0 8px; color: #fbbf24; font-size: 16px; font-weight: 600;">💰 VALOR TOTAL:</td>
+                  <td style="padding: 15px 0 8px; text-align: right; font-size: 20px; font-weight: 700; color: #fbbf24;">${formatarMoeda(valorExibir)}</td>
+                </tr>
+                ${isFOB ? '<tr><td colspan="2" style="padding: 5px 0; color: #94a3b8; font-size: 12px;">* Frete por conta do cliente (FOB)</td></tr>' : ''}
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Validade -->
+    ${dataExpiracao ? `
+    <tr>
+      <td style="padding: 0 30px 20px;">
+        <p style="color: #dc2626; font-size: 13px; margin: 0; text-align: center;">
+          ⏰ Esta proposta é válida até <strong>${formatarData(dataExpiracao)}</strong>
+        </p>
+      </td>
+    </tr>
+    ` : ''}
+
+    <!-- Botão de Aceite -->
+    <tr>
+      <td style="padding: 0 30px 30px; text-align: center;">
+        <a href="${linkAceite}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-size: 16px; font-weight: 600;">
+          ✅ ACEITAR PROPOSTA
+        </a>
+      </td>
+    </tr>
+
+    <!-- Contato do Vendedor -->
+    <tr>
+      <td style="padding: 0 30px 30px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border-radius: 12px;">
+          <tr>
+            <td style="padding: 20px;">
+              <p style="color: #0a2540; font-size: 14px; margin: 0 0 10px;">
+                <strong>Dúvidas? Fale com seu vendedor:</strong>
+              </p>
+              <p style="color: #475569; font-size: 14px; margin: 0;">
+                👤 ${vendedor || 'Equipe Comercial'}<br>
+                ${vendedorTelefone ? `📱 ${vendedorTelefone}` : ''}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="background-color: #0a2540; padding: 20px; text-align: center;">
+        <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+          Construcom - Materiais de Construção<br>
+          Este email foi enviado automaticamente. Por favor, não responda.
+        </p>
+      </td>
+    </tr>
+
+  </table>
+</body>
+</html>
+  `;
+};
+
+// Handler principal da API
+export default async function handler(req, res) {
+  // Configurar CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método não permitido' });
+  }
+
+  try {
+    const {
+      email,
+      numeroProposta,
+      nomeCliente,
+      nomeFantasia,
+      valorTotal,
+      totalProdutos,
+      totalFrete,
+      tipoFrete,
+      qtdViagens,
+      dataExpiracao,
+      vendedor,
+      vendedorTelefone,
+      linkAceite,
+      itens,
+      pdfBase64
+    } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email do destinatário é obrigatório' });
+    }
+
+    if (!numeroProposta) {
+      return res.status(400).json({ error: 'Número da proposta é obrigatório' });
+    }
+
+    const transporter = createTransporter();
+
+    // Gerar HTML do email
+    const htmlContent = gerarTemplateEmail({
+      numeroProposta,
+      nomeCliente,
+      nomeFantasia,
+      valorTotal,
+      totalProdutos,
+      totalFrete,
+      tipoFrete,
+      qtdViagens,
+      dataExpiracao,
+      vendedor,
+      vendedorTelefone,
+      linkAceite,
+      itens
+    });
+
+    // Configurar email
+    const mailOptions = {
+      from: `"Construcom" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: `Proposta Comercial ${numeroProposta} - Construcom`,
+      html: htmlContent
+    };
+
+    // Adicionar PDF como anexo se fornecido
+    if (pdfBase64) {
+      mailOptions.attachments = [
+        {
+          filename: `Proposta-${numeroProposta}.pdf`,
+          content: pdfBase64,
+          encoding: 'base64'
+        }
+      ];
+    }
+
+    // Enviar email
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log('Email enviado:', info.messageId);
+
+    return res.status(200).json({
+      success: true,
+      messageId: info.messageId,
+      message: 'Email enviado com sucesso'
+    });
+
+  } catch (error) {
+    console.error('Erro ao enviar email:', error);
+    return res.status(500).json({
+      error: 'Erro ao enviar email',
+      details: error.message
+    });
+  }
+}
