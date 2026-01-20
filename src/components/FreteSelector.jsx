@@ -13,10 +13,11 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   const [tipoVeiculo, setTipoVeiculo] = useState('')
   const [cidadeSelecionada, setCidadeSelecionada] = useState('')
   
-  // Frete manual - com valor por viagem e quantidade de viagens
+  // Frete manual - com valor por viagem, quantidade de viagens e observação
   const [freteManual, setFreteManual] = useState(false)
   const [valorManualViagem, setValorManualViagem] = useState('')
   const [qtdManualViagens, setQtdManualViagens] = useState(1)
+  const [observacaoFreteManual, setObservacaoFreteManual] = useState('')
   
   const [calculoFrete, setCalculoFrete] = useState(null)
 
@@ -43,6 +44,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         setFreteManual(true)
         setValorManualViagem(freteAtual.valor_manual_viagem || freteAtual.valor_unitario_viagem || '')
         setQtdManualViagens(freteAtual.qtd_manual_viagens || freteAtual.viagens_necessarias || 1)
+        setObservacaoFreteManual(freteAtual.observacao_frete_manual || '')
       }
     }
   }, [freteAtual])
@@ -54,7 +56,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     calcularFrete()
-  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, fretes])
+  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, observacaoFreteManual, fretes])
 
   const carregarFretes = async () => {
     try {
@@ -105,7 +107,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         ultima_viagem_percentual: 0,
         valor_unitario_viagem: 0,
         valor_total_frete: 0,
-        frete_manual: false
+        frete_manual: false,
+        observacao_frete_manual: null
       }
       setCalculoFrete(resultado)
       notificarFrete(resultado)
@@ -137,7 +140,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         frete_manual: true,
         manual: true,
         valor_manual_viagem: valorViagem,
-        qtd_manual_viagens: qtdViagens
+        qtd_manual_viagens: qtdViagens,
+        observacao_frete_manual: observacaoFreteManual || null
       }
 
       console.log('🚚 [FreteSelector] Frete MANUAL calculado:', resultado)
@@ -205,13 +209,14 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     // Se precisa 2 viagens por peso mas 3 por pallets, usa 3 viagens!
     const viagensNecessarias = Math.max(viagensPorPeso, viagensPorPallets, 1)
     
-    // ✨ NOVO: Calcular percentual de utilização (quanto enche do caminhão)
+    // ✨ Calcular percentual de utilização POR VIAGEM
+    // Se são 2 viagens, mostra quanto % de UMA viagem está usando
     const percentualPeso = pesoTotalKg > 0 && capacidadeKg > 0 
-      ? Math.min((pesoTotalKg / (viagensNecessarias * capacidadeKg)) * 100, 100)
+      ? ((pesoTotalKg / viagensNecessarias) / capacidadeKg) * 100
       : 0
     
     const percentualPallets = totalPallets > 0 && capacidadePallets > 0
-      ? Math.min((totalPallets / (viagensNecessarias * capacidadePallets)) * 100, 100)
+      ? ((totalPallets / viagensNecessarias) / capacidadePallets) * 100
       : 0
     
     console.log('📊 Cálculo de viagens:', {
@@ -262,7 +267,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       ultima_viagem_percentual: ultimaViagemPercentual,
       valor_unitario_viagem: valorUnitarioViagem,
       valor_total_frete: valorTotalFrete,
-      frete_manual: false
+      frete_manual: false,
+      observacao_frete_manual: null
     }
 
     console.log('🚚 [FreteSelector] Frete AUTOMÁTICO calculado:', resultado)
@@ -283,10 +289,10 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     setFreteManual(false)
     setValorManualViagem('')
     setQtdManualViagens(1)
+    setObservacaoFreteManual('')
   }
 
-  // ✅ REMOVIDO: Hardcoded pallet capacities - vem do banco agora!
-  // Tipos de veículos disponíveis (SEM informação de pallets)
+  // Tipos de veículos disponíveis
   const tiposVeiculo = [
     { valor: 'Toco 8t', nome: 'Toco', capacidade: '8 ton', icon: '🚚' },
     { valor: 'Truck 14t', nome: 'Truck', capacidade: '14 ton', icon: '🚛' },
@@ -295,6 +301,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
 
   // Verificar se é um pedido grande
   const isPedidoGrande = (pesoTotal || 0) >= 8000
+
+  // Verificar se frete manual pode ser salvo (tem observação)
+  const freteManualValido = !freteManual || (freteManual && observacaoFreteManual.trim().length > 0)
 
   const formatarMoeda = (valor) => {
     return `R$ ${(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
@@ -349,7 +358,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
           )}
         </div>
 
-        {/* ✨ NOVO: Viagens Necessárias com Barras de Progresso */}
+        {/* ✨ Viagens Necessárias com Barras de Progresso Duplas */}
         {calculoFrete && calculoFrete.viagens_necessarias > 0 && (
           <div className="mt-4 bg-white border-2 border-orange-300 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
@@ -361,19 +370,19 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Weight size={16} className="text-gray-600" />
+                  <Weight size={16} className="text-blue-600" />
                   <span className="text-sm font-medium text-gray-700">Peso</span>
                 </div>
-                <span className="text-sm font-bold text-gray-900">
-                  {calculoFrete.percentual_utilizacao_peso.toFixed(0)}%
+                <span className="text-sm font-bold text-blue-600">
+                  {Math.min(calculoFrete.percentual_utilizacao_peso, 100).toFixed(0)}%
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-end pr-2 transition-all duration-500"
-                  style={{ width: `${calculoFrete.percentual_utilizacao_peso}%` }}
+                  style={{ width: `${Math.min(calculoFrete.percentual_utilizacao_peso, 100)}%` }}
                 >
-                  {calculoFrete.percentual_utilizacao_peso > 15 && (
+                  {calculoFrete.percentual_utilizacao_peso > 20 && (
                     <span className="text-xs font-bold text-white">
                       {((pesoTotal || 0) / 1000).toFixed(2)} ton
                     </span>
@@ -386,30 +395,25 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Package size={16} className="text-gray-600" />
+                  <Package size={16} className="text-purple-600" />
                   <span className="text-sm font-medium text-gray-700">Pallets</span>
                 </div>
-                <span className="text-sm font-bold text-gray-900">
-                  {calculoFrete.percentual_utilizacao_pallets.toFixed(0)}%
+                <span className="text-sm font-bold text-purple-600">
+                  {Math.min(calculoFrete.percentual_utilizacao_pallets, 100).toFixed(0)}%
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-end pr-2 transition-all duration-500"
-                  style={{ width: `${calculoFrete.percentual_utilizacao_pallets}%` }}
+                  style={{ width: `${Math.min(calculoFrete.percentual_utilizacao_pallets, 100)}%` }}
                 >
-                  {calculoFrete.percentual_utilizacao_pallets > 15 && (
+                  {calculoFrete.percentual_utilizacao_pallets > 20 && (
                     <span className="text-xs font-bold text-white">
                       {(totalPallets || 0).toFixed(2)} pallets
                     </span>
                   )}
                 </div>
               </div>
-            </div>
-
-            {/* Explicação */}
-            <div className="mt-3 text-xs text-gray-500 italic">
-              O número de viagens é definido pelo limitante que atinge 100% primeiro
             </div>
           </div>
         )}
@@ -567,6 +571,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                     // Limpar valores manuais ao desmarcar
                     setValorManualViagem('')
                     setQtdManualViagens(1)
+                    setObservacaoFreteManual('')
                   }
                 }}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -574,7 +579,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <span className="text-sm text-gray-700">Definir valor de frete manualmente</span>
             </label>
 
-            {/* ✅ LAYOUT LADO A LADO: Valor por Viagem e Quantidade de Viagens */}
+            {/* ✅ LAYOUT: Valor por Viagem, Quantidade de Viagens e Observação */}
             {freteManual && (
               <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -608,6 +613,29 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                       className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
                     />
                   </div>
+                </div>
+
+                {/* ✅ NOVO: Campo de Observação (Obrigatório) */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <AlertCircle size={14} className="inline mr-1 text-orange-500" />
+                    Motivo do frete manual <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={observacaoFreteManual}
+                    onChange={(e) => setObservacaoFreteManual(e.target.value)}
+                    placeholder="Ex: Cliente negociou valor especial, frete combinado com transportadora X, desconto aprovado por gerência..."
+                    rows={2}
+                    className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      !observacaoFreteManual.trim() ? 'border-orange-400 bg-orange-50' : 'border-blue-300'
+                    }`}
+                  />
+                  {!observacaoFreteManual.trim() && (
+                    <p className="mt-1 text-xs text-orange-600 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      Obrigatório informar o motivo do frete manual
+                    </p>
+                  )}
                 </div>
 
                 {/* Valor Total (calculado) */}
