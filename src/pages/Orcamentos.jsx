@@ -18,6 +18,7 @@
 // - Nome do cliente ao lado do número (#ORC-0010 • Nome Cliente)
 // - Badge de status posicionado ao lado dos botões de ação
 // - Cidade do cadastro incluída nas informações
+// - Função duplicar corrigida: desconto zerado + campos de liberação resetados
 // ====================================================================================
 
 import { useState, useEffect } from 'react'
@@ -158,11 +159,13 @@ export default function Orcamentos() {
   }
 
   // ====================================================================================
-  // DUPLICAR ORÇAMENTO - CORRIGIDO
+  // DUPLICAR ORÇAMENTO - CORRIGIDO (DESCONTO ZERADO)
   // ====================================================================================
   const duplicar = async (id) => {
+    if (!confirm('Deseja duplicar este orçamento?\n\n⚠️ O desconto será zerado (nova proposta requer nova autorização).')) return
+
     try {
-      console.log('📋 Duplicando orçamento ID:', id)
+      console.log('📋 [DUPLICAR] Duplicando orçamento ID:', id)
       
       // Busca o orçamento original
       const { data: original, error: errorOrc } = await supabase
@@ -197,12 +200,13 @@ export default function Orcamentos() {
         novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
       }
 
-      console.log('📝 Novo número gerado:', novoNumero)
+      console.log('📝 [DUPLICAR] Novo número gerado:', novoNumero)
+      console.log('📝 [DUPLICAR] Desconto original:', original.desconto_geral, '→ Novo: 0')
 
-      // ✅ CORREÇÃO: Criar objeto novo explicitamente, sem usar spread do original
+      // ✅ CORREÇÃO: Criar objeto novo explicitamente, DESCONTO = 0
       const novoOrcamento = {
         numero: novoNumero,
-        numero_proposta: null, // Será gerado novo ao salvar
+        numero_proposta: null,
         cliente_nome: original.cliente_nome,
         cliente_empresa: original.cliente_empresa,
         cliente_email: original.cliente_email,
@@ -217,7 +221,8 @@ export default function Orcamentos() {
         data_validade: original.data_validade,
         forma_pagamento_id: original.forma_pagamento_id,
         prazo_entrega: original.prazo_entrega,
-        desconto_geral: original.desconto_geral || 0,
+        // ✅ DESCONTO SEMPRE ZERADO - nova proposta requer nova autorização
+        desconto_geral: 0,
         subtotal: original.subtotal,
         frete: original.frete,
         frete_modalidade: original.frete_modalidade || 'FOB',
@@ -246,10 +251,16 @@ export default function Orcamentos() {
         obra_logradouro: original.obra_logradouro,
         obra_numero: original.obra_numero,
         obra_complemento: original.obra_complemento,
-        obra_endereco_validado: original.obra_endereco_validado || false
+        obra_endereco_validado: original.obra_endereco_validado || false,
+        // ✅ LIBERAÇÃO DE DESCONTO - NÃO COPIA (nova proposta = nova autorização)
+        desconto_liberado: false,
+        desconto_liberado_por: null,
+        desconto_liberado_por_id: null,
+        desconto_liberado_em: null,
+        desconto_valor_liberado: null
       }
 
-      console.log('📦 Dados do novo orçamento:', novoOrcamento)
+      console.log('📦 [DUPLICAR] Dados do novo orçamento (desconto zerado)')
 
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
@@ -262,7 +273,7 @@ export default function Orcamentos() {
         throw errorCriar
       }
 
-      console.log('✅ Orçamento duplicado com ID:', orcCriado.id)
+      console.log('✅ [DUPLICAR] Orçamento duplicado com ID:', orcCriado.id)
 
       // Copia os itens para o novo orçamento
       if (itens && itens.length > 0) {
@@ -281,7 +292,7 @@ export default function Orcamentos() {
           ordem: item.ordem
         }))
 
-        console.log(`📦 Copiando ${novosItens.length} produtos...`)
+        console.log(`📦 [DUPLICAR] Copiando ${novosItens.length} produtos...`)
 
         const { error: errorItensNovos } = await supabase
           .from('orcamentos_itens')
@@ -292,10 +303,10 @@ export default function Orcamentos() {
           throw errorItensNovos
         }
         
-        console.log('✅ Produtos copiados!')
+        console.log('✅ [DUPLICAR] Produtos copiados!')
       }
 
-      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}`)
+      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}\n\n⚠️ Desconto zerado - solicite nova autorização se necessário.`)
       carregarOrcamentos()
     } catch (error) {
       console.error('❌ Erro ao duplicar:', error)
