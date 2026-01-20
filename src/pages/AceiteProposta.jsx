@@ -12,6 +12,7 @@ import { supabase } from '../services/supabase';
 // 4. Resumo com valores corretos (produtos, frete, viagens)
 // 5. Bloqueio de edições após aceite (só número ERP)
 // 6. ✅ NOVO: Salvar dados extras na tabela aceites (contribuinte, IE, tipo_cliente)
+// 7. ✅ FIX: Corrigido fallback para CPF/CNPJ (busca em todos os campos possíveis)
 // =====================================================
 
 export default function AceiteProposta() {
@@ -58,6 +59,17 @@ export default function AceiteProposta() {
 
   // ✅ URL do logo hospedado no Vercel
   const logoUrl = 'https://sistema-orcamentos-theta.vercel.app/logo-construcom.png';
+
+  // ✅ HELPER: Busca CPF/CNPJ em todos os campos possíveis
+  const getCpfCnpj = (dados, orcamento) => {
+    return dados?.cpf_cnpj || 
+           dados?.cliente_cpf_cnpj || 
+           dados?.cnpj_cpf ||
+           orcamento?.cpf_cnpj ||
+           orcamento?.cliente_cpf_cnpj || 
+           orcamento?.cnpj_cpf ||
+           '';
+  };
 
   // Carregar proposta
   useEffect(() => {
@@ -302,10 +314,10 @@ export default function AceiteProposta() {
         ipCliente = 'não disponível';
       }
 
-      // Obter dados do cliente
+      // Obter dados do cliente - ✅ CORRIGIDO: usa helper getCpfCnpj
       const dadosOriginais = proposta.dados_cliente_proposta?.[0];
       const emailCliente = dadosOriginais?.email || proposta.orcamentos?.cliente_email || '';
-      const cpfCnpjCliente = dadosOriginais?.cpf_cnpj || proposta.orcamentos?.cliente_cpf_cnpj || '';
+      const cpfCnpjCliente = getCpfCnpj(dadosOriginais, proposta.orcamentos);
 
       // ✅ INSERIR ACEITE COM TODOS OS DADOS EXTRAS
       const { error: erroAceite } = await supabase
@@ -394,6 +406,9 @@ export default function AceiteProposta() {
   const orcamento = proposta?.orcamentos;
   const dadosCliente = proposta?.dados_cliente_proposta?.[0] || orcamento;
   const isFOB = proposta?.tipo_frete === 'FOB' || orcamento?.tipo_frete === 'FOB' || orcamento?.frete_modalidade === 'FOB';
+  
+  // ✅ CORRIGIDO: Obter CPF/CNPJ usando helper que busca em todos os campos possíveis
+  const cpfCnpjExibicao = getCpfCnpj(dadosCliente, orcamento);
   
   // ✅ CORRIGIDO: Obter valores corretos de produtos, frete e viagens
   const totalProdutos = proposta?.total_produtos || orcamento?.subtotal || orcamento?.total_produtos || 0;
@@ -540,22 +555,23 @@ export default function AceiteProposta() {
                 <div style={styles.fieldGroup}>
                   <div style={styles.field}>
                     <label style={styles.label}>CPF/CNPJ</label>
-                    <div style={styles.readonlyField}>{dadosCliente?.cpf_cnpj || orcamento?.cliente_cpf_cnpj}</div>
+                    {/* ✅ CORRIGIDO: Usa cpfCnpjExibicao que busca em todos os campos */}
+                    <div style={styles.readonlyField}>{cpfCnpjExibicao || 'Não informado'}</div>
                   </div>
                   <div style={styles.field}>
                     <label style={styles.label}>Email</label>
-                    <div style={styles.readonlyField}>{dadosCliente?.email || orcamento?.cliente_email}</div>
+                    <div style={styles.readonlyField}>{dadosCliente?.email || orcamento?.cliente_email || 'Não informado'}</div>
                   </div>
                   <div style={styles.field}>
                     <label style={styles.label}>Telefone</label>
-                    <div style={styles.readonlyField}>{dadosCliente?.telefone || orcamento?.cliente_telefone}</div>
+                    <div style={styles.readonlyField}>{dadosCliente?.telefone || orcamento?.cliente_telefone || 'Não informado'}</div>
                   </div>
                   <div style={styles.fieldFull}>
                     <label style={styles.label}>Endereço de Entrega</label>
                     <div style={styles.readonlyField}>
-                      {dadosCliente?.logradouro || orcamento?.endereco_entrega || orcamento?.obra_logradouro}, 
-                      {dadosCliente?.bairro || orcamento?.bairro_entrega || orcamento?.obra_bairro} - 
-                      {dadosCliente?.cidade || orcamento?.cidade_entrega || orcamento?.obra_cidade}/
+                      {dadosCliente?.logradouro || orcamento?.endereco_entrega || orcamento?.obra_logradouro || ''}, 
+                      {dadosCliente?.bairro || orcamento?.bairro_entrega || orcamento?.obra_bairro || ''} - 
+                      {dadosCliente?.cidade || orcamento?.cidade_entrega || orcamento?.obra_cidade || ''}/
                       {dadosCliente?.uf || orcamento?.uf_entrega || 'MG'}
                     </div>
                   </div>
@@ -723,7 +739,8 @@ export default function AceiteProposta() {
 
               <div style={styles.dadosConfirmados}>
                 <h4 style={styles.dadosConfirmadosTitle}>✓ Dados Confirmados</h4>
-                <p><strong>CNPJ:</strong> {dadosCliente?.cpf_cnpj || orcamento?.cliente_cpf_cnpj}</p>
+                {/* ✅ CORRIGIDO: Usa cpfCnpjExibicao */}
+                <p><strong>CNPJ:</strong> {cpfCnpjExibicao || 'Não informado'}</p>
                 <p><strong>Razão Social:</strong> {dadosEditaveis.razao_social}</p>
                 <p><strong>IE:</strong> {dadosEditaveis.inscricao_estadual || 'ISENTO'}</p>
                 <p><strong>Contribuinte ICMS:</strong> {dadosEditaveis.contribuinte_icms ? 'Sim' : 'Não'}</p>
