@@ -72,6 +72,12 @@ function OrcamentoForm() {
   const [erroTelefone, setErroTelefone] = useState(false)
   
   const LIMITE_DESCONTO = 5
+
+  // ✅ Verifica se usuário pode ver código do sistema (admin ou comercial_interno)
+  const podeVerCodigoSistema = () => {
+    const tipoUsuario = (user?.tipo || '').toLowerCase().trim()
+    return ['admin', 'administrador', 'comercial_interno'].includes(tipoUsuario)
+  }
   
   const [formData, setFormData] = useState({
     numero: '',
@@ -673,7 +679,7 @@ function OrcamentoForm() {
   }
 
   const duplicar = async () => {
-    if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.')) return
+    if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.\n\n⚠️ O desconto será zerado (nova proposta requer nova autorização).')) return
 
     try {
       setLoading(true)
@@ -693,11 +699,10 @@ function OrcamentoForm() {
         novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
       }
 
+      // ✅ IMPORTANTE: Desconto zerado na duplicação (nova proposta = nova autorização)
       const subtotal = calcularSubtotal()
-      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-      const subtotalComDesconto = subtotal - desconto
       const frete = dadosFrete?.valor_total_frete || 0
-      const total = subtotalComDesconto + frete
+      const total = subtotal + frete // Sem desconto
 
       const novoOrcamento = {
         numero: novoNumero,
@@ -716,8 +721,8 @@ function OrcamentoForm() {
         data_validade: formData.data_validade,
         forma_pagamento_id: formData.forma_pagamento_id || null,
         prazo_entrega: formData.prazo_entrega,
-        desconto_geral: parseFloat(formData.desconto_geral) || 0,
-        subtotal: subtotalComDesconto,
+        desconto_geral: 0, // ✅ ZERADO - nova proposta requer nova autorização
+        subtotal: subtotal,
         frete: frete,
         frete_modalidade: dadosFrete?.modalidade || 'FOB',
         frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
@@ -746,11 +751,11 @@ function OrcamentoForm() {
         obra_numero: dadosEndereco?.obra_numero || formData.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || formData.obra_complemento || null,
         obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false,
-        desconto_liberado: false,
-        desconto_liberado_por: null,
-        desconto_liberado_por_id: null,
-        desconto_liberado_em: null,
-        desconto_valor_liberado: null
+        desconto_liberado: false, // ✅ ZERADO
+        desconto_liberado_por: null, // ✅ ZERADO
+        desconto_liberado_por_id: null, // ✅ ZERADO
+        desconto_liberado_em: null, // ✅ ZERADO
+        desconto_valor_liberado: null // ✅ ZERADO
       }
 
       const { data: orcCriado, error: errorCriar } = await supabase
@@ -782,7 +787,7 @@ function OrcamentoForm() {
 
       if (errorItens) throw errorItens
 
-      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}`)
+      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}\n\n⚠️ Desconto zerado - solicite nova autorização se necessário.`)
       navigate(`/orcamentos/editar/${orcCriado.id}`)
     } catch (error) {
       console.error('❌ Erro ao duplicar:', error)
@@ -1372,6 +1377,9 @@ function OrcamentoForm() {
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
+                    {podeVerCodigoSistema() && (
+                      <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Cód.</th>
+                    )}
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
                     <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
@@ -1400,6 +1408,18 @@ function OrcamentoForm() {
                           ))}
                         </select>
                       </td>
+
+                      {podeVerCodigoSistema() && (
+                        <td className="px-2 py-1 text-center">
+                          {item.codigo ? (
+                            <span className="inline-flex items-center justify-center bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-mono font-semibold min-w-[50px]">
+                              {item.codigo}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                      )}
 
                       <td className="px-2 py-1">
                         <select
