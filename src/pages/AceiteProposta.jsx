@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../services/supabase';
 
 // =====================================================
 // PÁGINA DE ACEITE DE PROPOSTA - VERSÃO MOBILE-FIRST

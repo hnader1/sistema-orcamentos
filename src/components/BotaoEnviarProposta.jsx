@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../services/supabase';
 
 export function BotaoEnviarProposta({ orcamento, onEnviado }) {
   const [modalAberto, setModalAberto] = useState(false);
