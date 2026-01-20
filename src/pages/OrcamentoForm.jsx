@@ -1,7 +1,7 @@
 // src/pages/OrcamentoForm.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send, CheckCircle, Edit3, AlertTriangle, Eye } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
@@ -16,6 +16,9 @@ import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaP
 import BotaoEnviarProposta from '../components/BotaoEnviarProposta'
 
 const TABELA_ITENS = 'orcamentos_itens'
+
+// ✅ STATUS QUE BLOQUEIAM EDIÇÃO TOTAL (exceto ERP para admin)
+const STATUS_BLOQUEADOS = ['aprovado', 'lancado', 'finalizado']
 
 function OrcamentoForm() {
   const navigate = useNavigate()
@@ -42,6 +45,11 @@ function OrcamentoForm() {
   const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
   const [descontoTravado, setDescontoTravado] = useState(false)
   const LIMITE_DESCONTO = 5
+  
+  // ✅ NOVO: Estados para controle de PDF/Proposta travada
+  const [propostaTravada, setPropostaTravada] = useState(false)
+  const [pdfExistente, setPdfExistente] = useState(null)
+  const [propostaIdAtual, setPropostaIdAtual] = useState(null)
   
   const [formData, setFormData] = useState({
     numero: '',
@@ -83,6 +91,129 @@ function OrcamentoForm() {
     desconto_liberado_em: null,
     desconto_valor_liberado: null
   })
+
+  // ✅ NOVO: Verificar se orçamento está em status bloqueado
+  const isStatusBloqueado = () => {
+    return STATUS_BLOQUEADOS.includes(formData.status)
+  }
+
+  // ✅ NOVO: Verificar se usuário pode editar
+  const podeEditar = () => {
+    // Se é vendedor e status está bloqueado, não pode editar
+    if (isVendedor() && isStatusBloqueado()) {
+      return false
+    }
+    // Se tem PDF gerado (proposta travada), não pode editar
+    if (propostaTravada) {
+      return false
+    }
+    return true
+  }
+
+  // ✅ NOVO: Verificar se pode editar apenas campo ERP
+  const podeEditarApenasERP = () => {
+    // Admin ou Comercial Interno pode editar ERP em status bloqueado
+    if ((isAdmin() || isComercialInterno()) && isStatusBloqueado()) {
+      return true
+    }
+    return false
+  }
+
+  // ✅ NOVO: Determinar modo de visualização
+  const getModoVisualizacao = () => {
+    // Vendedor em status bloqueado = somente visualização
+    if (isVendedor() && isStatusBloqueado()) {
+      return 'visualizacao'
+    }
+    // Proposta travada (PDF gerado) = somente visualização
+    if (propostaTravada) {
+      return 'proposta_travada'
+    }
+    // Admin/Comercial em status bloqueado = apenas ERP editável
+    if ((isAdmin() || isComercialInterno()) && isStatusBloqueado()) {
+      return 'apenas_erp'
+    }
+    // Modo normal
+    return 'edicao'
+  }
+
+  // ✅ NOVO: Verificar se existe PDF para este orçamento
+  const verificarPropostaExistente = async () => {
+    if (!id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('propostas')
+        .select('id, pdf_path, status')
+        .eq('orcamento_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (!error && data && data.length > 0) {
+        setPropostaIdAtual(data[0].id)
+        if (data[0].pdf_path) {
+          setPdfExistente(data[0].pdf_path)
+          setPropostaTravada(true)
+          console.log('🔒 Proposta travada - PDF existente:', data[0].pdf_path)
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao verificar proposta existente:', e)
+    }
+  }
+
+  // ✅ NOVO: Função para editar proposta (exclui PDF e libera edição)
+  const editarProposta = async () => {
+    if (!propostaIdAtual || !pdfExistente) {
+      alert('Não há proposta com PDF para editar.')
+      return
+    }
+
+    const confirmacao = confirm(
+      '⚠️ ATENÇÃO!\n\n' +
+      'Ao editar a proposta, o PDF atual será EXCLUÍDO.\n' +
+      'Você precisará gerar um novo PDF após as alterações.\n\n' +
+      'Deseja continuar?'
+    )
+
+    if (!confirmacao) return
+
+    try {
+      setLoading(true)
+
+      // 1. Excluir o PDF do Storage
+      const { error: erroStorage } = await supabase.storage
+        .from('propostas-pdf')
+        .remove([pdfExistente])
+
+      if (erroStorage) {
+        console.error('Erro ao excluir PDF do storage:', erroStorage)
+        // Continua mesmo se falhar a exclusão do storage
+      }
+
+      // 2. Limpar referência do PDF na proposta
+      const { error: erroUpdate } = await supabase
+        .from('propostas')
+        .update({ pdf_path: null })
+        .eq('id', propostaIdAtual)
+
+      if (erroUpdate) {
+        throw erroUpdate
+      }
+
+      // 3. Atualizar estados locais
+      setPdfExistente(null)
+      setPropostaTravada(false)
+
+      alert('✅ PDF excluído! Agora você pode editar o orçamento.\nLembre-se de gerar um novo PDF após as alterações.')
+
+    } catch (error) {
+      console.error('❌ Erro ao editar proposta:', error)
+      alert('Erro ao editar proposta: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const carregarVendedores = async () => {
     try {
@@ -146,7 +277,8 @@ function OrcamentoForm() {
   }
 
   useEffect(() => {
-    if (isReadOnly) return
+    const modoAtual = getModoVisualizacao()
+    if (modoAtual === 'visualizacao' || modoAtual === 'proposta_travada') return
     
     const temCNPJ = dadosCNPJCPF?.cnpj_cpf && !dadosCNPJCPF?.cnpj_cpf_nao_informado
     const temLocalizacao = dadosEndereco?.obra_cidade
@@ -160,7 +292,7 @@ function OrcamentoForm() {
     }, 1000)
 
     return () => clearTimeout(timer)
-  }, [dadosCNPJCPF, dadosEndereco, isReadOnly])
+  }, [dadosCNPJCPF, dadosEndereco, propostaTravada, formData.status])
 
   useEffect(() => {
     carregarProdutos()
@@ -168,6 +300,7 @@ function OrcamentoForm() {
     calcularDataValidade()
     if (id) {
       carregarOrcamento()
+      verificarPropostaExistente()
     } else {
       gerarNumeroSequencial()
       if (user) {
@@ -184,6 +317,12 @@ function OrcamentoForm() {
   useEffect(() => {
     calcularDataValidade()
   }, [formData.data_orcamento, formData.validade_dias])
+
+  // ✅ ATUALIZADO: Definir isReadOnly baseado nas regras
+  useEffect(() => {
+    const modo = getModoVisualizacao()
+    setIsReadOnly(modo === 'visualizacao' || modo === 'proposta_travada' || modo === 'apenas_erp')
+  }, [formData.status, propostaTravada, user])
 
   const calcularDataValidade = () => {
     if (formData.data_orcamento && formData.validade_dias) {
@@ -364,9 +503,6 @@ function OrcamentoForm() {
         setProdutosSelecionados([])
       }
 
-      if (isVendedor() && orc.status === 'lancado') {
-        setIsReadOnly(true)
-      }
     } catch (error) {
       console.error('❌ Erro ao carregar orçamento:', error)
       alert('Erro ao carregar orçamento: ' + error.message)
@@ -771,17 +907,54 @@ function OrcamentoForm() {
   // Verificar se pode aprovar manualmente
   const podeAprovarManual = () => {
     if (!id) return false
-    if (isReadOnly) return false
     if (!isAdmin() && !isComercialInterno()) return false
-    if (['aprovado', 'lancado', 'cancelado'].includes(formData.status)) return false
+    if (['aprovado', 'lancado', 'cancelado', 'finalizado'].includes(formData.status)) return false
     return true
   }
 
+  // ✅ ATUALIZADO: Salvar com verificação de permissões
   const salvar = async () => {
+    // Verificar se pode salvar
+    const modo = getModoVisualizacao()
+    
+    if (modo === 'visualizacao') {
+      alert('Você não tem permissão para editar este orçamento.')
+      return
+    }
+
+    if (modo === 'proposta_travada') {
+      alert('Este orçamento possui PDF gerado e está travado.\nUse "Editar Proposta" para desbloquear.')
+      return
+    }
+
     try {
       const temCnpjCpfPreenchido = dadosCNPJCPF?.cnpj_cpf && dadosCNPJCPF.cnpj_cpf.trim() !== ''
       const marcouNaoInformar = dadosCNPJCPF?.cnpj_cpf_nao_informado === true
       const cnpjCpfOk = cnpjCpfValido || temCnpjCpfPreenchido || marcouNaoInformar
+
+      // Se é modo apenas_erp, só salva o número ERP
+      if (modo === 'apenas_erp') {
+        if (!formData.numero_lancamento_erp && formData.status === 'lancado') {
+          alert('Informe o número do lançamento no ERP!')
+          return
+        }
+
+        setLoading(true)
+
+        const { error } = await supabase
+          .from('orcamentos')
+          .update({
+            numero_lancamento_erp: formData.numero_lancamento_erp,
+            data_lancamento: formData.status === 'lancado' ? new Date().toISOString() : null
+          })
+          .eq('id', id)
+
+        if (error) throw error
+
+        alert('✅ Número ERP atualizado com sucesso!')
+        setLoading(false)
+        return
+      }
 
       if (!cnpjCpfOk) {
         alert('CNPJ/CPF é obrigatório!\n\nPreencha um CNPJ ou CPF válido, ou marque a opção "Não informar".')
@@ -991,6 +1164,13 @@ function OrcamentoForm() {
     return ''
   }
 
+  // ✅ Callback quando PDF é gerado - trava a proposta
+  const handlePdfGerado = (pdfUrl, pdfPath) => {
+    console.log('✅ PDF gerado, travando proposta:', pdfPath)
+    setPdfExistente(pdfPath)
+    setPropostaTravada(true)
+  }
+
   // ✅ Função para montar dados do orçamento para o botão enviar
   const getOrcamentoParaEnvio = () => {
     return {
@@ -1018,8 +1198,42 @@ function OrcamentoForm() {
   const getDadosOrcamentoParaProposta = () => {
     return {
       ...formData,
-      id: id  // ← IMPORTANTE: adicionar o id do orçamento!
+      id: id
     }
+  }
+
+  // ✅ Obter mensagem de bloqueio
+  const getMensagemBloqueio = () => {
+    const modo = getModoVisualizacao()
+    
+    if (modo === 'visualizacao') {
+      return {
+        titulo: 'Modo Visualização',
+        descricao: `Este orçamento está com status "${formData.status.toUpperCase()}" e você não tem permissão para editá-lo. Use "Duplicar" para criar uma nova proposta baseada neste orçamento.`,
+        cor: 'blue',
+        icone: Eye
+      }
+    }
+    
+    if (modo === 'proposta_travada') {
+      return {
+        titulo: 'Proposta Travada - PDF Gerado',
+        descricao: 'Este orçamento possui um PDF gerado e está travado para edição. Para fazer alterações, clique em "Editar Proposta" - isso excluirá o PDF atual.',
+        cor: 'amber',
+        icone: Lock
+      }
+    }
+    
+    if (modo === 'apenas_erp') {
+      return {
+        titulo: 'Edição Restrita',
+        descricao: `Este orçamento está com status "${formData.status.toUpperCase()}". Apenas o número do ERP pode ser alterado.`,
+        cor: 'purple',
+        icone: AlertTriangle
+      }
+    }
+    
+    return null
   }
 
   if (loading && id) {
@@ -1032,6 +1246,9 @@ function OrcamentoForm() {
       </>
     )
   }
+
+  const mensagemBloqueio = getMensagemBloqueio()
+  const modo = getModoVisualizacao()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1125,17 +1342,30 @@ function OrcamentoForm() {
 
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          {isReadOnly && (
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          
+          {/* ✅ NOVO: Banner de bloqueio */}
+          {mensagemBloqueio && (
+            <div className={`mb-4 bg-${mensagemBloqueio.cor}-50 border border-${mensagemBloqueio.cor}-200 rounded-lg p-4`}>
               <div className="flex items-center gap-3">
-                <Lock className="text-blue-600" size={24} />
+                <mensagemBloqueio.icone className={`text-${mensagemBloqueio.cor}-600`} size={24} />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-blue-900">Modo Visualização</h3>
-                  <p className="text-sm text-blue-700">
-                    Este orçamento está lançado no ERP. Você pode visualizar mas não editar.
-                    Use "Duplicar" para criar uma nova proposta baseada neste orçamento.
+                  <h3 className={`font-semibold text-${mensagemBloqueio.cor}-900`}>{mensagemBloqueio.titulo}</h3>
+                  <p className={`text-sm text-${mensagemBloqueio.cor}-700`}>
+                    {mensagemBloqueio.descricao}
                   </p>
                 </div>
+                
+                {/* ✅ Botão Editar Proposta (quando travada por PDF) */}
+                {modo === 'proposta_travada' && (isAdmin() || isComercialInterno() || !isStatusBloqueado()) && (
+                  <button
+                    onClick={editarProposta}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+                  >
+                    <Edit3 size={18} />
+                    Editar Proposta
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1149,22 +1379,25 @@ function OrcamentoForm() {
                 <ArrowLeft size={24} className="text-gray-600" />
               </button>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                {isReadOnly ? 'Visualizar Orçamento' : (id ? 'Editar Orçamento' : 'Novo Orçamento')}
+                {modo === 'visualizacao' || modo === 'proposta_travada' 
+                  ? 'Visualizar Orçamento' 
+                  : modo === 'apenas_erp'
+                    ? 'Atualizar ERP'
+                    : (id ? 'Editar Orçamento' : 'Novo Orçamento')}
               </h1>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {isReadOnly && (
-                <button
-                  onClick={duplicar}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  <Copy size={20} />
-                  <span className="hidden sm:inline">Duplicar</span>
-                </button>
-              )}
+              {/* Botão Duplicar - sempre visível */}
+              <button
+                onClick={duplicar}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              >
+                <Copy size={20} />
+                <span className="hidden sm:inline">Duplicar</span>
+              </button>
               
-              {/* ✅ BOTÃO APROVAR MANUAL - Admin/Comercial Interno */}
+              {/* ✅ BOTÃO APROVAR MANUAL - Admin/Comercial Interno (não em status bloqueado) */}
               {podeAprovarManual() && (
                 <button
                   onClick={aprovarManual}
@@ -1177,19 +1410,21 @@ function OrcamentoForm() {
                 </button>
               )}
               
-              {/* ✅ BOTÃO GERAR PROPOSTA */}
-              <button
-                onClick={() => setMostrarProposta(true)}
-                disabled={!podeGerarProposta()}
-                title={getTooltipGerarProposta()}
-                className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FileText size={20} />
-                <span className="hidden sm:inline">Gerar Proposta</span>
-              </button>
+              {/* ✅ BOTÃO GERAR PROPOSTA - não em modo visualização puro */}
+              {modo !== 'visualizacao' && (
+                <button
+                  onClick={() => setMostrarProposta(true)}
+                  disabled={!podeGerarProposta()}
+                  title={getTooltipGerarProposta()}
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FileText size={20} />
+                  <span className="hidden sm:inline">Gerar Proposta</span>
+                </button>
+              )}
               
-              {/* ✅ NOVO: BOTÃO ENVIAR PARA CLIENTE */}
-              {id && formData.numero_proposta && !isReadOnly && (
+              {/* ✅ BOTÃO ENVIAR PARA CLIENTE - quando tem PDF */}
+              {id && formData.numero_proposta && propostaTravada && (
                 <BotaoEnviarProposta 
                   orcamento={getOrcamentoParaEnvio()}
                   onEnviado={(proposta) => {
@@ -1199,14 +1434,17 @@ function OrcamentoForm() {
                 />
               )}
               
-              {!isReadOnly && (
+              {/* ✅ BOTÃO SALVAR - adapta ao modo */}
+              {(modo === 'edicao' || modo === 'apenas_erp') && (
                 <button
                   onClick={salvar}
                   disabled={loading}
                   className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   <Save size={20} />
-                  <span className="hidden sm:inline">Salvar</span>
+                  <span className="hidden sm:inline">
+                    {modo === 'apenas_erp' ? 'Salvar ERP' : 'Salvar'}
+                  </span>
                 </button>
               )}
             </div>
@@ -1236,7 +1474,7 @@ function OrcamentoForm() {
                 value={formData.data_orcamento}
                 onChange={(e) => setFormData({ ...formData, data_orcamento: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
               />
             </div>
             <div>
@@ -1245,7 +1483,7 @@ function OrcamentoForm() {
                 value={formData.vendedor}
                 onChange={(e) => handleVendedorChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
               >
                 <option value="">Selecione...</option>
                 {vendedores.map(v => (
@@ -1260,7 +1498,7 @@ function OrcamentoForm() {
                 value={formData.validade_dias}
                 onChange={(e) => setFormData({ ...formData, validade_dias: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
               />
             </div>
             <div>
@@ -1269,7 +1507,7 @@ function OrcamentoForm() {
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao' || isVendedor()}
               >
                 <option value="rascunho">Rascunho</option>
                 <option value="enviado">Enviado</option>
@@ -1277,11 +1515,16 @@ function OrcamentoForm() {
                 {podeAcessarLancamento() && (
                   <option value="lancado">Lançado</option>
                 )}
+                {podeAcessarLancamento() && (
+                  <option value="finalizado">Finalizado</option>
+                )}
                 <option value="rejeitado">Rejeitado</option>
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
-            {formData.status === 'lancado' && (
+            
+            {/* ✅ Campo ERP - editável mesmo em modo apenas_erp */}
+            {(formData.status === 'lancado' || formData.status === 'aprovado' || formData.status === 'finalizado') && podeAcessarLancamento() && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nº Lançamento ERP *
@@ -1292,7 +1535,7 @@ function OrcamentoForm() {
                   onChange={(e) => setFormData({ ...formData, numero_lancamento_erp: e.target.value })}
                   placeholder="Ex: PED-12345"
                   className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50"
-                  disabled={isReadOnly}
+                  disabled={false}
                 />
               </div>
             )}
@@ -1305,10 +1548,13 @@ function OrcamentoForm() {
           <CNPJCPFForm
             valores={formData}
             onChange={(dados) => {
-              setDadosCNPJCPF(dados)
-              setFormData(prev => ({ ...prev, ...dados }))
+              if (modo === 'edicao') {
+                setDadosCNPJCPF(dados)
+                setFormData(prev => ({ ...prev, ...dados }))
+              }
             }}
             onValidacao={setCnpjCpfValido}
+            disabled={modo !== 'edicao'}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -1321,7 +1567,7 @@ function OrcamentoForm() {
                 value={formData.cliente_nome}
                 onChange={(e) => setFormData({ ...formData, cliente_nome: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
               />
             </div>
             <div>
@@ -1331,7 +1577,7 @@ function OrcamentoForm() {
                 value={formData.cliente_empresa}
                 onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
               />
             </div>
             <div>
@@ -1343,7 +1589,7 @@ function OrcamentoForm() {
                 value={formData.cliente_telefone}
                 onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
               />
             </div>
             <div>
@@ -1355,7 +1601,7 @@ function OrcamentoForm() {
                 value={formData.cliente_email}
                 onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
               />
             </div>
           </div>
@@ -1365,9 +1611,12 @@ function OrcamentoForm() {
           <EnderecoObraForm
             valores={formData}
             onChange={(dados) => {
-              setDadosEndereco(dados)
-              setFormData(prev => ({ ...prev, ...dados }))
+              if (modo === 'edicao') {
+                setDadosEndereco(dados)
+                setFormData(prev => ({ ...prev, ...dados }))
+              }
             }}
+            disabled={modo !== 'edicao'}
           />
         </div>
 
@@ -1376,7 +1625,7 @@ function OrcamentoForm() {
             <h2 className="text-lg font-semibold">Produtos</h2>
             <button
               onClick={adicionarProduto}
-              disabled={isReadOnly}
+              disabled={modo !== 'edicao'}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={18} />
@@ -1413,7 +1662,7 @@ function OrcamentoForm() {
                         <select
                           value={item.produto}
                           onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
-                          disabled={isReadOnly}
+                          disabled={modo !== 'edicao'}
                           className="w-40 px-2 py-1 border rounded text-sm"
                         >
                           <option value="">Selecione...</option>
@@ -1426,7 +1675,7 @@ function OrcamentoForm() {
                         <select
                           value={item.classe}
                           onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
-                          disabled={!item.produto || isReadOnly}
+                          disabled={!item.produto || modo !== 'edicao'}
                           className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
                         >
                           <option value="">-</option>
@@ -1439,7 +1688,7 @@ function OrcamentoForm() {
                         <select
                           value={item.mpa}
                           onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
-                          disabled={!item.classe || isReadOnly}
+                          disabled={!item.classe || modo !== 'edicao'}
                           className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
                         >
                           <option value="">-</option>
@@ -1453,7 +1702,7 @@ function OrcamentoForm() {
                           type="number"
                           value={item.quantidade}
                           onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
-                          disabled={isReadOnly}
+                          disabled={modo !== 'edicao'}
                           className="w-20 px-2 py-1 border rounded text-sm text-center"
                           min="1"
                         />
@@ -1493,7 +1742,7 @@ function OrcamentoForm() {
                       <td className="px-2 py-1">
                         <button
                           onClick={() => removerProduto(index)}
-                          disabled={isReadOnly}
+                          disabled={modo !== 'edicao'}
                           className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 size={16} />
@@ -1512,9 +1761,12 @@ function OrcamentoForm() {
             pesoTotal={calcularPesoTotal()}
             totalPallets={calcularTotalPallets()}
             onFreteChange={(dados) => {
-              setDadosFrete(dados)
+              if (modo === 'edicao') {
+                setDadosFrete(dados)
+              }
             }}
             freteAtual={dadosFrete}
+            disabled={modo !== 'edicao'}
           />
         </div>
 
@@ -1526,7 +1778,7 @@ function OrcamentoForm() {
                 value={formData.observacoes}
                 onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
                 rows="10"
-                disabled={isReadOnly}
+                disabled={modo !== 'edicao'}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Observações adicionais que aparecerão na proposta comercial..."
               />
@@ -1570,7 +1822,7 @@ function OrcamentoForm() {
                       max={descontoLiberado ? 100 : LIMITE_DESCONTO}
                       value={formData.desconto_geral}
                       onChange={(e) => handleDescontoChange(e.target.value)}
-                      disabled={isReadOnly}
+                      disabled={modo !== 'edicao'}
                       className={`w-20 px-2 py-1 border rounded text-center text-sm ${
                         descontoTravado 
                           ? 'border-blue-400 bg-blue-50 cursor-pointer' 
@@ -1579,7 +1831,7 @@ function OrcamentoForm() {
                             : 'border-gray-300'
                       }`}
                     />
-                    {descontoTravado && (
+                    {descontoTravado && modo === 'edicao' && (
                       <button
                         type="button"
                         onClick={() => setMostrarModalSenha(true)}
@@ -1619,8 +1871,13 @@ function OrcamentoForm() {
                   </label>
                   <SearchableSelectFormaPagamento
                     value={formData.forma_pagamento_id}
-                    onChange={(id) => setFormData({ ...formData, forma_pagamento_id: id })}
+                    onChange={(id) => {
+                      if (modo === 'edicao') {
+                        setFormData({ ...formData, forma_pagamento_id: id })
+                      }
+                    }}
                     placeholder="Digite para buscar (ex: 28, pix, boleto)..."
+                    disabled={modo !== 'edicao'}
                   />
                 </div>
               </div>
@@ -1642,7 +1899,7 @@ function OrcamentoForm() {
               value={formData.observacoes_internas}
               onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
               rows="4"
-              disabled={isReadOnly}
+              disabled={modo !== 'edicao'}
               className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
               placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
             />
@@ -1650,13 +1907,15 @@ function OrcamentoForm() {
         </div>
       </div>
 
-      {/* ✅ CORRIGIDO: Passar id junto com formData */}
+      {/* ✅ CORRIGIDO: Passar callback onPdfGerado */}
       <PropostaComercial
         isOpen={mostrarProposta}
         onClose={() => setMostrarProposta(false)}
         dadosOrcamento={getDadosOrcamentoParaProposta()}
         produtos={produtosSelecionados}
         dadosFrete={dadosFrete}
+        propostaId={propostaIdAtual}
+        onPdfGerado={handlePdfGerado}
       />
       
       <ModalAlertaConcorrencia
