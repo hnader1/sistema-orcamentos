@@ -3,6 +3,7 @@
 // COMPONENTE DE SELEÇÃO DE FRETE - DADOS DO SUPABASE
 // ====================================================================================
 // CORREÇÃO: Todos os dados (modalidades, veículos, pallets) vêm da tabela fretes
+// Pallets não aparecem no dropdown pois variam por cidade + modalidade
 // ====================================================================================
 
 import { useState, useEffect } from 'react'
@@ -14,7 +15,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   const [buscaCidade, setBuscaCidade] = useState('')
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false)
   
-  // ✅ NOVO: Dados extraídos do banco
+  // ✅ Dados extraídos do banco
   const [tiposVeiculoUnicos, setTiposVeiculoUnicos] = useState([])
   const [modalidadesUnicas, setModalidadesUnicas] = useState([])
   
@@ -78,12 +79,11 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       
       setFretes(data || [])
       
-      // ✅ NOVO: Extrair localidades únicas
+      // ✅ Extrair localidades únicas
       const locsUnicas = [...new Set(data?.map(f => f.cidade) || [])]
       setLocalidades(locsUnicas.sort())
       
-      // ✅ NOVO: Extrair tipos de veículos únicos com suas capacidades
-      // Agrupa por tipo base (ex: "Toco 8t", "Truck 14t", "Carreta 32t")
+      // ✅ Extrair tipos de veículos únicos (apenas peso, SEM pallets pois varia por cidade/modalidade)
       const veiculosMap = new Map()
       data?.forEach(f => {
         // Extrair tipo base do tipo_veiculo (ex: "Truck 14t - SEM DESCARGA" → "Truck 14t")
@@ -91,8 +91,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         if (tipoBase && !veiculosMap.has(tipoBase)) {
           veiculosMap.set(tipoBase, {
             valor: tipoBase,
-            capacidade_kg: f.capacidade_kg || 0,
-            capacidade_pallets: f.capacidade_pallets || 0
+            capacidade_kg: f.capacidade_kg || 0
+            // NÃO inclui pallets aqui pois varia por cidade/modalidade
           })
         }
       })
@@ -102,7 +102,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       setTiposVeiculoUnicos(veiculosArray)
       console.log('🚛 Tipos de veículos extraídos:', veiculosArray)
       
-      // ✅ NOVO: Extrair modalidades únicas
+      // ✅ Extrair modalidades únicas
       const modalidadesSet = new Set()
       data?.forEach(f => {
         if (f.modalidade) {
@@ -127,7 +127,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     }
   }
 
-  // ✅ NOVO: Formatar nome da modalidade para exibição
+  // ✅ Formatar nome da modalidade para exibição
   const formatarModalidade = (mod) => {
     switch(mod) {
       case 'CIF':
@@ -140,9 +140,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     }
   }
 
-  // ✅ NOVO: Buscar capacidade de pallets do registro específico encontrado
-  const buscarCapacidadePallets = (cidade, tipoVeic, mod) => {
-    if (!cidade || !tipoVeic || !mod || mod === 'FOB') return 0
+  // ✅ Buscar dados do frete específico (cidade + veículo + modalidade)
+  const buscarFreteEspecifico = (cidade, tipoVeic, mod) => {
+    if (!cidade || !tipoVeic || !mod || mod === 'FOB') return null
     
     const modalidadeBusca = mod === 'CIF_COM_DESCARGA' ? 'COM DESCARGA' : 'SEM DESCARGA'
     const veiculoBusca = `${tipoVeic} - ${modalidadeBusca}`
@@ -153,7 +153,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       f.modalidade === mod
     )
     
-    return frete?.capacidade_pallets || 0
+    return frete
   }
 
   // Filtrar cidades para autocomplete
@@ -192,11 +192,14 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // ✅ CORREÇÃO: Se está usando frete manual
+    // ✅ Se está usando frete manual
     if (freteManual && valorManualViagem) {
       const valorViagem = parseFloat(valorManualViagem) || 0
       const qtdViagens = parseInt(qtdManualViagens) || 1
       const valorTotal = valorViagem * qtdViagens
+      
+      // Buscar frete específico para pegar capacidades
+      const freteEspecifico = buscarFreteEspecifico(cidadeSelecionada, tipoVeiculo, modalidade)
 
       const resultado = {
         modalidade: modalidade,
@@ -205,15 +208,15 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         tipo_caminhao: tipoVeiculo,
         localidade: cidadeSelecionada,
         cidade: cidadeSelecionada,
-        capacidade_kg: tiposVeiculoUnicos.find(v => v.valor === tipoVeiculo)?.capacidade_kg || 0,
-        capacidade_pallets: buscarCapacidadePallets(cidadeSelecionada, tipoVeiculo, modalidade),
+        capacidade_kg: freteEspecifico?.capacidade_kg || tiposVeiculoUnicos.find(v => v.valor === tipoVeiculo)?.capacidade_kg || 0,
+        capacidade_pallets: freteEspecifico?.capacidade_pallets || 0,
         peso_total_kg: pesoTotal || 0,
         viagens_necessarias: qtdViagens,
         viagens_completas: qtdViagens,
         ultima_viagem_percentual: 100,
         valor_unitario_viagem: valorViagem,
         valor_total_frete: valorTotal,
-        // ✅ IMPORTANTE: Campos específicos de frete manual
+        // ✅ Campos específicos de frete manual
         frete_manual: true,
         manual: true,
         valor_manual_viagem: valorViagem,
@@ -234,20 +237,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     }
 
     // Buscar frete na tabela
-    const modalidadeBusca = modalidade === 'CIF_COM_DESCARGA' 
-      ? 'COM DESCARGA' 
-      : 'SEM DESCARGA'
-    
-    const veiculoBusca = `${tipoVeiculo} - ${modalidadeBusca}`
-    
-    // Buscar frete verificando cidade, tipo_veiculo E modalidade
-    const frete = fretes.find(f => 
-      f.cidade === cidadeSelecionada && 
-      f.tipo_veiculo === veiculoBusca &&
-      f.modalidade === modalidade
-    )
+    const frete = buscarFreteEspecifico(cidadeSelecionada, tipoVeiculo, modalidade)
 
-    console.log('Buscando frete:', { cidadeSelecionada, veiculoBusca, modalidade })
+    console.log('Buscando frete:', { cidadeSelecionada, tipoVeiculo, modalidade })
     console.log('Frete encontrado:', frete)
 
     if (!frete) {
@@ -256,25 +248,25 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // ✅ CORREÇÃO: Usar capacidade_kg e capacidade_pallets do registro encontrado
+    // ✅ Usar capacidade_kg e capacidade_pallets do registro encontrado
     const pesoTotalKg = pesoTotal || 0
     const capacidadeKg = frete.capacidade_kg || 0
     const capacidadePallets = frete.capacidade_pallets || 0
     
-    // ✅ NOVO: Calcular viagens por PESO
+    // ✅ Calcular viagens por PESO
     let viagensPorPeso = 1
     if (pesoTotalKg > 0 && capacidadeKg > 0) {
       viagensPorPeso = Math.ceil(pesoTotalKg / capacidadeKg)
     }
     
-    // ✅ NOVO: Calcular viagens por PALLETS
+    // ✅ Calcular viagens por PALLETS
     let viagensPorPallets = 1
     const palletsTotal = totalPallets || 0
     if (palletsTotal > 0 && capacidadePallets > 0) {
       viagensPorPallets = Math.ceil(palletsTotal / capacidadePallets)
     }
     
-    // ✅ NOVO: Usar o MAIOR limitante
+    // ✅ Usar o MAIOR limitante
     const viagensNecessarias = Math.max(viagensPorPeso, viagensPorPallets, 1)
     const limitante = viagensPorPallets > viagensPorPeso ? 'pallets' : 'peso'
     
@@ -282,7 +274,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       viagensPorPeso,
       viagensPorPallets,
       viagensNecessarias,
-      limitante
+      limitante,
+      capacidadePallets
     })
 
     // Usar preco_fixo - valor fixo por viagem (do banco de dados)
@@ -364,15 +357,15 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             </p>
           </div>
 
-          {/* Capacidade do Veículo */}
+          {/* Capacidade do Veículo - MOSTRA PALLETS CORRETOS APÓS SELECIONAR TUDO */}
           {tipoVeiculo && calculoFrete && (
             <div className="bg-white rounded-lg p-3 border border-purple-100">
               <span className="text-xs text-purple-600 block mb-1">Capacidade do Veículo</span>
               <p className="text-lg font-bold text-gray-900">
                 {((calculoFrete.capacidade_kg || 0) / 1000).toFixed(0)} ton
               </p>
-              <span className="text-xs text-gray-500">
-                {calculoFrete.capacidade_pallets || 0} pallets
+              <span className="text-xs text-purple-700 font-semibold">
+                📦 {calculoFrete.capacidade_pallets || 0} pallets
               </span>
             </div>
           )}
@@ -411,7 +404,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
 
         {/* ✅ LAYOUT LADO A LADO: Modalidade, Tipo Veículo, Destino */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          {/* Modalidade - AGORA VEM DO BANCO */}
+          {/* Modalidade */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Modalidade
@@ -436,7 +429,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             </select>
           </div>
 
-          {/* Tipo de Veículo - AGORA VEM DO BANCO */}
+          {/* Tipo de Veículo - SEM PALLETS (pois varia por cidade/modalidade) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Tipo de Veículo
@@ -450,7 +443,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <option value="">Selecione...</option>
               {tiposVeiculoUnicos.map(v => (
                 <option key={v.valor} value={v.valor}>
-                  🚚 {v.valor} ({(v.capacidade_kg / 1000).toFixed(0)} ton / {v.capacidade_pallets} pallets)
+                  🚚 {v.valor} ({(v.capacidade_kg / 1000).toFixed(0)} ton)
                 </option>
               ))}
             </select>
@@ -524,7 +517,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               <span className="text-sm text-gray-600">Qtd de Viagens:</span>
               <span className="font-semibold">{calculoFrete.viagens_necessarias}x</span>
             </div>
-            {/* ✅ NOVO: Mostrar detalhes do cálculo */}
+            {/* ✅ Mostrar detalhes do cálculo */}
             {calculoFrete.limitante && (
               <div className="flex justify-between items-center mb-2 text-xs text-gray-500">
                 <span>Viagens por peso: {calculoFrete.viagens_por_peso} | Viagens por pallets: {calculoFrete.viagens_por_pallets}</span>
