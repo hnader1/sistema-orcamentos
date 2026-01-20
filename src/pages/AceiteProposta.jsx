@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase';
 
 // =====================================================
 // PÁGINA DE ACEITE DE PROPOSTA - VERSÃO MOBILE-FIRST
-// VERSÃO 4.1 - TELEFONE E EMAIL DO VENDEDOR NA SIDEBAR
+// VERSÃO 4.2 - VENDEDOR NA TELA DE SUCESSO + EMAILS
 // =====================================================
 
 export default function AceiteProposta() {
@@ -278,6 +278,33 @@ export default function AceiteProposta() {
     setDocumentos(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Função para enviar emails de notificação
+  const enviarEmailsNotificacao = async (dadosNotificacao) => {
+    try {
+      const response = await fetch('/api/notificar-aceite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dadosNotificacao)
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('Emails de notificação enviados:', result.resultados);
+      } else {
+        console.error('Erro ao enviar emails:', result);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Erro ao chamar API de notificação:', error);
+      // Não lançar erro para não impedir o fluxo do aceite
+      return { success: false, error: error.message };
+    }
+  };
+
   const handleAceitar = async () => {
     if (!termoAceito || !lgpdAceito) {
       alert('Você precisa aceitar os termos para continuar.');
@@ -298,6 +325,7 @@ export default function AceiteProposta() {
 
       const dadosOriginais = proposta.dados_cliente_proposta?.[0];
       const emailCliente = dadosOriginais?.email || proposta.orcamentos?.cliente_email || '';
+      const telefoneCliente = dadosOriginais?.telefone || proposta.orcamentos?.cliente_telefone || '';
       const cpfCnpjCliente = getCpfCnpj(dadosOriginais, proposta.orcamentos);
 
       const { error: erroAceite } = await supabase
@@ -354,10 +382,35 @@ export default function AceiteProposta() {
           });
       }
 
+      const dataAceiteAtual = new Date().toISOString();
+
       await supabase
         .from('propostas')
-        .update({ status: 'aceita', data_aceite: new Date().toISOString() })
+        .update({ status: 'aceita', data_aceite: dataAceiteAtual })
         .eq('id', proposta.id);
+
+      // ========================================
+      // DISPARAR EMAILS DE NOTIFICAÇÃO
+      // ========================================
+      const orcamento = proposta.orcamentos;
+      const valorTotalFinal = proposta.valor_total || orcamento?.total || 0;
+
+      await enviarEmailsNotificacao({
+        numeroProposta: proposta.numero_proposta,
+        nomeCliente: dadosEditaveis.razao_social || dadosEditaveis.nome_fantasia || orcamento?.cliente_nome,
+        cpfCnpj: cpfCnpjCliente,
+        emailCliente: emailCliente,
+        telefoneCliente: telefoneCliente,
+        valorTotal: valorTotalFinal,
+        dataAceite: dataAceiteAtual,
+        vendedor: orcamento?.vendedor,
+        vendedorTelefone: orcamento?.vendedor_telefone,
+        vendedorEmail: orcamento?.vendedor_email,
+        observacaoCliente: observacaoCliente,
+        tipoCliente: dadosEditaveis.tipo_cliente,
+        contribuinteIcms: dadosEditaveis.contribuinte_icms,
+        inscricaoEstadual: dadosEditaveis.inscricao_estadual
+      });
 
       setAceiteConfirmado(true);
 
@@ -457,19 +510,54 @@ export default function AceiteProposta() {
     );
   }
 
-  // TELA DE SUCESSO
+  // ========================================
+  // TELA DE SUCESSO - COM DADOS DO VENDEDOR
+  // ========================================
   if (aceiteConfirmado) {
     return (
       <div style={styles.successContainer}>
         <div style={styles.successIcon}>✓</div>
         <h1 style={styles.successTitle}>Proposta Aceita!</h1>
         <p style={styles.successText}>Sua confirmação foi registrada com sucesso. Nossa equipe entrará em contato em breve.</p>
+        
+        {/* Resumo da Proposta */}
         <div style={styles.successInfo}>
           <p><strong>Proposta:</strong> {proposta?.numero_proposta}</p>
           <p><strong>Valor:</strong> {formatarMoeda(valorTotal)}</p>
           <p><strong>Data do Aceite:</strong> {formatarData(proposta?.data_aceite || new Date())}</p>
         </div>
         
+        {/* Card do Vendedor */}
+        <div style={styles.vendedorCard}>
+          <h3 style={styles.vendedorCardTitle}>👤 Seu Vendedor</h3>
+          <p style={styles.vendedorNome}>{orcamento?.vendedor || 'Equipe Comercial'}</p>
+          
+          {orcamento?.vendedor_telefone && (
+            <p style={styles.vendedorInfo}>
+              📞 {orcamento.vendedor_telefone}
+            </p>
+          )}
+          
+          {orcamento?.vendedor_email && (
+            <p style={styles.vendedorInfo}>
+              ✉️ {orcamento.vendedor_email}
+            </p>
+          )}
+          
+          {/* Botão WhatsApp */}
+          {orcamento?.vendedor_telefone && (
+            <a 
+              href={`https://wa.me/55${orcamento.vendedor_telefone.replace(/\D/g, '')}?text=Olá! Acabei de aceitar a proposta ${proposta?.numero_proposta}. Gostaria de mais informações sobre a entrega.`}
+              style={styles.whatsappButtonSuccess}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              📱 Falar no WhatsApp
+            </a>
+          )}
+        </div>
+        
+        {/* Botão Baixar PDF */}
         {pdfUrl && (
           <button 
             onClick={handleBaixarPdf} 
@@ -480,7 +568,9 @@ export default function AceiteProposta() {
           </button>
         )}
         
-        <p style={styles.successHint}>Um email de confirmação foi enviado para {dadosCliente?.email || orcamento?.cliente_email}</p>
+        <p style={styles.successHint}>
+          Um email de confirmação foi enviado para {dadosCliente?.email || orcamento?.cliente_email}
+        </p>
       </div>
     );
   }
@@ -958,9 +1048,49 @@ const styles = {
   successIcon: { width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', marginBottom: '25px', boxShadow: '0 10px 40px rgba(16, 185, 129, 0.4)' },
   successTitle: { fontSize: '28px', marginBottom: '15px' },
   successText: { opacity: 0.9, marginBottom: '25px', fontSize: '16px', maxWidth: '350px' },
-  successInfo: { background: 'rgba(255,255,255,0.1)', borderRadius: '12px', padding: '20px', marginBottom: '20px' },
-  successHint: { opacity: 0.6, fontSize: '13px' },
+  successInfo: { background: 'rgba(255,255,255,0.1)', borderRadius: '12px', padding: '20px', marginBottom: '20px', width: '100%', maxWidth: '350px' },
+  successHint: { opacity: 0.6, fontSize: '13px', marginTop: '20px' },
   downloadPdfButton: { display: 'inline-block', marginBottom: '20px', padding: '16px 32px', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', borderRadius: '12px', textDecoration: 'none', fontSize: '16px', fontWeight: '600', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(220, 38, 38, 0.4)' },
+  // Estilos para o card do vendedor na tela de sucesso
+  vendedorCard: { 
+    background: 'rgba(255,255,255,0.15)', 
+    borderRadius: '12px', 
+    padding: '20px', 
+    marginBottom: '20px', 
+    width: '100%', 
+    maxWidth: '350px',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255,255,255,0.2)'
+  },
+  vendedorCardTitle: { 
+    margin: '0 0 12px', 
+    fontSize: '14px', 
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600'
+  },
+  vendedorNome: { 
+    margin: '0 0 10px', 
+    fontSize: '18px', 
+    fontWeight: '700',
+    color: '#fbbf24'
+  },
+  vendedorInfo: { 
+    margin: '0 0 8px', 
+    fontSize: '14px', 
+    color: 'rgba(255,255,255,0.9)'
+  },
+  whatsappButtonSuccess: { 
+    display: 'inline-block', 
+    marginTop: '15px', 
+    padding: '12px 24px', 
+    background: '#25d366', 
+    color: 'white', 
+    borderRadius: '10px', 
+    textDecoration: 'none', 
+    fontSize: '14px', 
+    fontWeight: '600',
+    boxShadow: '0 4px 15px rgba(37, 211, 102, 0.3)'
+  },
 };
 
 if (typeof window !== 'undefined' && window.innerWidth >= 768) {
