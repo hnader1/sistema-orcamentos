@@ -5,6 +5,12 @@ import { supabase } from '../services/supabase';
 // =====================================================
 // PÁGINA DE ACEITE DE PROPOSTA - VERSÃO MOBILE-FIRST
 // Com: LGPD, Validade, Tipo Descarga, Foto do Celular
+// CORREÇÕES:
+// 1. Logo da empresa no header (sem ícone emoji)
+// 2. Botão Baixar PDF funcional
+// 3. Download PDF na tela de sucesso
+// 4. Resumo com valores corretos (produtos, frete, viagens)
+// 5. Bloqueio de edições após aceite (só número ERP)
 // =====================================================
 
 export default function AceiteProposta() {
@@ -22,6 +28,10 @@ export default function AceiteProposta() {
   
   // Estado para proposta expirada
   const [propostaExpirada, setPropostaExpirada] = useState(false);
+  
+  // ✅ Estado para URL do PDF
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [baixandoPdf, setBaixandoPdf] = useState(false);
   
   // Dados editáveis
   const [dadosEditaveis, setDadosEditaveis] = useState({
@@ -44,6 +54,9 @@ export default function AceiteProposta() {
   
   // Termo de aceite final
   const [termoAceito, setTermoAceito] = useState(false);
+
+  // ✅ URL do logo hospedado no Vercel
+  const logoUrl = 'https://sistema-orcamentos-theta.vercel.app/logo-construcom.png';
 
   // Carregar proposta
   useEffect(() => {
@@ -85,6 +98,10 @@ export default function AceiteProposta() {
       if (propostaData.status === 'aceita') {
         setAceiteConfirmado(true);
         setProposta(propostaData);
+        // ✅ Carregar URL do PDF para download
+        if (propostaData.pdf_path) {
+          await carregarUrlPdf(propostaData.pdf_path);
+        }
         setCarregando(false);
         return;
       }
@@ -101,6 +118,11 @@ export default function AceiteProposta() {
       }
 
       setProposta(propostaData);
+      
+      // ✅ Carregar URL do PDF para o botão de download
+      if (propostaData.pdf_path) {
+        await carregarUrlPdf(propostaData.pdf_path);
+      }
       
       // Preencher dados editáveis
       const dadosCliente = propostaData.dados_cliente_proposta?.[0] || propostaData.orcamentos;
@@ -127,6 +149,41 @@ export default function AceiteProposta() {
       setErro(error.message || 'Erro ao carregar proposta');
     } finally {
       setCarregando(false);
+    }
+  };
+
+  // ✅ Função para carregar URL do PDF do Storage
+  const carregarUrlPdf = async (pdfPath) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('propostas-pdf')
+        .createSignedUrl(pdfPath, 604800); // 7 dias de validade
+
+      if (!error && data?.signedUrl) {
+        setPdfUrl(data.signedUrl);
+        console.log('✅ URL do PDF carregada');
+      }
+    } catch (e) {
+      console.error('Erro ao carregar URL do PDF:', e);
+    }
+  };
+
+  // ✅ Função para baixar o PDF
+  const handleBaixarPdf = async () => {
+    if (!pdfUrl) {
+      alert('PDF não disponível. Tente recarregar a página.');
+      return;
+    }
+    
+    setBaixandoPdf(true);
+    try {
+      // Abrir em nova aba
+      window.open(pdfUrl, '_blank');
+    } catch (e) {
+      console.error('Erro ao baixar PDF:', e);
+      alert('Erro ao baixar PDF. Tente novamente.');
+    } finally {
+      setBaixandoPdf(false);
     }
   };
 
@@ -318,7 +375,14 @@ export default function AceiteProposta() {
 
   const orcamento = proposta?.orcamentos;
   const dadosCliente = proposta?.dados_cliente_proposta?.[0] || orcamento;
-  const isFOB = proposta?.tipo_frete === 'FOB' || orcamento?.tipo_frete === 'FOB';
+  const isFOB = proposta?.tipo_frete === 'FOB' || orcamento?.tipo_frete === 'FOB' || orcamento?.frete_modalidade === 'FOB';
+  
+  // ✅ CORRIGIDO: Obter valores corretos de produtos, frete e viagens
+  const totalProdutos = proposta?.total_produtos || orcamento?.subtotal || orcamento?.total_produtos || 0;
+  const totalFrete = proposta?.total_frete || orcamento?.frete || 0;
+  const valorTotal = proposta?.valor_total || orcamento?.total || (totalProdutos + totalFrete);
+  const qtdViagens = orcamento?.frete_qtd_viagens || proposta?.qtd_viagens || 0;
+  const tipoDescarga = proposta?.tipo_descarga || orcamento?.tipo_descarga || '';
 
   // TELA DE CARREGAMENTO
   if (carregando) {
@@ -372,7 +436,7 @@ export default function AceiteProposta() {
     );
   }
 
-  // TELA DE SUCESSO
+  // ✅ TELA DE SUCESSO - COM BOTÃO DE DOWNLOAD DO PDF
   if (aceiteConfirmado) {
     return (
       <div style={styles.successContainer}>
@@ -381,9 +445,21 @@ export default function AceiteProposta() {
         <p style={styles.successText}>Sua confirmação foi registrada com sucesso. Nossa equipe entrará em contato em breve.</p>
         <div style={styles.successInfo}>
           <p><strong>Proposta:</strong> {proposta?.numero_proposta}</p>
-          <p><strong>Valor:</strong> {formatarMoeda(proposta?.valor_total)}</p>
-          <p><strong>Data do Aceite:</strong> {formatarData(new Date())}</p>
+          <p><strong>Valor:</strong> {formatarMoeda(valorTotal)}</p>
+          <p><strong>Data do Aceite:</strong> {formatarData(proposta?.data_aceite || new Date())}</p>
         </div>
+        
+        {/* ✅ BOTÃO DOWNLOAD PDF */}
+        {pdfUrl && (
+          <button 
+            onClick={handleBaixarPdf} 
+            disabled={baixandoPdf}
+            style={styles.downloadPdfButton}
+          >
+            {baixandoPdf ? '⏳ Carregando...' : '📄 Baixar Proposta em PDF'}
+          </button>
+        )}
+        
         <p style={styles.successHint}>Um email de confirmação foi enviado para {dadosCliente?.email || orcamento?.cliente_email}</p>
       </div>
     );
@@ -392,14 +468,19 @@ export default function AceiteProposta() {
   // PÁGINA PRINCIPAL
   return (
     <div style={styles.container}>
+      {/* ✅ HEADER COM LOGO DA EMPRESA (SEM EMOJI) */}
       <header style={styles.header}>
         <div style={styles.headerContent}>
           <div style={styles.logo}>
-            <span style={styles.logoIcon}>🏗️</span>
-            <div>
-              <h1 style={styles.logoText}>Construcom</h1>
-              <p style={styles.logoSubtext}>Materiais de Construção</p>
-            </div>
+            <img 
+              src={logoUrl} 
+              alt="Construcom" 
+              style={styles.logoImage}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.style.display = 'none';
+              }}
+            />
           </div>
           <div style={styles.propostaNumero}>
             <span style={styles.propostaLabel}>Proposta</span>
@@ -454,9 +535,9 @@ export default function AceiteProposta() {
                   <div style={styles.fieldFull}>
                     <label style={styles.label}>Endereço de Entrega</label>
                     <div style={styles.readonlyField}>
-                      {dadosCliente?.logradouro || orcamento?.endereco_entrega}, 
-                      {dadosCliente?.bairro || orcamento?.bairro_entrega} - 
-                      {dadosCliente?.cidade || orcamento?.cidade_entrega}/
+                      {dadosCliente?.logradouro || orcamento?.endereco_entrega || orcamento?.obra_logradouro}, 
+                      {dadosCliente?.bairro || orcamento?.bairro_entrega || orcamento?.obra_bairro} - 
+                      {dadosCliente?.cidade || orcamento?.cidade_entrega || orcamento?.obra_cidade}/
                       {dadosCliente?.uf || orcamento?.uf_entrega || 'MG'}
                     </div>
                   </div>
@@ -569,32 +650,54 @@ export default function AceiteProposta() {
               <h2 style={styles.cardTitle}>✅ Confirmar Aceite</h2>
             </div>
             <div style={styles.cardContent}>
+              {/* ✅ RESUMO CORRIGIDO COM VALORES REAIS */}
               <div style={styles.resumoBox}>
                 <h3 style={styles.resumoTitle}>📦 Resumo da Proposta</h3>
                 {orcamento?.itens_json && JSON.parse(orcamento.itens_json).map((item, i) => (
                   <div key={i} style={styles.resumoItem}>
                     <span style={styles.resumoItemNome}>{item.produto}</span>
+                    <span style={styles.resumoItemQtd}>{item.quantidade} un</span>
                     <span style={styles.resumoItemValor}>{formatarMoeda(item.total)}</span>
                   </div>
                 ))}
+                
+                {/* ✅ TOTAIS CORRIGIDOS */}
                 <div style={styles.totaisBox}>
                   <div style={styles.totalLinha}>
                     <span>Total Produtos:</span>
-                    <span style={styles.totalValor}>{formatarMoeda(proposta?.total_produtos || orcamento?.total_produtos)}</span>
+                    <span style={styles.totalValor}>{formatarMoeda(totalProdutos)}</span>
                   </div>
+                  
+                  {/* ✅ FRETE COM VALOR CORRETO */}
                   <div style={{...styles.totalLinha, ...styles.freteLinha, background: isFOB ? '#fef3c7' : '#f0fdf4'}}>
-                    <span style={{ color: isFOB ? '#92400e' : '#166534' }}>{isFOB ? '🚚 Frete (FOB - Por conta do cliente)' : '🚚 Frete (CIF - Incluso)'}</span>
-                    <span style={{ color: isFOB ? '#92400e' : '#166534', fontWeight: '600' }}>{isFOB ? 'A COMBINAR' : formatarMoeda(proposta?.total_frete || orcamento?.total_frete)}</span>
+                    <span style={{ color: isFOB ? '#92400e' : '#166534' }}>
+                      🚚 Frete ({isFOB ? 'FOB - Por conta do cliente' : 'CIF - Incluso'}):
+                    </span>
+                    <span style={{ color: isFOB ? '#92400e' : '#166534', fontWeight: '600' }}>
+                      {isFOB ? 'A COMBINAR' : formatarMoeda(totalFrete)}
+                    </span>
                   </div>
-                  {(proposta?.tipo_descarga || orcamento?.tipo_descarga) && (
+                  
+                  {/* ✅ QUANTIDADE DE VIAGENS */}
+                  {qtdViagens > 0 && (
                     <div style={styles.totalLinha}>
-                      <span>🏗️ Tipo de Descarga:</span>
-                      <span style={styles.totalValor}>{proposta?.tipo_descarga || orcamento?.tipo_descarga}</span>
+                      <span>🚛 Quantidade de Viagens:</span>
+                      <span style={styles.totalValor}>{qtdViagens} {qtdViagens === 1 ? 'viagem' : 'viagens'}</span>
                     </div>
                   )}
+                  
+                  {/* TIPO DE DESCARGA */}
+                  {tipoDescarga && (
+                    <div style={styles.totalLinha}>
+                      <span>🏗️ Tipo de Descarga:</span>
+                      <span style={styles.totalValor}>{tipoDescarga}</span>
+                    </div>
+                  )}
+                  
+                  {/* ✅ TOTAL GERAL */}
                   <div style={styles.totalGeral}>
                     <span>TOTAL DA PROPOSTA:</span>
-                    <span style={styles.totalGeralValor}>{formatarMoeda(isFOB ? proposta?.total_produtos : proposta?.valor_total)}</span>
+                    <span style={styles.totalGeralValor}>{formatarMoeda(isFOB ? totalProdutos : valorTotal)}</span>
                   </div>
                   {isFOB && <p style={styles.fobAviso}>* O valor do frete será combinado e cobrado separadamente</p>}
                 </div>
@@ -652,11 +755,12 @@ export default function AceiteProposta() {
           </div>
         )}
 
+        {/* ✅ SIDEBAR COM BOTÃO DE DOWNLOAD PDF FUNCIONAL */}
         <aside style={styles.sidebar}>
           <div style={styles.sidebarCard}>
             <div style={styles.sidebarHeader}>
               <p style={styles.sidebarLabel}>{isFOB ? 'Total Produtos' : 'Valor Total'}</p>
-              <p style={styles.sidebarValue}>{formatarMoeda(isFOB ? proposta?.total_produtos : proposta?.valor_total)}</p>
+              <p style={styles.sidebarValue}>{formatarMoeda(isFOB ? totalProdutos : valorTotal)}</p>
               {!isFOB && <p style={styles.sidebarDetail}>(Produtos + Frete)</p>}
             </div>
             {isFOB && <div style={styles.fobBadge}>🚚 Frete FOB - Por conta do cliente</div>}
@@ -664,8 +768,23 @@ export default function AceiteProposta() {
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Proposta</span><span style={styles.sidebarInfoValue}>{proposta?.numero_proposta}</span></div>
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Validade</span><span style={styles.sidebarInfoValue}>{formatarData(proposta?.data_expiracao)}</span></div>
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Vendedor</span><span style={styles.sidebarInfoValue}>{orcamento?.vendedor}</span></div>
+              {qtdViagens > 0 && (
+                <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Viagens</span><span style={styles.sidebarInfoValue}>{qtdViagens}</span></div>
+              )}
             </div>
-            <a href="#" style={styles.downloadButton}>📄 Baixar PDF</a>
+            
+            {/* ✅ BOTÃO BAIXAR PDF FUNCIONAL */}
+            <button 
+              onClick={handleBaixarPdf} 
+              disabled={!pdfUrl || baixandoPdf}
+              style={{
+                ...styles.downloadButton,
+                opacity: pdfUrl ? 1 : 0.5,
+                cursor: pdfUrl ? 'pointer' : 'not-allowed'
+              }}
+            >
+              {baixandoPdf ? '⏳ Carregando...' : '📄 Baixar PDF'}
+            </button>
           </div>
           <div style={styles.contactCard}>
             <h4>💬 Dúvidas?</h4>
@@ -695,6 +814,7 @@ const styles = {
   header: { background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)', padding: '15px', position: 'sticky', top: 0, zIndex: 100 },
   headerContent: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1000px', margin: '0 auto' },
   logo: { display: 'flex', alignItems: 'center', gap: '10px' },
+  logoImage: { maxHeight: '50px', width: 'auto' },
   logoIcon: { fontSize: '28px' },
   logoText: { color: 'white', fontSize: '18px', fontWeight: '700', margin: 0 },
   logoSubtext: { color: 'rgba(255,255,255,0.6)', fontSize: '11px', margin: 0 },
@@ -749,8 +869,9 @@ const styles = {
   uploadingIndicator: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '15px', color: '#6366f1', fontSize: '14px' },
   resumoBox: { background: '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '20px' },
   resumoTitle: { margin: '0 0 15px', fontSize: '15px', fontWeight: '600', color: '#0a2540' },
-  resumoItem: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e2e8f0', fontSize: '13px' },
-  resumoItemNome: { color: '#475569' },
+  resumoItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #e2e8f0', fontSize: '13px' },
+  resumoItemNome: { flex: 1, color: '#475569' },
+  resumoItemQtd: { padding: '0 10px', color: '#64748b', fontSize: '12px' },
   resumoItemValor: { color: '#0a2540', fontWeight: '500' },
   totaisBox: { marginTop: '15px', paddingTop: '15px', borderTop: '2px solid #e2e8f0' },
   totalLinha: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px' },
@@ -783,7 +904,7 @@ const styles = {
   sidebarInfoItem: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #e2e8f0' },
   sidebarInfoLabel: { color: '#94a3b8', fontSize: '12px' },
   sidebarInfoValue: { color: '#0a2540', fontWeight: '600', fontSize: '13px' },
-  downloadButton: { display: 'block', margin: '0 20px 20px', padding: '12px', background: '#f1f5f9', borderRadius: '10px', textAlign: 'center', color: '#475569', textDecoration: 'none', fontSize: '14px', fontWeight: '500' },
+  downloadButton: { display: 'block', margin: '0 20px 20px', padding: '14px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', borderRadius: '10px', textAlign: 'center', color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', width: 'calc(100% - 40px)' },
   contactCard: { background: 'rgba(255,255,255,0.1)', borderRadius: '16px', padding: '20px', marginTop: '20px', color: 'white', textAlign: 'center' },
   whatsappButton: { display: 'inline-block', marginTop: '10px', padding: '12px 20px', background: '#25d366', color: 'white', borderRadius: '10px', textDecoration: 'none', fontSize: '14px', fontWeight: '600' },
   footer: { background: 'rgba(0,0,0,0.3)', padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '12px' },
@@ -809,6 +930,7 @@ const styles = {
   successText: { opacity: 0.9, marginBottom: '25px', fontSize: '16px', maxWidth: '350px' },
   successInfo: { background: 'rgba(255,255,255,0.1)', borderRadius: '12px', padding: '20px', marginBottom: '20px' },
   successHint: { opacity: 0.6, fontSize: '13px' },
+  downloadPdfButton: { display: 'inline-block', marginBottom: '20px', padding: '16px 32px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white', borderRadius: '12px', textDecoration: 'none', fontSize: '16px', fontWeight: '600', border: 'none', cursor: 'pointer', boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)' },
 };
 
 if (typeof window !== 'undefined' && window.innerWidth >= 768) {

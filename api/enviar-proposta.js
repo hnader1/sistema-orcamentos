@@ -16,7 +16,9 @@ const createTransporter = () => {
   });
 };
 
-// Template do email HTML - VERSÃO CORRIGIDA COM LOGO E LINK COMPLETO
+// Template do email HTML - VERSÃO CORRIGIDA
+// - Logo da empresa (sem ícone + texto)
+// - Valores de frete e viagens corretos
 const gerarTemplateEmail = (dados) => {
   const {
     numeroProposta,
@@ -26,6 +28,7 @@ const gerarTemplateEmail = (dados) => {
     totalProdutos,
     totalFrete,
     tipoFrete,
+    qtdViagens,
     dataExpiracao,
     vendedor,
     vendedorTelefone,
@@ -57,8 +60,16 @@ const gerarTemplateEmail = (dados) => {
     `).join('');
   }
 
-  // URL do logo hospedado no Vercel
+  // URL do logo hospedado no Vercel - APENAS O LOGO (sem ícone + texto)
   const logoUrl = 'https://sistema-orcamentos-theta.vercel.app/logo-construcom.png';
+
+  // HTML para viagens (se houver)
+  const viagensHtml = qtdViagens && qtdViagens > 0 ? `
+    <tr>
+      <td style="padding: 8px 0; color: #475569;">🚛 Quantidade de Viagens:</td>
+      <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #0a2540;">${qtdViagens} ${qtdViagens === 1 ? 'viagem' : 'viagens'}</td>
+    </tr>
+  ` : '';
 
   return `
 <!DOCTYPE html>
@@ -71,11 +82,10 @@ const gerarTemplateEmail = (dados) => {
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
     
-    <!-- Header com Logo -->
+    <!-- Header APENAS com Logo (sem ícone + texto) -->
     <tr>
       <td style="background: linear-gradient(135deg, #0a2540 0%, #1a365d 100%); padding: 30px; text-align: center;">
-        <img src="${logoUrl}" alt="Construcom" style="max-width: 180px; height: auto; margin-bottom: 10px;" />
-        <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0; font-size: 14px;">Materiais de Construção</p>
+        <img src="${logoUrl}" alt="Construcom" style="max-width: 200px; height: auto;" />
       </td>
     </tr>
 
@@ -119,236 +129,4 @@ const gerarTemplateEmail = (dados) => {
                 </thead>
                 <tbody>
                   ${itensHtml}
-                </tbody>
-              </table>
-
-              <!-- Totais -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 15px; border-top: 2px solid #e2e8f0; padding-top: 15px;">
-                <tr>
-                  <td style="padding: 8px 0; color: #475569;">Total Produtos:</td>
-                  <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #0a2540;">${formatarMoeda(totalProdutos)}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: ${isFOB ? '#92400e' : '#166534'}; background-color: ${isFOB ? '#fef3c7' : '#f0fdf4'}; padding-left: 10px; border-radius: 6px 0 0 6px;">
-                    🚚 Frete (${isFOB ? 'FOB - Por sua conta' : 'CIF - Incluso'}):
-                  </td>
-                  <td style="padding: 8px 0; text-align: right; font-weight: 600; color: ${isFOB ? '#92400e' : '#166534'}; background-color: ${isFOB ? '#fef3c7' : '#f0fdf4'}; padding-right: 10px; border-radius: 0 6px 6px 0;">
-                    ${isFOB ? 'A COMBINAR' : formatarMoeda(totalFrete)}
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Total Geral -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 15px;">
-                <tr>
-                  <td style="background: linear-gradient(135deg, #0a2540, #1a365d); padding: 15px; border-radius: 10px;">
-                    <table width="100%">
-                      <tr>
-                        <td style="color: #ffffff; font-weight: 600;">TOTAL${isFOB ? ' (sem frete)' : ''}:</td>
-                        <td style="text-align: right; color: #fbbf24; font-size: 22px; font-weight: 700;">${formatarMoeda(valorExibir)}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              ${isFOB ? '<p style="text-align: center; color: #92400e; font-size: 12px; margin: 10px 0 0; font-style: italic;">* O valor do frete será combinado e cobrado separadamente</p>' : ''}
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- CTA Button -->
-    <tr>
-      <td style="padding: 0 30px 20px; text-align: center;">
-        <a href="${linkAceite}" style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 18px 40px; border-radius: 12px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
-          ✓ ACEITAR PROPOSTA
-        </a>
-      </td>
-    </tr>
-
-    <!-- Link Completo Visível -->
-    <tr>
-      <td style="padding: 0 30px 30px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; border-radius: 10px; border: 1px solid #e2e8f0;">
-          <tr>
-            <td style="padding: 15px;">
-              <p style="margin: 0 0 8px; font-size: 12px; color: #64748b; font-weight: 600;">🔗 Link para aceite da proposta:</p>
-              <p style="margin: 0; font-size: 12px; word-break: break-all; line-height: 1.5;">
-                <a href="${linkAceite}" style="color: #6366f1; text-decoration: underline;">${linkAceite}</a>
-              </p>
-              <p style="margin: 10px 0 0; font-size: 11px; color: #94a3b8;">
-                💡 Copie e cole este link no navegador caso o botão acima não funcione.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Validade -->
-    <tr>
-      <td style="padding: 0 30px 30px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-radius: 10px; border: 1px solid #fbbf24;">
-          <tr>
-            <td style="padding: 15px; text-align: center;">
-              <span style="color: #92400e; font-size: 14px;">⏰ Esta proposta é válida até <strong>${formatarData(dataExpiracao)}</strong></span>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Contato Vendedor -->
-    <tr>
-      <td style="padding: 0 30px 30px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border-radius: 10px; border: 1px solid #86efac;">
-          <tr>
-            <td style="padding: 20px;">
-              <p style="color: #166534; margin: 0 0 10px; font-weight: 600;">💬 Dúvidas? Fale com seu vendedor:</p>
-              <p style="color: #166534; margin: 0; font-size: 15px;">
-                <strong>${vendedor}</strong>
-                ${vendedorTelefone ? `<br><a href="https://wa.me/55${vendedorTelefone.replace(/\\D/g, '')}" style="color: #25d366; text-decoration: none;">📱 WhatsApp: ${vendedorTelefone}</a>` : ''}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Aviso PDF -->
-    <tr>
-      <td style="padding: 0 30px 30px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border-radius: 10px; border: 1px solid #93c5fd;">
-          <tr>
-            <td style="padding: 15px; text-align: center;">
-              <span style="color: #1e40af; font-size: 13px;">📄 A proposta comercial completa está disponível no link acima.</span>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Footer -->
-    <tr>
-      <td style="background-color: #0a2540; padding: 25px; text-align: center;">
-        <p style="color: rgba(255,255,255,0.6); margin: 0; font-size: 12px;">
-          Construcom Materiais de Construção LTDA<br>
-          Este email foi enviado automaticamente. Em caso de dúvidas, contate seu vendedor.
-        </p>
-      </td>
-    </tr>
-
-  </table>
-</body>
-</html>
-  `;
-};
-
-// Handler principal
-export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
-  }
-
-  try {
-    const {
-      emailDestino,
-      numeroProposta,
-      nomeCliente,
-      nomeFantasia,
-      valorTotal,
-      totalProdutos,
-      totalFrete,
-      tipoFrete,
-      dataExpiracao,
-      vendedor,
-      vendedorTelefone,
-      vendedorEmail,
-      linkAceite,
-      itens,
-      pdfBase64,
-      pdfNome
-    } = req.body;
-
-    // Validações
-    if (!emailDestino || !numeroProposta || !linkAceite) {
-      return res.status(400).json({ 
-        error: 'Dados obrigatórios faltando',
-        detalhes: 'emailDestino, numeroProposta e linkAceite são obrigatórios'
-      });
-    }
-
-    // Criar transporter
-    const transporter = createTransporter();
-
-    // Verificar conexão
-    await transporter.verify();
-
-    // Gerar HTML do email
-    const htmlEmail = gerarTemplateEmail({
-      numeroProposta,
-      nomeCliente,
-      nomeFantasia,
-      valorTotal,
-      totalProdutos,
-      totalFrete,
-      tipoFrete,
-      dataExpiracao,
-      vendedor,
-      vendedorTelefone,
-      linkAceite,
-      itens
-    });
-
-    // Configurar email
-    const mailOptions = {
-      from: `"Construcom" <${process.env.SMTP_USER}>`,
-      to: emailDestino,
-      cc: vendedorEmail || undefined,
-      subject: `Proposta Comercial ${numeroProposta} - Construcom`,
-      html: htmlEmail,
-      attachments: []
-    };
-
-    // Adicionar PDF se fornecido
-    if (pdfBase64) {
-      mailOptions.attachments.push({
-        filename: pdfNome || `Proposta_${numeroProposta}.pdf`,
-        content: pdfBase64,
-        encoding: 'base64',
-        contentType: 'application/pdf'
-      });
-    }
-
-    // Enviar email
-    const info = await transporter.sendMail(mailOptions);
-
-    console.log('Email enviado:', info.messageId);
-
-    return res.status(200).json({
-      success: true,
-      messageId: info.messageId,
-      mensagem: `Email enviado com sucesso para ${emailDestino}`
-    });
-
-  } catch (error) {
-    console.error('Erro ao enviar email:', error);
-    
-    return res.status(500).json({
-      error: 'Erro ao enviar email',
-      detalhes: error.message,
-      codigo: error.code
-    });
-  }
-}
+                </tbody
