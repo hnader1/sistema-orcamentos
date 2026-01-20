@@ -20,6 +20,7 @@
 // - Nome do cliente ao lado do número (#ORC-0010 • Nome Cliente)
 // - Badge de status posicionado ao lado dos botões de ação
 // - Cidade do cadastro incluída nas informações
+// - ✅ DESCONTO ZERADO ao duplicar (requer nova autorização)
 // ====================================================================================
 
 import { useState, useEffect } from 'react'
@@ -95,11 +96,13 @@ export default function OrcamentosStatus() {
   })
 
   // ====================================================================================
-  // AÇÃO: DUPLICAR ORÇAMENTO
+  // AÇÃO: DUPLICAR ORÇAMENTO - CORRIGIDO (DESCONTO ZERADO)
   // ====================================================================================
   const duplicar = async (id) => {
+    if (!confirm('Deseja duplicar este orçamento?\n\n⚠️ O desconto será zerado (nova proposta requer nova autorização).')) return
+
     try {
-      console.log('📋 Duplicando orçamento ID:', id)
+      console.log('📋 [DUPLICAR] Duplicando orçamento ID:', id)
       
       // Busca o orçamento original
       const { data: original, error: errorOrc } = await supabase
@@ -134,23 +137,71 @@ export default function OrcamentosStatus() {
         novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
       }
 
-      console.log('📝 Novo número gerado:', novoNumero)
+      console.log('📝 [DUPLICAR] Novo número gerado:', novoNumero)
+      console.log('📝 [DUPLICAR] Desconto original:', original.desconto_geral, '→ Novo: 0')
 
-      // Cria o novo orçamento
+      // ✅ CORREÇÃO: Criar objeto novo explicitamente, DESCONTO = 0
       const novoOrcamento = {
-        ...original,
-        id: undefined,
         numero: novoNumero,
+        numero_proposta: null, // Será gerado novo ao salvar
+        cliente_nome: original.cliente_nome,
+        cliente_empresa: original.cliente_empresa,
+        cliente_email: original.cliente_email,
+        cliente_telefone: original.cliente_telefone,
+        cliente_cpf_cnpj: original.cliente_cpf_cnpj,
+        endereco_entrega: original.endereco_entrega,
+        vendedor: user?.nome || original.vendedor,
+        vendedor_telefone: user?.telefone || original.vendedor_telefone,
+        vendedor_email: user?.email || original.vendedor_email,
+        data_orcamento: new Date().toISOString().split('T')[0],
+        validade_dias: original.validade_dias || 15,
+        data_validade: original.data_validade,
+        forma_pagamento_id: original.forma_pagamento_id,
+        prazo_entrega: original.prazo_entrega,
+        // ✅ DESCONTO ZERADO - nova proposta requer nova autorização
+        desconto_geral: 0,
+        subtotal: original.subtotal,
+        frete: original.frete,
+        frete_modalidade: original.frete_modalidade || 'FOB',
+        frete_qtd_viagens: original.frete_qtd_viagens || 0,
+        frete_valor_viagem: original.frete_valor_viagem || 0,
+        frete_cidade: original.frete_cidade,
+        frete_tipo_caminhao: original.frete_tipo_caminhao,
+        frete_manual: original.frete_manual || false,
+        frete_valor_manual_viagem: original.frete_valor_manual_viagem,
+        frete_qtd_manual_viagens: original.frete_qtd_manual_viagens,
+        observacao_frete_manual: original.observacao_frete_manual,
+        total: original.subtotal + (original.frete || 0), // Recalcular sem desconto
+        observacoes: original.observacoes,
+        observacoes_internas: original.observacoes_internas,
         status: 'rascunho',
         excluido: false,
-        data_exclusao: null,
         numero_lancamento_erp: null,
         data_lancamento: null,
         lancado_por: null,
         usuario_id: user?.id || null,
-        created_at: undefined,
-        updated_at: undefined
+        // Campos de CNPJ/CPF
+        cnpj_cpf: original.cnpj_cpf,
+        cnpj_cpf_nao_informado: original.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: original.cnpj_cpf_nao_informado_aceite_data,
+        cnpj_cpf_nao_informado_aceite_ip: null,
+        // Campos de endereço da obra
+        obra_cep: original.obra_cep,
+        obra_cidade: original.obra_cidade,
+        obra_bairro: original.obra_bairro,
+        obra_logradouro: original.obra_logradouro,
+        obra_numero: original.obra_numero,
+        obra_complemento: original.obra_complemento,
+        obra_endereco_validado: original.obra_endereco_validado || false,
+        // ✅ CAMPOS DE DESCONTO ZERADOS
+        desconto_liberado: false,
+        desconto_liberado_por: null,
+        desconto_liberado_por_id: null,
+        desconto_liberado_em: null,
+        desconto_valor_liberado: null
       }
+
+      console.log('📦 [DUPLICAR] Dados do novo orçamento (desconto_geral=0):', novoOrcamento.desconto_geral)
 
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
@@ -158,34 +209,49 @@ export default function OrcamentosStatus() {
         .select()
         .single()
 
-      if (errorCriar) throw errorCriar
+      if (errorCriar) {
+        console.error('❌ [DUPLICAR] Erro ao criar orçamento:', errorCriar)
+        throw errorCriar
+      }
 
-      console.log('✅ Orçamento duplicado com ID:', orcCriado.id)
+      console.log('✅ [DUPLICAR] Orçamento duplicado com ID:', orcCriado.id)
+      console.log('✅ [DUPLICAR] desconto_geral no banco:', orcCriado.desconto_geral)
 
       // Copia os itens para o novo orçamento
       if (itens && itens.length > 0) {
         const novosItens = itens.map(item => ({
-          ...item,
-          id: undefined,
           orcamento_id: orcCriado.id,
-          created_at: undefined
+          produto_id: item.produto_id,
+          produto_codigo: item.produto_codigo,
+          produto: item.produto,
+          classe: item.classe,
+          mpa: item.mpa,
+          quantidade: item.quantidade,
+          preco_unitario: item.preco_unitario,
+          peso_unitario: item.peso_unitario,
+          qtd_por_pallet: item.qtd_por_pallet,
+          subtotal: item.subtotal,
+          ordem: item.ordem
         }))
 
-        console.log(`📦 Copiando ${novosItens.length} produtos...`)
+        console.log(`📦 [DUPLICAR] Copiando ${novosItens.length} produtos...`)
 
         const { error: errorItensNovos } = await supabase
           .from('orcamentos_itens')
           .insert(novosItens)
 
-        if (errorItensNovos) throw errorItensNovos
+        if (errorItensNovos) {
+          console.error('❌ [DUPLICAR] Erro ao copiar itens:', errorItensNovos)
+          throw errorItensNovos
+        }
         
-        console.log('✅ Produtos copiados!')
+        console.log('✅ [DUPLICAR] Produtos copiados!')
       }
 
-      alert('Orçamento duplicado com sucesso!')
+      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}\n\n⚠️ Desconto zerado - solicite nova autorização se necessário.`)
       navigate(`/orcamentos/editar/${orcCriado.id}`)
     } catch (error) {
-      console.error('❌ Erro ao duplicar:', error)
+      console.error('❌ [DUPLICAR] Erro ao duplicar:', error)
       alert('Erro ao duplicar orçamento: ' + error.message)
     }
   }
@@ -495,5 +561,9 @@ export default function OrcamentosStatus() {
 // 8. QUERIES DO SUPABASE:
 //    Certifique-se que a query está buscando todos os campos:
 //    .select('*, cidade, vendedor, usuarios!orcamentos_usuario_id_fkey!inner(nome)')
+//
+// 9. DUPLICAÇÃO:
+//    - ✅ DESCONTO É ZERADO ao duplicar (nova proposta requer nova autorização)
+//    - Campos de desconto_liberado também são resetados
 //
 // ====================================================================================
