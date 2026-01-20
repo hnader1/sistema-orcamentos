@@ -18,6 +18,7 @@ export default function PropostaComercial({
   const [loading, setLoading] = useState(true)
   const [salvandoPdf, setSalvandoPdf] = useState(false)
   const [pdfSalvo, setPdfSalvo] = useState(false)
+  const [propostaIdLocal, setPropostaIdLocal] = useState(propostaId)
 
   useEffect(() => {
     if (isOpen && dadosOrcamento?.forma_pagamento_id) {
@@ -25,7 +26,40 @@ export default function PropostaComercial({
     } else {
       setLoading(false)
     }
-  }, [isOpen, dadosOrcamento?.forma_pagamento_id])
+    
+    // Verificar se já existe proposta com PDF para este orçamento
+    if (isOpen && dadosOrcamento?.id) {
+      verificarPropostaExistente()
+    }
+  }, [isOpen, dadosOrcamento?.forma_pagamento_id, dadosOrcamento?.id])
+
+  // Atualizar propostaIdLocal quando propostaId prop mudar
+  useEffect(() => {
+    if (propostaId) {
+      setPropostaIdLocal(propostaId)
+    }
+  }, [propostaId])
+
+  const verificarPropostaExistente = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('propostas')
+        .select('id, pdf_path')
+        .eq('orcamento_id', dadosOrcamento.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (!error && data && data.length > 0) {
+        setPropostaIdLocal(data[0].id)
+        if (data[0].pdf_path) {
+          setPdfSalvo(true)
+          console.log('✅ Proposta existente com PDF encontrada:', data[0].id)
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao verificar proposta existente:', e)
+    }
+  }
 
   const carregarFormaPagamento = async () => {
     try {
@@ -126,19 +160,82 @@ export default function PropostaComercial({
     setTimeout(() => { janela.print(); janela.close() }, 300)
   }
 
+  // ✅ Criar ou buscar proposta automaticamente
+  const obterOuCriarProposta = async () => {
+    // Se já temos um ID, usar ele
+    if (propostaIdLocal) {
+      return propostaIdLocal
+    }
+
+    // Verificar se já existe proposta para este orçamento
+    const { data: existente, error: erroConsulta } = await supabase
+      .from('propostas')
+      .select('id')
+      .eq('orcamento_id', dadosOrcamento.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (!erroConsulta && existente && existente.length > 0) {
+      setPropostaIdLocal(existente[0].id)
+      return existente[0].id
+    }
+
+    // Criar nova proposta
+    const token = crypto.randomUUID().replace(/-/g, '')
+    const dataExpiracao = new Date()
+    dataExpiracao.setDate(dataExpiracao.getDate() + (dadosOrcamento.validade_dias || 15))
+
+    const { data: novaProposta, error: erroCriacao } = await supabase
+      .from('propostas')
+      .insert({
+        orcamento_id: dadosOrcamento.id,
+        vendedor_id: dadosOrcamento.usuario_id || dadosOrcamento.usuario_id_original,
+        token_aceite: token,
+        numero_proposta: dadosOrcamento.numero_proposta || dadosOrcamento.numero,
+        valor_total: totalGeral,
+        total_produtos: totalProdutosComDesconto,
+        total_frete: totalFrete,
+        tipo_frete: dadosFrete?.modalidade || 'FOB',
+        status: 'rascunho',
+        data_expiracao: dataExpiracao.toISOString()
+      })
+      .select()
+      .single()
+
+    if (erroCriacao) {
+      console.error('Erro ao criar proposta:', erroCriacao)
+      throw new Error('Não foi possível criar a proposta: ' + erroCriacao.message)
+    }
+
+    console.log('✅ Proposta criada:', novaProposta.id)
+    setPropostaIdLocal(novaProposta.id)
+    return novaProposta.id
+  }
+
   // Salvar PDF para envio por email
   const salvarPdfParaEnvio = async () => {
-    if (!propostaId) {
-      alert('Erro: ID da proposta não encontrado. Salve o orçamento primeiro.')
+    if (!dadosOrcamento?.id) {
+      alert('Erro: Salve o orçamento primeiro antes de gerar o PDF.')
       return
     }
 
     setSalvandoPdf(true)
     try {
+      // 1. Obter ou criar proposta
+      console.log('📋 Obtendo/criando proposta...')
+      const idProposta = await obterOuCriarProposta()
+      
+      if (!idProposta) {
+        throw new Error('Não foi possível obter o ID da proposta')
+      }
+
+      // 2. Gerar e salvar PDF
       const numeroProposta = dadosOrcamento.numero_proposta || dadosOrcamento.numero
+      console.log('📄 Gerando PDF para proposta:', idProposta)
+      
       const resultado = await gerarESalvarPdfProposta(
         printRef.current,
-        propostaId,
+        idProposta,
         numeroProposta
       )
 
@@ -173,6 +270,9 @@ export default function PropostaComercial({
     clausulaTitulo: { fontSize: '9px', fontWeight: 'bold', color: '#4c7f8a', marginBottom: '3px' },
     clausulaTexto: { fontSize: '8px', color: '#4a5568', paddingLeft: '8px', lineHeight: '1.5' }
   }
+
+  // Verificar se pode mostrar o botão de salvar
+  const podeSalvarPdf = dadosOrcamento?.id && dadosOrcamento?.numero_proposta
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '20px' }}>
@@ -441,7 +541,7 @@ export default function PropostaComercial({
         </div>
 
         {/* Ações */}
-        <div style={{ backgroundColor: '#f0f0f0', padding: '12px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #ddd' }}>
+        <div style={{ backgroundColor: '#f0f0f0', padding: '12px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #ddd', flexWrap: 'wrap' }}>
           <button onClick={onClose} style={{ padding: '10px 20px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
             Fechar
           </button>
@@ -451,9 +551,11 @@ export default function PropostaComercial({
             style={{ padding: '10px 20px', backgroundColor: '#4c7f8a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', opacity: loading ? 0.5 : 1 }}
           >
             <Printer size={18} />
-            Imprimir / Salvar PDF
+            Imprimir
           </button>
-          {propostaId && (
+          
+          {/* ✅ BOTÃO SEMPRE VISÍVEL SE ORÇAMENTO TIVER NÚMERO */}
+          {podeSalvarPdf ? (
             <button 
               onClick={salvarPdfParaEnvio} 
               disabled={loading || salvandoPdf}
@@ -473,7 +575,7 @@ export default function PropostaComercial({
             >
               {salvandoPdf ? (
                 <>
-                  <span className="animate-spin">⏳</span>
+                  <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span>
                   Salvando...
                 </>
               ) : pdfSalvo ? (
@@ -488,9 +590,37 @@ export default function PropostaComercial({
                 </>
               )}
             </button>
+          ) : (
+            <button 
+              disabled
+              title="Salve o orçamento primeiro para gerar o número da proposta"
+              style={{ 
+                padding: '10px 20px', 
+                backgroundColor: '#9ca3af', 
+                color: '#fff', 
+                border: 'none', 
+                borderRadius: '6px', 
+                cursor: 'not-allowed', 
+                fontWeight: 'bold', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                opacity: 0.6 
+              }}
+            >
+              <Upload size={18} />
+              Salve primeiro
+            </button>
           )}
         </div>
       </div>
+      
+      <style>{`
+        @keyframes spin { 
+          0% { transform: rotate(0deg); } 
+          100% { transform: rotate(360deg); } 
+        }
+      `}</style>
     </div>
   )
 }
