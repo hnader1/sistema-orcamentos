@@ -1,7 +1,7 @@
 // src/pages/OrcamentoForm.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
@@ -13,6 +13,7 @@ import { verificarConcorrenciaInterna } from '../utils/concorrenciaUtils'
 import { gerarNumeroProposta, buscarCodigoVendedor } from '../utils/numeracaoPropostaUtils'
 import ModalAlertaConcorrencia from '../components/ModalAlertaConcorrencia'
 import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaPagamento'
+import BotaoEnviarProposta from '../components/BotaoEnviarProposta'
 
 const TABELA_ITENS = 'orcamentos_itens'
 
@@ -39,7 +40,7 @@ function OrcamentoForm() {
   const [senhaLiberacao, setSenhaLiberacao] = useState('')
   const [validandoSenha, setValidandoSenha] = useState(false)
   const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
-  const [descontoTravado, setDescontoTravado] = useState(false) // ✅ Novo: trava o campo após liberação
+  const [descontoTravado, setDescontoTravado] = useState(false)
   const LIMITE_DESCONTO = 5
   
   const [formData, setFormData] = useState({
@@ -76,7 +77,6 @@ function OrcamentoForm() {
     obra_numero: '',
     obra_complemento: '',
     obra_endereco_validado: false,
-    // ✅ Campos de controle de liberação de desconto
     desconto_liberado: false,
     desconto_liberado_por: null,
     desconto_liberado_por_id: null,
@@ -93,8 +93,6 @@ function OrcamentoForm() {
         .order('nome')
 
       if (error) throw error
-      
-      console.log('📋 Vendedores carregados:', data?.length || 0)
       setVendedores(data || [])
     } catch (error) {
       console.error('❌ Erro ao carregar vendedores:', error)
@@ -111,7 +109,6 @@ function OrcamentoForm() {
         vendedor_telefone: vendedorSelecionado.telefone || '',
         vendedor_email: vendedorSelecionado.email || ''
       }))
-      console.log('✅ Vendedor selecionado:', vendedorSelecionado.nome)
     } else {
       setFormData(prev => ({
         ...prev,
@@ -142,9 +139,6 @@ function OrcamentoForm() {
       if (resultado.temConflito) {
         setConflitosDetectados(resultado)
         setMostrarAlertaConcorrencia(true)
-        console.log('⚠️ Conflitos detectados:', resultado.totalConflitos)
-      } else {
-        console.log('✅ Nenhum conflito detectado')
       }
     } catch (error) {
       console.error('Erro ao verificar concorrência:', error)
@@ -244,8 +238,6 @@ function OrcamentoForm() {
     try {
       setLoading(true)
       
-      console.log('🔍 [CARREGAR] Iniciando carregamento do orçamento ID:', id)
-      
       const { data: orc, error: errorOrc } = await supabase
         .from('orcamentos')
         .select('*')
@@ -253,18 +245,6 @@ function OrcamentoForm() {
         .single()
 
       if (errorOrc) throw errorOrc
-
-      console.log('✅ [CARREGAR] Orçamento carregado:', orc.numero)
-      
-      // ✅ LOG para debug do frete
-      console.log('🚚 [CARREGAR] Dados de frete do banco:', {
-        frete_modalidade: orc.frete_modalidade,
-        frete_tipo_caminhao: orc.frete_tipo_caminhao,
-        frete_cidade: orc.frete_cidade,
-        frete_qtd_viagens: orc.frete_qtd_viagens,
-        frete_valor_viagem: orc.frete_valor_viagem,
-        frete: orc.frete
-      })
 
       setFormData({
         numero: orc.numero,
@@ -300,7 +280,6 @@ function OrcamentoForm() {
         obra_numero: orc.obra_numero || '',
         obra_complemento: orc.obra_complemento || '',
         obra_endereco_validado: orc.obra_endereco_validado || false,
-        // ✅ Campos de controle de liberação de desconto
         desconto_liberado: orc.desconto_liberado || false,
         desconto_liberado_por: orc.desconto_liberado_por || null,
         desconto_liberado_por_id: orc.desconto_liberado_por_id || null,
@@ -314,7 +293,6 @@ function OrcamentoForm() {
         cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null
       })
 
-      // ✅ CORREÇÃO: Definir cnpjCpfValido ao carregar orçamento existente
       const cnpjValido = orc.cnpj_cpf || orc.cnpj_cpf_nao_informado
       setCnpjCpfValido(cnpjValido)
 
@@ -330,45 +308,35 @@ function OrcamentoForm() {
 
       if (orc.desconto_geral > LIMITE_DESCONTO) {
         setDescontoLiberado(true)
-        setDescontoTravado(true) // ✅ Trava o campo se já foi liberado
+        setDescontoTravado(true)
         
-        // Carregar dados de quem liberou do banco
         if (orc.desconto_liberado_por) {
           setDescontoLiberadoPor({
             nome: orc.desconto_liberado_por,
             data: orc.desconto_liberado_em ? new Date(orc.desconto_liberado_em).toLocaleString('pt-BR') : '',
             valor: orc.desconto_valor_liberado
           })
-          console.log('📋 Desconto foi liberado por:', orc.desconto_liberado_por, 'em', orc.desconto_liberado_em)
         }
       }
 
-      // ✅ CORREÇÃO: Carregar frete com nomes PADRONIZADOS
-    
-// ✅ CORREÇÃO: Carregar frete com suporte a FRETE MANUAL
-if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
-  const dadosFreteCarregados = {
-    modalidade: orc.frete_modalidade || 'FOB',
-    tipo_frete: orc.frete_modalidade || 'FOB',
-    tipo_veiculo: orc.frete_tipo_caminhao || '',
-    tipo_caminhao: orc.frete_tipo_caminhao || '',
-    localidade: orc.frete_cidade || '',
-    cidade: orc.frete_cidade || '',
-    viagens_necessarias: orc.frete_qtd_viagens || 0,
-    valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
-    valor_total_frete: parseFloat(orc.frete) || 0,
-    // ✅ NOVOS CAMPOS PARA FRETE MANUAL
-    frete_manual: orc.frete_manual || false,
-    manual: orc.frete_manual || false,
-    valor_manual_viagem: parseFloat(orc.frete_valor_manual_viagem) || parseFloat(orc.frete_valor_viagem) || 0,
-    qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1
-  }
-  console.log('🚚 [CARREGAR] setDadosFrete com:', dadosFreteCarregados)
-  setDadosFrete(dadosFreteCarregados)
-}
-
-
-      console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
+      if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
+        const dadosFreteCarregados = {
+          modalidade: orc.frete_modalidade || 'FOB',
+          tipo_frete: orc.frete_modalidade || 'FOB',
+          tipo_veiculo: orc.frete_tipo_caminhao || '',
+          tipo_caminhao: orc.frete_tipo_caminhao || '',
+          localidade: orc.frete_cidade || '',
+          cidade: orc.frete_cidade || '',
+          viagens_necessarias: orc.frete_qtd_viagens || 0,
+          valor_unitario_viagem: parseFloat(orc.frete_valor_viagem) || 0,
+          valor_total_frete: parseFloat(orc.frete) || 0,
+          frete_manual: orc.frete_manual || false,
+          manual: orc.frete_manual || false,
+          valor_manual_viagem: parseFloat(orc.frete_valor_manual_viagem) || parseFloat(orc.frete_valor_viagem) || 0,
+          qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1
+        }
+        setDadosFrete(dadosFreteCarregados)
+      }
 
       const { data: itens, error: errorItens } = await supabase
         .from(TABELA_ITENS)
@@ -376,12 +344,7 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
         .eq('orcamento_id', id)
         .order('ordem', { ascending: true })
 
-      if (errorItens) {
-        console.error('❌ [CARREGAR] Erro ao buscar itens:', errorItens)
-        throw errorItens
-      }
-
-      console.log('📦 [CARREGAR] Itens encontrados:', itens?.length || 0)
+      if (errorItens) throw errorItens
 
       if (itens && itens.length > 0) {
         const produtosCarregados = itens.map(item => ({
@@ -396,19 +359,16 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
           qtd_por_pallet: item.qtd_por_pallet
         }))
         
-        console.log('✅ [CARREGAR] Produtos carregados com sucesso')
         setProdutosSelecionados(produtosCarregados)
       } else {
-        console.log('⚠️ [CARREGAR] Nenhum item encontrado')
         setProdutosSelecionados([])
       }
 
       if (isVendedor() && orc.status === 'lancado') {
         setIsReadOnly(true)
-        console.log('🔒 [MODO LEITURA] Vendedor visualizando orçamento lançado')
       }
     } catch (error) {
-      console.error('❌ [CARREGAR] Erro ao carregar orçamento:', error)
+      console.error('❌ Erro ao carregar orçamento:', error)
       alert('Erro ao carregar orçamento: ' + error.message)
     } finally {
       setLoading(false)
@@ -418,13 +378,11 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
   const handleDescontoChange = (valor) => {
     const novoValor = parseFloat(valor) || 0
     
-    // ✅ Se o desconto está travado (já foi liberado e salvo), precisa de nova autorização
     if (descontoTravado && novoValor !== parseFloat(formData.desconto_geral)) {
       setMostrarModalSenha(true)
       return
     }
     
-    // Se tentar colocar desconto acima do limite sem estar liberado
     if (novoValor > LIMITE_DESCONTO && !descontoLiberado) {
       setMostrarModalSenha(true)
       return
@@ -443,113 +401,56 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
     setErroSenha(false)
 
     try {
-      console.log('🔐 ========== INICIANDO VALIDAÇÃO ==========')
-      console.log('🔐 Usuário digitado:', `"${usuarioLiberacao}"`)
-      console.log('🔐 Senha digitada:', `"${senhaLiberacao}"`)
-      
-      // Buscar usuário pelo nome ou email
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select('id, nome, email, senha, senha_hash, tipo')
         .eq('ativo', true)
 
-      if (error) {
-        console.error('❌ Erro na busca:', error)
-        throw error
-      }
+      if (error) throw error
 
-      console.log('📋 Total de usuários ativos:', usuarios?.length)
-      
-      // Log de todos os usuários para debug
-      usuarios?.forEach((u, i) => {
-        console.log(`   [${i}] Nome: "${u.nome}" | Email: "${u.email}" | Tipo: "${u.tipo}"`)
-      })
-
-      // Filtrar para encontrar o usuário - busca mais flexível
       const inputLower = usuarioLiberacao.toLowerCase().trim()
-      console.log('🔍 Buscando por:', `"${inputLower}"`)
       
       const usuarioEncontrado = usuarios?.find(u => {
         const nomeLower = (u.nome || '').toLowerCase().trim()
         const emailLower = (u.email || '').toLowerCase().trim()
-        
-        // Busca exata ou parcial
-        const nomeExato = nomeLower === inputLower
-        const emailExato = emailLower === inputLower
-        const nomeContem = nomeLower.includes(inputLower)
-        const emailContem = emailLower.includes(inputLower)
-        
-        const match = nomeExato || emailExato || nomeContem || emailContem
-        
-        if (match) {
-          console.log(`   ✓ Match encontrado: "${u.nome}" (${u.email})`)
-        }
-        
-        return match
+        return nomeLower === inputLower || emailLower === inputLower || 
+               nomeLower.includes(inputLower) || emailLower.includes(inputLower)
       })
 
       if (!usuarioEncontrado) {
-        console.log('❌ Nenhum usuário encontrado com esse nome/email')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      console.log('✅ Usuário encontrado:', usuarioEncontrado.nome)
-      console.log('   Tipo:', usuarioEncontrado.tipo)
-      console.log('   senha_hash:', usuarioEncontrado.senha_hash)
-      console.log('   senha:', usuarioEncontrado.senha)
-
-      // Verificar se tem permissão
       const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
       const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
       
-      console.log('🔒 Verificando permissão...')
-      console.log('   Tipo do usuário:', `"${tipoLower}"`)
-      console.log('   Tipos permitidos:', perfisPermitidos)
-      
       if (!perfisPermitidos.includes(tipoLower)) {
-        console.log('❌ Tipo sem permissão!')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      console.log('✅ Tipo autorizado!')
-
-      // Verificar senha - PRIORIZA senha_hash, depois senha
-      // IMPORTANTE: senha_hash é o campo correto!
       const senhaCorreta = usuarioEncontrado.senha_hash ? usuarioEncontrado.senha_hash : usuarioEncontrado.senha
       
-      console.log('🔑 Verificando senha...')
-      console.log('   Campo senha_hash:', `"${usuarioEncontrado.senha_hash}"`)
-      console.log('   Campo senha:', `"${usuarioEncontrado.senha}"`)
-      console.log('   Usando:', `"${senhaCorreta}"`)
-      console.log('   Digitada:', `"${senhaLiberacao}"`)
-      console.log('   São iguais?', senhaCorreta === senhaLiberacao)
-      
       if (!senhaCorreta || senhaCorreta !== senhaLiberacao) {
-        console.log('❌ Senha incorreta!')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
 
-      console.log('✅ Senha correta!')
-
-      // ✅ Tudo ok - liberar desconto
       const agora = new Date()
       const dataHora = agora.toLocaleString('pt-BR')
       
       setDescontoLiberado(true)
-      setDescontoTravado(false) // ✅ Destrava temporariamente para permitir edição
+      setDescontoTravado(false)
       setDescontoLiberadoPor({
         id: usuarioEncontrado.id,
         nome: usuarioEncontrado.nome,
         data: dataHora
       })
       
-      // ✅ Salvar dados de liberação no formData para persistir no banco
       setFormData(prev => ({
         ...prev,
         desconto_liberado: true,
@@ -561,10 +462,6 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
       setMostrarModalSenha(false)
       setUsuarioLiberacao('')
       setSenhaLiberacao('')
-      
-      console.log('🎉 ========== DESCONTO LIBERADO ==========')
-      console.log(`   Por: ${usuarioEncontrado.nome}`)
-      console.log(`   Data/Hora: ${dataHora}`)
 
     } catch (error) {
       console.error('❌ Erro ao validar senha:', error)
@@ -722,7 +619,6 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
 
     try {
       setLoading(true)
-      console.log('📋 Duplicando orçamento:', formData.numero)
 
       const { data: ultimoOrc, error: errorUltimo } = await supabase
         .from('orcamentos')
@@ -745,10 +641,9 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
-      // ✅ CORREÇÃO: Incluir TODOS os campos necessários (CNPJ/CPF, endereço obra, forma_pagamento)
       const novoOrcamento = {
         numero: novoNumero,
-        numero_proposta: null, // Será gerado novo ao salvar
+        numero_proposta: null,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
         cliente_email: formData.cliente_email,
@@ -763,21 +658,17 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
         data_validade: formData.data_validade,
         forma_pagamento_id: formData.forma_pagamento_id || null,
         prazo_entrega: formData.prazo_entrega,
-        desconto_geral: 0, // ✅ FORÇAR desconto zero na duplicação
+        desconto_geral: 0,
         subtotal: subtotalComDesconto,
-       frete: frete,
-frete_modalidade: dadosFrete?.modalidade || 'FOB',
-frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-frete_cidade: dadosFrete?.localidade || null,
-frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
-// ✅ NOVOS CAMPOS PARA FRETE MANUAL
-frete_manual: dadosFrete?.frete_manual || false,
-frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
-frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
-
-
-
+        frete: frete,
+        frete_modalidade: dadosFrete?.modalidade || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+        frete_manual: dadosFrete?.frete_manual || false,
+        frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
+        frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas, 
@@ -785,12 +676,10 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         numero_lancamento_erp: null,
         usuario_id: user?.id,
         excluido: false,
-        // ✅ Campos de CNPJ/CPF
         cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || formData.cnpj_cpf || null,
         cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || formData.cnpj_cpf_nao_informado || false,
         cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || formData.cnpj_cpf_nao_informado_aceite_data || null,
         cnpj_cpf_nao_informado_aceite_ip: null,
-        // ✅ Campos de endereço da obra
         obra_cep: dadosEndereco?.obra_cep || formData.obra_cep || null,
         obra_cidade: dadosEndereco?.obra_cidade || formData.obra_cidade || null,
         obra_bairro: dadosEndereco?.obra_bairro || formData.obra_bairro || null,
@@ -798,19 +687,12 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         obra_numero: dadosEndereco?.obra_numero || formData.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || formData.obra_complemento || null,
         obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false,
-        // ✅ NÃO copia liberação de desconto - nova proposta precisa de nova autorização
         desconto_liberado: false,
         desconto_liberado_por: null,
         desconto_liberado_por_id: null,
         desconto_liberado_em: null,
         desconto_valor_liberado: null
       }
-
-      console.log('🚚 [DUPLICAR] Dados de frete:', {
-        frete_modalidade: novoOrcamento.frete_modalidade,
-        frete_tipo_caminhao: novoOrcamento.frete_tipo_caminhao,
-        frete_cidade: novoOrcamento.frete_cidade
-      })
 
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
@@ -819,8 +701,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         .single()
 
       if (errorCriar) throw errorCriar
-
-      console.log('✅ Orçamento duplicado:', novoNumero)
 
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcCriado.id,
@@ -855,8 +735,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
 
   const salvar = async () => {
     try {
-      // ✅ VALIDAÇÃO CNPJ/CPF OBRIGATÓRIO - BLOQUEIO DE SALVAMENTO
-      // Verifica tanto o estado cnpjCpfValido quanto os dados diretamente
       const temCnpjCpfPreenchido = dadosCNPJCPF?.cnpj_cpf && dadosCNPJCPF.cnpj_cpf.trim() !== ''
       const marcouNaoInformar = dadosCNPJCPF?.cnpj_cpf_nao_informado === true
       const cnpjCpfOk = cnpjCpfValido || temCnpjCpfPreenchido || marcouNaoInformar
@@ -888,7 +766,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
 
       setLoading(true)
 
-      // ✨ GERAR NÚMERO DA PROPOSTA AUTOMATICAMENTE
       let numeroProposta = formData.numero_proposta
       
       if (!numeroProposta) {
@@ -908,10 +785,9 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
             }
           } else {
             numeroProposta = await gerarNumeroProposta(user?.id, codigoVendedor)
-            console.log('✅ [SALVAR] Número de proposta gerado:', numeroProposta)
           }
         } catch (error) {
-          console.error('❌ [SALVAR] Erro ao gerar número de proposta:', error)
+          console.error('❌ Erro ao gerar número de proposta:', error)
           alert('Erro ao gerar número de proposta. Continuando sem numeração...')
         }
       }
@@ -922,7 +798,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotalComDesconto + frete
 
-      // ✅ CORREÇÃO: Usar nomes PADRONIZADOS (sem fallbacks confusos)
       const dadosOrcamento = {
         numero: formData.numero || 'TEMP',
         numero_proposta: numeroProposta || null,
@@ -942,16 +817,15 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
-       frete: frete,
-frete_modalidade: dadosFrete?.modalidade || 'FOB',
-frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
-frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
-frete_cidade: dadosFrete?.localidade || null,
-frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
-// ✅ NOVOS CAMPOS PARA FRETE MANUAL
-frete_manual: dadosFrete?.frete_manual || false,
-frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
-frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
+        frete: frete,
+        frete_modalidade: dadosFrete?.modalidade || 'FOB',
+        frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
+        frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
+        frete_cidade: dadosFrete?.localidade || null,
+        frete_tipo_caminhao: dadosFrete?.tipo_veiculo || null,
+        frete_manual: dadosFrete?.frete_manual || false,
+        frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
+        frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas,
@@ -968,23 +842,12 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         obra_numero: dadosEndereco?.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || null,
         obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false,
-        // ✅ Campos de controle de liberação de desconto
         desconto_liberado: formData.desconto_liberado || false,
         desconto_liberado_por: formData.desconto_liberado_por || null,
         desconto_liberado_por_id: formData.desconto_liberado_por_id || null,
         desconto_liberado_em: formData.desconto_liberado_em || null,
         desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null
       }
-
-      // ✅ LOG para debug
-      console.log('🚚 [SALVAR] Dados de frete a serem salvos:', {
-        frete_modalidade: dadosOrcamento.frete_modalidade,
-        frete_tipo_caminhao: dadosOrcamento.frete_tipo_caminhao,
-        frete_cidade: dadosOrcamento.frete_cidade,
-        frete_qtd_viagens: dadosOrcamento.frete_qtd_viagens,
-        frete_valor_viagem: dadosOrcamento.frete_valor_viagem,
-        frete: dadosOrcamento.frete
-      })
 
       if (!id) {
         dadosOrcamento.usuario_id = user?.id || null
@@ -999,31 +862,21 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
       let orcamentoId = id
 
       if (id) {
-        console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
-        
         const { error } = await supabase
           .from('orcamentos')
           .update(dadosOrcamento)
           .eq('id', id)
 
         if (error) throw error
-        console.log('✅ [EDITAR] Orçamento atualizado')
 
-        console.log('🗑️ [EDITAR] Deletando itens antigos...')
         const { error: errorDelete } = await supabase
           .from(TABELA_ITENS)
           .delete()
           .eq('orcamento_id', id)
 
-        if (errorDelete) {
-          console.error('❌ [EDITAR] Erro ao deletar:', errorDelete)
-          throw errorDelete
-        }
-        console.log('✅ [EDITAR] Itens deletados')
+        if (errorDelete) throw errorDelete
 
       } else {
-        console.log('✨ [CRIAR] Criando novo orçamento')
-        
         const { data, error } = await supabase
           .from('orcamentos')
           .insert([dadosOrcamento])
@@ -1033,7 +886,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         if (error) throw error
         
         orcamentoId = data.id
-        console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
       }
 
       const itens = produtosSelecionados.map((item, index) => ({
@@ -1051,21 +903,12 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
         ordem: index
       }))
 
-      console.log(`💾 [INSERT] Inserindo ${itens.length} itens...`)
-
       const { error: errorItens } = await supabase
         .from(TABELA_ITENS)
         .insert(itens)
 
-      if (errorItens) {
-        console.error('❌ [INSERT] Erro:', errorItens)
-        throw errorItens
-      }
+      if (errorItens) throw errorItens
 
-      console.log('✅ [INSERT] Itens inseridos')
-      console.log('🎉 Salvamento concluído!')
-
-      // ✅ Atualizar formData com o número da proposta gerado
       if (numeroProposta) {
         setFormData(prev => ({ ...prev, numero_proposta: numeroProposta }))
       }
@@ -1084,18 +927,13 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
     }
   }
 
-  // ✅ Função auxiliar para verificar se pode gerar proposta
   const podeGerarProposta = () => {
-    // Precisa ter produtos
     if (produtosSelecionados.length === 0) return false
-    // Precisa ter sido salvo (ter ID)
     if (!id) return false
-    // Precisa ter número de proposta válido (ex: NH-06-0005, não ORC-XXXX)
     if (!formData.numero_proposta) return false
     return true
   }
 
-  // ✅ Função auxiliar para obter tooltip do botão Gerar Proposta
   const getTooltipGerarProposta = () => {
     if (produtosSelecionados.length === 0) {
       return 'Adicione produtos primeiro'
@@ -1107,6 +945,29 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
       return 'Salve o orçamento para gerar o número da proposta'
     }
     return ''
+  }
+
+  // ✅ Função para montar dados do orçamento para o botão enviar
+  const getOrcamentoParaEnvio = () => {
+    return {
+      id: id,
+      numero: formData.numero,
+      numero_proposta: formData.numero_proposta,
+      cliente_nome: formData.cliente_nome,
+      cliente_empresa: formData.cliente_empresa,
+      cliente_email: formData.cliente_email,
+      cliente_telefone: formData.cliente_telefone,
+      cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
+      obra_cep: dadosEndereco?.obra_cep,
+      obra_logradouro: dadosEndereco?.obra_logradouro,
+      obra_bairro: dadosEndereco?.obra_bairro,
+      obra_cidade: dadosEndereco?.obra_cidade,
+      usuario_id: formData.usuario_id_original || user?.id,
+      validade_dias: formData.validade_dias,
+      frete_modalidade: dadosFrete?.modalidade || 'FOB',
+      total: calcularTotal(),
+      total_geral: calcularTotal()
+    }
   }
 
   if (loading && id) {
@@ -1239,7 +1100,7 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                 {isReadOnly ? 'Visualizar Orçamento' : (id ? 'Editar Orçamento' : 'Novo Orçamento')}
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {isReadOnly && (
                 <button
                   onClick={duplicar}
@@ -1250,7 +1111,8 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                   <span className="hidden sm:inline">Duplicar</span>
                 </button>
               )}
-              {/* ✅ CORREÇÃO: Botão Gerar Proposta desabilitado antes de salvar e gerar numero_proposta */}
+              
+              {/* ✅ BOTÃO GERAR PROPOSTA */}
               <button
                 onClick={() => setMostrarProposta(true)}
                 disabled={!podeGerarProposta()}
@@ -1258,8 +1120,20 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                 className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FileText size={20} />
-                <span>Gerar Proposta</span>
+                <span className="hidden sm:inline">Gerar Proposta</span>
               </button>
+              
+              {/* ✅ NOVO: BOTÃO ENVIAR PARA CLIENTE */}
+              {id && formData.numero_proposta && !isReadOnly && (
+                <BotaoEnviarProposta 
+                  orcamento={getOrcamentoParaEnvio()}
+                  onEnviado={(proposta) => {
+                    console.log('✅ Proposta enviada:', proposta)
+                    setFormData(prev => ({ ...prev, status: 'enviado' }))
+                  }}
+                />
+              )}
+              
               {!isReadOnly && (
                 <button
                   onClick={salvar}
@@ -1289,7 +1163,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
             </div>  
           </div>
           
-          {/* ✅ OTIMIZADO: 4 campos em uma linha - Data, Vendedor, Validade (dias), Status */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
@@ -1484,7 +1357,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                           ))}
                         </select>
                       </td>
-
                       <td className="px-2 py-1">
                         <select
                           value={item.classe}
@@ -1498,7 +1370,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                           ))}
                         </select>
                       </td>
-
                       <td className="px-2 py-1">
                         <select
                           value={item.mpa}
@@ -1512,7 +1383,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                           ))}
                         </select>
                       </td>
-
                       <td className="px-2 py-1">
                         <input
                           type="number"
@@ -1523,15 +1393,12 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                           min="1"
                         />
                       </td>
-
                       <td className="px-2 py-1 text-right text-gray-600">
                         {item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
                       </td>
-
                       <td className="px-2 py-1 text-right text-gray-600">
                         {item.peso_unitario ? `${item.peso_unitario} kg` : '-'}
                       </td>
-
                       <td className="px-2 py-1 text-center">
                         {item.qtd_por_pallet ? (
                           <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold min-w-[40px]">
@@ -1541,19 +1408,16 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-
                       <td className="px-2 py-1 text-right text-gray-600">
                         {item.peso_unitario && item.quantidade 
                           ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
                           : '-'} 
                       </td>
-
                       <td className="px-2 py-1 text-right font-semibold text-gray-900">
                         {item.preco && item.quantidade 
                           ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
                           : '-'}
                       </td>
-
                       <td className="px-2 py-1 text-center">
                         <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold">
                           {item.qtd_por_pallet && item.quantidade 
@@ -1561,7 +1425,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                             : '-'}
                         </span>
                       </td>
-
                       <td className="px-2 py-1">
                         <button
                           onClick={() => removerProduto(index)}
@@ -1584,7 +1447,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
             pesoTotal={calcularPesoTotal()}
             totalPallets={calcularTotalPallets()}
             onFreteChange={(dados) => {
-              console.log('🚚 FRETE RECEBIDO no OrcamentoForm:', dados)
               setDadosFrete(dados)
             }}
             freteAtual={dadosFrete}
@@ -1593,7 +1455,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
             <div>
               <h2 className="text-lg font-semibold mb-4">Observações</h2>
               <textarea
@@ -1605,7 +1466,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                 placeholder="Observações adicionais que aparecerão na proposta comercial..."
               />
             </div>
-
             <div>
               <h2 className="text-lg font-semibold mb-4">Resumo Financeiro</h2>
               <div className="space-y-2">
@@ -1615,7 +1475,6 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                     R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-
 
                 <div className="flex justify-between items-center">
                   <label className="text-sm text-gray-600 flex items-center gap-1 flex-wrap">
@@ -1702,27 +1561,27 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
               </div>
             </div>
           </div>
-{/* OBSERVAÇÕES INTERNAS - NÃO APARECE NA PROPOSTA */}
-<div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mt-6">
-  <div className="flex items-center gap-2 mb-3">
-    <span className="text-xl">🔒</span>
-    <h2 className="text-lg font-semibold text-yellow-800">Observações Internas</h2>
-    <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded-full">
-      NÃO aparece na proposta
-    </span>
-  </div>
-  <p className="text-sm text-yellow-700 mb-3">
-    Use este campo para anotações da equipe (ex: negociação, pendências, alertas sobre o cliente).
-  </p>
-  <textarea
-    value={formData.observacoes_internas}
-    onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
-    rows="4"
-    disabled={isReadOnly}
-    className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
-    placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
-  />
-</div>
+
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mt-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">🔒</span>
+              <h2 className="text-lg font-semibold text-yellow-800">Observações Internas</h2>
+              <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded-full">
+                NÃO aparece na proposta
+              </span>
+            </div>
+            <p className="text-sm text-yellow-700 mb-3">
+              Use este campo para anotações da equipe (ex: negociação, pendências, alertas sobre o cliente).
+            </p>
+            <textarea
+              value={formData.observacoes_internas}
+              onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
+              rows="4"
+              disabled={isReadOnly}
+              className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
+              placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
+            />
+          </div>
         </div>
       </div>
 
