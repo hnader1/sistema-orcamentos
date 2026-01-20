@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase';
 
 // =====================================================
 // PÁGINA DE ACEITE DE PROPOSTA - VERSÃO MOBILE-FIRST
-// VERSÃO 4.0 - AJUSTES VISUAIS E LÓGICA DE FRETE
+// VERSÃO 4.1 - TELEFONE E EMAIL DO VENDEDOR NA SIDEBAR
 // =====================================================
 
 export default function AceiteProposta() {
@@ -786,6 +786,12 @@ export default function AceiteProposta() {
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Proposta</span><span style={styles.sidebarInfoValue}>{proposta?.numero_proposta}</span></div>
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Validade</span><span style={styles.sidebarInfoValue}>{formatarData(proposta?.data_expiracao)}</span></div>
               <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>Vendedor</span><span style={styles.sidebarInfoValue}>{orcamento?.vendedor}</span></div>
+              {orcamento?.vendedor_telefone && (
+                <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>📞 Telefone</span><span style={styles.sidebarInfoValue}>{orcamento.vendedor_telefone}</span></div>
+              )}
+              {orcamento?.vendedor_email && (
+                <div style={styles.sidebarInfoItem}><span style={styles.sidebarInfoLabel}>✉️ Email</span><span style={{...styles.sidebarInfoValue, fontSize: '11px'}}>{orcamento.vendedor_email}</span></div>
+              )}
             </div>
             
             {/* BOTÃO BAIXAR PROPOSTA COM ÍCONE PDF */}
