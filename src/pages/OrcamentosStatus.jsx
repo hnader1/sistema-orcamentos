@@ -11,22 +11,18 @@
 // - Ações: Editar e Duplicar
 // - Header personalizado com ícone e cor do status
 // - Permissões: Vendedor vê apenas seus orçamentos, outros veem todos
+// - NOVO: Badge de origem da aprovação (Link/Manual)
 //
 // STATUS SUPORTADOS:
 // - rascunho, enviado, aprovado, lancado, cancelado
-//
-// MELHORIAS RECENTES:
-// - Layout compacto (2 linhas por orçamento)
-// - Nome do cliente ao lado do número (#ORC-0010 • Nome Cliente)
-// - Badge de status posicionado ao lado dos botões de ação
-// - Cidade do cadastro incluída nas informações
 // ====================================================================================
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { 
   ArrowLeft, Search, Edit2, Copy, FileText, Calendar, User, DollarSign,
-  Edit, Send, CheckCircle, XCircle, Briefcase, MapPin, PackageCheck
+  Edit, Send, CheckCircle, XCircle, Briefcase, MapPin, PackageCheck,
+  Link as LinkIcon, Hand
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -148,6 +144,7 @@ export default function OrcamentosStatus() {
         data_lancamento: null,
         lancado_por: null,
         usuario_id: user?.id || null,
+        aprovado_via: null, // Reset aprovação
         created_at: undefined,
         updated_at: undefined
       }
@@ -254,6 +251,33 @@ export default function OrcamentosStatus() {
     )
   }
 
+  // ====================================================================================
+  // COMPONENTE DE BADGE DE ORIGEM DA APROVAÇÃO
+  // ====================================================================================
+  const getAprovadoViaBadge = (aprovadoVia) => {
+    if (!aprovadoVia) return null
+    
+    if (aprovadoVia === 'link') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+          <LinkIcon size={12} />
+          Cliente
+        </span>
+      )
+    }
+    
+    if (aprovadoVia === 'manual') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+          <Hand size={12} />
+          Manual
+        </span>
+      )
+    }
+    
+    return null
+  }
+
   const statusInfo = getStatusInfo(status)
   const StatusIcon = statusInfo.icone
 
@@ -349,13 +373,11 @@ export default function OrcamentosStatus() {
                     {/* Linha 1: Número • Nome do Cliente */}
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h3 className="text-base font-bold text-gray-900">
-                        <h3 className="text-base font-bold text-gray-900">
-  {orc.numero_proposta ? (
-    <span className="text-purple-700">{orc.numero_proposta}</span>
-  ) : (
-    <span className="text-gray-400">#{orc.numero}</span>
-  )}
-</h3>
+                        {orc.numero_proposta ? (
+                          <span className="text-purple-700">{orc.numero_proposta}</span>
+                        ) : (
+                          <span className="text-gray-400">#{orc.numero}</span>
+                        )}
                       </h3>
                       <span className="text-blue-600 font-semibold">•</span>
                       <span className="text-gray-700 font-medium truncate">
@@ -371,11 +393,11 @@ export default function OrcamentosStatus() {
                     
                     {/* Linha 2: Cidade | Valor | Data | Vendedor */}
                     <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-                      {orc.cidade && (
+                      {orc.obra_cidade && (
                         <>
                           <div className="flex items-center gap-1">
                             <MapPin size={14} className="text-gray-400" />
-                            <span>{orc.cidade}</span>
+                            <span>{orc.obra_cidade}</span>
                           </div>
                           <span className="text-gray-300">|</span>
                         </>
@@ -410,10 +432,13 @@ export default function OrcamentosStatus() {
                     </div>
                   </div>
                   
-                  {/* Coluna Direita: Badge Status + Botões de Ação */}
+                  {/* Coluna Direita: Badge Status + Badge Origem + Botões de Ação */}
                   <div className="flex flex-col items-end gap-2">
-                    {/* Badge de Status */}
-                    {getStatusBadge(orc.status)}
+                    {/* Badges de Status e Origem */}
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(orc.status)}
+                      {orc.status === 'aprovado' && getAprovadoViaBadge(orc.aprovado_via)}
+                    </div>
                     
                     {/* Botões de Ação */}
                     <div className="flex gap-2">
@@ -442,58 +467,3 @@ export default function OrcamentosStatus() {
     </div>
   )
 }
-
-// ====================================================================================
-// NOTAS IMPORTANTES PARA FUTURAS MODIFICAÇÕES:
-// ====================================================================================
-//
-// 1. ESTRUTURA DO LAYOUT:
-//    - Cards organizados em 2 linhas por orçamento
-//    - Linha 1: #Número • Nome do Cliente [+ Badge ERP se existir]
-//    - Linha 2: 📍 Cidade | 💰 Valor | 📅 Data | 👤 Vendedor
-//    - Badge de status posicionado acima dos botões de ação (lado direito)
-//
-// 2. DIFERENÇAS COM A PÁGINA PRINCIPAL:
-//    - Esta página filtra por UM status específico (vem da URL)
-//    - Não tem botão "Cancelar" (apenas Editar e Duplicar)
-//    - Não tem cards de estatísticas no topo
-//    - Não tem seção "Últimos 5"
-//
-// 3. BUSCA:
-//    - Busca por texto: número, nome do cliente ou empresa
-//    - Já está filtrado por status (não tem filtro adicional de status)
-//
-// 4. HEADER PERSONALIZADO:
-//    - Muda cor e ícone conforme o status
-//    - Rascunho: Cinza + ícone de lápis
-//    - Enviado: Azul + ícone de envio
-//    - Aprovado: Verde + ícone de check
-//    - Lançado: Roxo + ícone de maleta
-//    - Cancelado: Vermelho + ícone de X
-//
-// 5. BADGE ERP:
-//    - Se o orçamento foi lançado no ERP, mostra o número do lançamento
-//    - Aparece na Linha 1, após o nome do cliente
-//
-// 6. CAMPOS NECESSÁRIOS NO BANCO (tabela orcamentos):
-//    - numero (string) - Número do orçamento formato ORC-0001
-//    - cliente_nome (string) - Nome do cliente
-//    - cliente_empresa (string) - Nome da empresa
-//    - cidade (string) - Cidade do cadastro (IMPORTANTE: garantir que está sendo buscado)
-//    - total (decimal) - Valor total do orçamento
-//    - data_orcamento (date) - Data de criação
-//    - vendedor (string) - Nome do vendedor
-//    - status (enum) - Fixo nesta página, vem da URL
-//    - excluido (boolean) - Sempre false
-//    - usuario_id (uuid) - ID do vendedor responsável
-//    - numero_lancamento_erp (string) - Número do lançamento no ERP (opcional)
-//
-// 7. NAVEGAÇÃO:
-//    - Ao duplicar, redireciona para edição do novo orçamento
-//    - Botão voltar retorna para /orcamentos (página principal)
-//
-// 8. QUERIES DO SUPABASE:
-//    Certifique-se que a query está buscando todos os campos:
-//    .select('*, cidade, vendedor, usuarios!orcamentos_usuario_id_fkey!inner(nome)')
-//
-// ====================================================================================
