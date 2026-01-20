@@ -1065,6 +1065,11 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
       console.log('✅ [INSERT] Itens inseridos')
       console.log('🎉 Salvamento concluído!')
 
+      // ✅ Atualizar formData com o número da proposta gerado
+      if (numeroProposta) {
+        setFormData(prev => ({ ...prev, numero_proposta: numeroProposta }))
+      }
+
       alert('Orçamento salvo com sucesso!')
       
       if (!id) {
@@ -1077,6 +1082,31 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
     } finally {
       setLoading(false)
     }
+  }
+
+  // ✅ Função auxiliar para verificar se pode gerar proposta
+  const podeGerarProposta = () => {
+    // Precisa ter produtos
+    if (produtosSelecionados.length === 0) return false
+    // Precisa ter sido salvo (ter ID)
+    if (!id) return false
+    // Precisa ter número de proposta válido (ex: NH-06-0005, não ORC-XXXX)
+    if (!formData.numero_proposta) return false
+    return true
+  }
+
+  // ✅ Função auxiliar para obter tooltip do botão Gerar Proposta
+  const getTooltipGerarProposta = () => {
+    if (produtosSelecionados.length === 0) {
+      return 'Adicione produtos primeiro'
+    }
+    if (!id) {
+      return 'Salve o orçamento primeiro'
+    }
+    if (!formData.numero_proposta) {
+      return 'Salve o orçamento para gerar o número da proposta'
+    }
+    return ''
   }
 
   if (loading && id) {
@@ -1220,15 +1250,15 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                   <span className="hidden sm:inline">Duplicar</span>
                 </button>
               )}
-              {/* ✅ CORREÇÃO: Botão Gerar Proposta desabilitado antes de salvar */}
+              {/* ✅ CORREÇÃO: Botão Gerar Proposta desabilitado antes de salvar e gerar numero_proposta */}
               <button
                 onClick={() => setMostrarProposta(true)}
-                disabled={produtosSelecionados.length === 0 || !id}
-                title={!id ? 'Salve o orçamento primeiro' : ''}
+                disabled={!podeGerarProposta()}
+                title={getTooltipGerarProposta()}
                 className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FileText size={20} />
-                <span className="hidden sm:inline">Gerar Proposta</span>
+                <span>Gerar Proposta</span>
               </button>
               {!isReadOnly && (
                 <button
