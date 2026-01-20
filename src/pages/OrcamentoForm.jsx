@@ -1,5 +1,5 @@
 // src/pages/OrcamentoForm.jsx
-// VERSION: 2026-01-20-v2 - DESCONTO RESET FIX
+// VERSION: 2026-01-20-v3 - DESCONTO RESET FIX + UUID FIX
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
@@ -18,7 +18,7 @@ import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaP
 const TABELA_ITENS = 'orcamentos_itens'
 
 // 🔄 VERSION MARKER - If you see this in console, cache is cleared!
-console.log('🔄 OrcamentoForm VERSION: 2026-01-20-v2 - DESCONTO RESET ENABLED')
+console.log('🔄 OrcamentoForm VERSION: 2026-01-20-v3 - DESCONTO RESET + UUID FIX')
 
 // ✅ FUNÇÕES DE VALIDAÇÃO
 const validarEmail = (email) => {
@@ -78,9 +78,7 @@ function OrcamentoForm() {
   const LIMITE_DESCONTO = 5
 
   // ✅ Verifica se usuário pode ver código do sistema (admin ou comercial_interno)
-  // Usa podeAcessarLancamento() que já verifica ['admin', 'comercial_interno']
   const podeVerCodigoSistema = () => {
-    // Debug log
     console.log('🔍 [podeVerCodigoSistema] user:', user)
     console.log('🔍 [podeVerCodigoSistema] user?.tipo:', user?.tipo)
     console.log('🔍 [podeVerCodigoSistema] podeAcessarLancamento():', podeAcessarLancamento())
@@ -355,7 +353,6 @@ function OrcamentoForm() {
         obra_endereco_validado: orc.obra_endereco_validado || false
       })
 
-      // ✅ Reset discount states based on loaded data
       if (orc.desconto_geral > LIMITE_DESCONTO) {
         setDescontoLiberado(true)
         setDescontoTravado(true)
@@ -368,7 +365,6 @@ function OrcamentoForm() {
           })
         }
       } else {
-        // ✅ Reset discount states for quotations with discount <= 5%
         setDescontoLiberado(false)
         setDescontoTravado(false)
         setDescontoLiberadoPor(null)
@@ -502,7 +498,6 @@ function OrcamentoForm() {
 
       console.log('✅ Tipo autorizado!')
 
-      // ✅ CORREÇÃO: Priorizar campo 'senha' (onde estão as senhas reais)
       const senhaCorreta = usuarioEncontrado.senha ? usuarioEncontrado.senha : usuarioEncontrado.senha_hash
       
       console.log('🔑 Verificando senha...')
@@ -698,9 +693,9 @@ function OrcamentoForm() {
   }
 
   const duplicar = async () => {
-    // 🔄 VERSION CHECK - This log confirms the new code is running
-    console.log('🔄 ========== DUPLICAR VERSION: 2026-01-20-v2 ==========')
-    console.log('🔄 DESCONTO SERÁ ZERADO!')
+    // 🔄 VERSION CHECK
+    console.log('🔄 ========== DUPLICAR VERSION: 2026-01-20-v3 ==========')
+    console.log('🔄 DESCONTO SERÁ ZERADO + UUID GERADO NO CLIENTE!')
     
     if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.\n\n⚠️ O desconto será zerado (nova proposta requer nova autorização).')) return
 
@@ -722,20 +717,19 @@ function OrcamentoForm() {
         novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
       }
 
-      // ✅ IMPORTANTE: Desconto zerado na duplicação (nova proposta = nova autorização)
       const subtotal = calcularSubtotal()
       const frete = dadosFrete?.valor_total_frete || 0
-      const total = subtotal + frete // Sem desconto
+      const total = subtotal + frete
 
-      // 🔄 CRITICAL LOG - Confirms we're setting 0
-      console.log('📋 [DUPLICAR v2] ============================================')
-      console.log('📋 [DUPLICAR v2] formData.desconto_geral atual:', formData.desconto_geral)
-      console.log('📋 [DUPLICAR v2] IGNORANDO e usando desconto_geral = 0')
-      console.log('📋 [DUPLICAR v2] ============================================')
+      // ✅ GERA UUID NO CLIENTE (fix para default do banco não funcionar)
+      const novoId = crypto.randomUUID()
+      console.log('📋 [DUPLICAR v3] Gerando UUID no cliente:', novoId)
+      console.log('📋 [DUPLICAR v3] desconto_geral = 0')
 
       const novoOrcamento = {
+        id: novoId, // ✅ UUID GERADO NO CLIENTE
         numero: novoNumero,
-        numero_proposta: null, // ✅ IMPORTANTE: Sem número de proposta (será gerado ao salvar)
+        numero_proposta: null,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
         cliente_email: formData.cliente_email,
@@ -750,7 +744,7 @@ function OrcamentoForm() {
         data_validade: formData.data_validade,
         forma_pagamento_id: formData.forma_pagamento_id || null,
         prazo_entrega: formData.prazo_entrega,
-        desconto_geral: 0, // ✅ ZERADO - nova proposta requer nova autorização
+        desconto_geral: 0, // ✅ ZERADO
         subtotal: subtotal,
         frete: frete,
         frete_modalidade: dadosFrete?.modalidade || 'FOB',
@@ -780,15 +774,12 @@ function OrcamentoForm() {
         obra_numero: dadosEndereco?.obra_numero || formData.obra_numero || null,
         obra_complemento: dadosEndereco?.obra_complemento || formData.obra_complemento || null,
         obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false,
-        desconto_liberado: false, // ✅ ZERADO
-        desconto_liberado_por: null, // ✅ ZERADO
-        desconto_liberado_por_id: null, // ✅ ZERADO
-        desconto_liberado_em: null, // ✅ ZERADO
-        desconto_valor_liberado: null // ✅ ZERADO
+        desconto_liberado: false,
+        desconto_liberado_por: null,
+        desconto_liberado_por_id: null,
+        desconto_liberado_em: null,
+        desconto_valor_liberado: null
       }
-
-      // 🔄 LOG BEFORE INSERT
-      console.log('📋 [DUPLICAR v2] Objeto a ser inserido - desconto_geral:', novoOrcamento.desconto_geral)
 
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
@@ -798,9 +789,8 @@ function OrcamentoForm() {
 
       if (errorCriar) throw errorCriar
 
-      // 🔄 LOG AFTER INSERT
-      console.log('📋 [DUPLICAR v2] Novo orçamento criado:', orcCriado.id)
-      console.log('📋 [DUPLICAR v2] desconto_geral retornado do banco:', orcCriado.desconto_geral)
+      console.log('📋 [DUPLICAR v3] Novo orçamento criado:', orcCriado.id)
+      console.log('📋 [DUPLICAR v3] desconto_geral retornado:', orcCriado.desconto_geral)
 
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcCriado.id,
@@ -825,7 +815,6 @@ function OrcamentoForm() {
 
       alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}\n\n⚠️ Desconto zerado - solicite nova autorização se necessário.\n⚠️ Salve o orçamento para gerar o número da proposta.`)
       
-      // ✅ Force page reload to ensure clean state
       window.location.href = `/orcamentos/editar/${orcCriado.id}`
     } catch (error) {
       console.error('❌ Erro ao duplicar:', error)
@@ -835,9 +824,7 @@ function OrcamentoForm() {
     }
   }
 
-  // ✅ Handler para clicar em Gerar Proposta
   const handleGerarProposta = () => {
-    // Validação: Requer salvar antes de gerar proposta (para ter numero_proposta)
     if (!formData.numero_proposta) {
       alert('⚠️ Salve o orçamento primeiro!\n\nO número da proposta (ex: NH-26-0001) será gerado ao salvar.\n\nSem este número, a proposta comercial não terá identificação correta.')
       return
@@ -1044,7 +1031,6 @@ function OrcamentoForm() {
 
       if (errorItens) throw errorItens
 
-      // ✅ Update formData with new numero_proposta
       if (numeroProposta && !formData.numero_proposta) {
         setFormData(prev => ({ ...prev, numero_proposta: numeroProposta }))
       }
@@ -1085,7 +1071,6 @@ function OrcamentoForm() {
     )
   }
 
-  // Debug log for codigo visibility
   console.log('🔍 [RENDER] podeVerCodigoSistema():', podeVerCodigoSistema())
   console.log('🔍 [RENDER] formData.numero_proposta:', formData.numero_proposta)
 
@@ -1219,7 +1204,6 @@ function OrcamentoForm() {
                   <span className="hidden sm:inline">Duplicar</span>
                 </button>
               )}
-              {/* ✅ Botão Gerar Proposta - requer salvar primeiro (numero_proposta) */}
               <button
                 onClick={handleGerarProposta}
                 disabled={produtosSelecionados.length === 0}
