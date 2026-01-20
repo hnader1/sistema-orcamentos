@@ -240,6 +240,7 @@ export default async function handler(req, res) {
   try {
     const {
       email,
+      emailDestino, // Aceitar também emailDestino do frontend
       numeroProposta,
       nomeCliente,
       nomeFantasia,
@@ -256,7 +257,10 @@ export default async function handler(req, res) {
       pdfBase64
     } = req.body;
 
-    if (!email) {
+    // Aceitar tanto 'email' quanto 'emailDestino'
+    const destinatario = email || emailDestino;
+
+    if (!destinatario) {
       return res.status(400).json({ error: 'Email do destinatário é obrigatório' });
     }
 
@@ -286,7 +290,7 @@ export default async function handler(req, res) {
     // Configurar email
     const mailOptions = {
       from: `"Construcom" <${process.env.SMTP_USER}>`,
-      to: email,
+      to: destinatario,
       subject: `Proposta Comercial ${numeroProposta} - Construcom`,
       html: htmlContent
     };
