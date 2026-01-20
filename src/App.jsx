@@ -16,6 +16,7 @@ import RelatorioOrcamentos from './pages/RelatorioOrcamentos'
 import Conflitos from './pages/Conflitos'
 import FormasPagamentoAdmin from './pages/FormasPagamentoAdmin'
 import GerenciarCodigosVendedores from './pages/GerenciarCodigosVendedores'
+import AceiteProposta from './pages/AceiteProposta'
 
 
 function App() {
@@ -25,6 +26,9 @@ function App() {
         <Routes>
           {/* Rota pública - Login */}
           <Route path="/login" element={<Login />} />
+
+          {/* Rota pública - Aceite de Proposta (cliente externo) */}
+          <Route path="/aceite/:token" element={<AceiteProposta />} />
 
           {/* Rotas protegidas - Usuários logados */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
