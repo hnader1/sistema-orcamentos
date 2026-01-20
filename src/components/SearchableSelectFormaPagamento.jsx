@@ -6,7 +6,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Selecione a forma de pagamento..." }) => {
+const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Selecione a forma de pagamento...", disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
@@ -72,6 +72,8 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
   }, [searchTerm])
 
   const handleKeyDown = (e) => {
+    if (disabled) return
+    
     if (!isOpen) {
       if (e.key === 'Enter' || e.key === 'ArrowDown') {
         setIsOpen(true)
@@ -103,6 +105,7 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
   }
 
   const handleSelect = (option) => {
+    if (disabled) return
     onChange(option.id)
     setIsOpen(false)
     setSearchTerm('')
@@ -140,15 +143,20 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
         <input
           ref={inputRef}
           type="text"
-          className="w-full p-2 pr-10 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder:text-gray-400"
+          className={`w-full p-2 pr-10 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder:text-gray-400 ${
+            disabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+          }`}
           placeholder={selectedOption ? selectedOption.descricao : placeholder}
           value={searchTerm}
           onChange={(e) => {
+            if (disabled) return
             setSearchTerm(e.target.value)
             if (!isOpen) setIsOpen(true)
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => !disabled && setIsOpen(true)}
           onKeyDown={handleKeyDown}
+          disabled={disabled}
+          readOnly={disabled}
         />
         
         <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -170,7 +178,8 @@ const SearchableSelectFormaPagamento = ({ value, onChange, placeholder = "Seleci
         )}
       </div>
 
-      {isOpen && (
+      {/* ✅ Só mostrar dropdown se não estiver disabled */}
+      {isOpen && !disabled && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-hidden">
           {filteredOptions.length > 0 ? (
             <ul className="options-list overflow-y-auto max-h-80">
