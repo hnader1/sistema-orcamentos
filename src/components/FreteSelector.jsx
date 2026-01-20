@@ -1,6 +1,6 @@
 // src/components/FreteSelector.jsx
 import { useState, useEffect } from 'react'
-import { Truck, Package, AlertCircle, CheckCircle, Search, Weight } from 'lucide-react'
+import { Truck, Package, AlertCircle, CheckCircle, Search, Scale } from 'lucide-react'
 
 export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, freteAtual }) {
   const [fretes, setFretes] = useState([])
@@ -302,9 +302,6 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   // Verificar se é um pedido grande
   const isPedidoGrande = (pesoTotal || 0) >= 8000
 
-  // Verificar se frete manual pode ser salvo (tem observação)
-  const freteManualValido = !freteManual || (freteManual && observacaoFreteManual.trim().length > 0)
-
   const formatarMoeda = (valor) => {
     return `R$ ${(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
   }
@@ -370,7 +367,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Weight size={16} className="text-blue-600" />
+                  <Scale size={16} className="text-blue-600" />
                   <span className="text-sm font-medium text-gray-700">Peso</span>
                 </div>
                 <span className="text-sm font-bold text-blue-600">
@@ -615,7 +612,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                   </div>
                 </div>
 
-                {/* ✅ NOVO: Campo de Observação (Obrigatório) */}
+                {/* ✅ Campo de Observação (Obrigatório) */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     <AlertCircle size={14} className="inline mr-1 text-orange-500" />
