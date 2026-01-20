@@ -911,7 +911,26 @@ function OrcamentoForm() {
     if (['aprovado', 'lancado', 'cancelado', 'finalizado'].includes(formData.status)) return false
     return true
   }
-
+// Função para salvar apenas observações internas quando proposta travada
+const salvarObservacoesInternas = async () => {
+  if (!id) return;
+  
+  setSalvando(true);
+  try {
+    const { error } = await supabase
+      .from('orcamentos')
+      .update({ observacoes_internas: formData.observacoes_internas })
+      .eq('id', id);
+    
+    if (error) throw error;
+    alert('Observações salvas com sucesso!');
+  } catch (error) {
+    console.error('Erro ao salvar observações:', error);
+    alert('Erro ao salvar observações: ' + error.message);
+  } finally {
+    setSalvando(false);
+  }
+};
   // ✅ ATUALIZADO: Salvar com verificação de permissões
   const salvar = async () => {
     // Verificar se pode salvar
@@ -1899,10 +1918,20 @@ function OrcamentoForm() {
               value={formData.observacoes_internas}
               onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
               rows="4"
-              disabled={modo !== 'edicao'}
+              disabled={modo === 'visualizacao'}
               className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
               placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
             />
+            {modo === 'proposta_travada' && (
+                <button
+                  type="button"
+                  onClick={salvarObservacoesInternas}
+                  disabled={salvando}
+                  className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+                >
+                  {salvando ? 'Salvando...' : 'Salvar Observações'}
+                </button>
+              )}
           </div>
         </div>
       </div>
