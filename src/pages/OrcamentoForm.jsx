@@ -289,6 +289,7 @@ function OrcamentoForm() {
       if (errorOrc) throw errorOrc
 
       console.log('📦 [CARREGAR] Desconto no banco:', orc.desconto_geral)
+      console.log('📦 [CARREGAR] Numero proposta:', orc.numero_proposta)
 
       setFormData({
         numero: orc.numero,
@@ -722,7 +723,7 @@ function OrcamentoForm() {
 
       const novoOrcamento = {
         numero: novoNumero,
-        numero_proposta: null,
+        numero_proposta: null, // ✅ IMPORTANTE: Sem número de proposta (será gerado ao salvar)
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
         cliente_email: formData.cliente_email,
@@ -805,7 +806,7 @@ function OrcamentoForm() {
 
       if (errorItens) throw errorItens
 
-      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}\n\n⚠️ Desconto zerado - solicite nova autorização se necessário.`)
+      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}\n\n⚠️ Desconto zerado - solicite nova autorização se necessário.\n⚠️ Salve o orçamento para gerar o número da proposta.`)
       
       // ✅ Force page reload to ensure clean state
       window.location.href = `/orcamentos/editar/${orcCriado.id}`
@@ -815,6 +816,16 @@ function OrcamentoForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // ✅ Handler para clicar em Gerar Proposta
+  const handleGerarProposta = () => {
+    // Validação: Requer salvar antes de gerar proposta (para ter numero_proposta)
+    if (!formData.numero_proposta) {
+      alert('⚠️ Salve o orçamento primeiro!\n\nO número da proposta (ex: NH-26-0001) será gerado ao salvar.\n\nSem este número, a proposta comercial não terá identificação correta.')
+      return
+    }
+    setMostrarProposta(true)
   }
 
   const salvar = async () => {
@@ -1016,6 +1027,11 @@ function OrcamentoForm() {
 
       if (errorItens) throw errorItens
 
+      // ✅ Update formData with new numero_proposta
+      if (numeroProposta && !formData.numero_proposta) {
+        setFormData(prev => ({ ...prev, numero_proposta: numeroProposta }))
+      }
+
       alert('Orçamento salvo com sucesso!')
       
       if (!id) {
@@ -1054,6 +1070,7 @@ function OrcamentoForm() {
 
   // Debug log for codigo visibility
   console.log('🔍 [RENDER] podeVerCodigoSistema():', podeVerCodigoSistema())
+  console.log('🔍 [RENDER] formData.numero_proposta:', formData.numero_proposta)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1185,10 +1202,16 @@ function OrcamentoForm() {
                   <span className="hidden sm:inline">Duplicar</span>
                 </button>
               )}
+              {/* ✅ Botão Gerar Proposta - requer salvar primeiro (numero_proposta) */}
               <button
-                onClick={() => setMostrarProposta(true)}
+                onClick={handleGerarProposta}
                 disabled={produtosSelecionados.length === 0}
-                className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  formData.numero_proposta 
+                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                    : 'bg-purple-300 text-purple-100'
+                }`}
+                title={!formData.numero_proposta ? 'Salve o orçamento primeiro para gerar o número da proposta' : 'Gerar proposta comercial'}
               >
                 <FileText size={20} />
                 <span className="hidden sm:inline">Gerar Proposta</span>
