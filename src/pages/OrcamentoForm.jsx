@@ -1,4 +1,5 @@
 // src/pages/OrcamentoForm.jsx
+// VERSION: 2026-01-20-v2 - DESCONTO RESET FIX
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
@@ -15,6 +16,9 @@ import ModalAlertaConcorrencia from '../components/ModalAlertaConcorrencia'
 import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaPagamento'
 
 const TABELA_ITENS = 'orcamentos_itens'
+
+// 🔄 VERSION MARKER - If you see this in console, cache is cleared!
+console.log('🔄 OrcamentoForm VERSION: 2026-01-20-v2 - DESCONTO RESET ENABLED')
 
 // ✅ FUNÇÕES DE VALIDAÇÃO
 const validarEmail = (email) => {
@@ -694,6 +698,10 @@ function OrcamentoForm() {
   }
 
   const duplicar = async () => {
+    // 🔄 VERSION CHECK - This log confirms the new code is running
+    console.log('🔄 ========== DUPLICAR VERSION: 2026-01-20-v2 ==========')
+    console.log('🔄 DESCONTO SERÁ ZERADO!')
+    
     if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.\n\n⚠️ O desconto será zerado (nova proposta requer nova autorização).')) return
 
     try {
@@ -719,7 +727,11 @@ function OrcamentoForm() {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotal + frete // Sem desconto
 
-      console.log('📋 [DUPLICAR] Criando novo orçamento com desconto_geral = 0')
+      // 🔄 CRITICAL LOG - Confirms we're setting 0
+      console.log('📋 [DUPLICAR v2] ============================================')
+      console.log('📋 [DUPLICAR v2] formData.desconto_geral atual:', formData.desconto_geral)
+      console.log('📋 [DUPLICAR v2] IGNORANDO e usando desconto_geral = 0')
+      console.log('📋 [DUPLICAR v2] ============================================')
 
       const novoOrcamento = {
         numero: novoNumero,
@@ -775,6 +787,9 @@ function OrcamentoForm() {
         desconto_valor_liberado: null // ✅ ZERADO
       }
 
+      // 🔄 LOG BEFORE INSERT
+      console.log('📋 [DUPLICAR v2] Objeto a ser inserido - desconto_geral:', novoOrcamento.desconto_geral)
+
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
         .insert([novoOrcamento])
@@ -783,7 +798,9 @@ function OrcamentoForm() {
 
       if (errorCriar) throw errorCriar
 
-      console.log('📋 [DUPLICAR] Novo orçamento criado:', orcCriado.id, 'desconto_geral:', orcCriado.desconto_geral)
+      // 🔄 LOG AFTER INSERT
+      console.log('📋 [DUPLICAR v2] Novo orçamento criado:', orcCriado.id)
+      console.log('📋 [DUPLICAR v2] desconto_geral retornado do banco:', orcCriado.desconto_geral)
 
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcCriado.id,
