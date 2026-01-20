@@ -12,6 +12,7 @@
 // - Header personalizado com ícone e cor do status
 // - Permissões: Vendedor vê apenas seus orçamentos, outros veem todos
 // - NOVO: Badge de origem da aprovação (Link/Manual)
+// - NOVO: Botão Ver Dados da Aceitação (Admin/Comercial Interno)
 //
 // STATUS SUPORTADOS:
 // - rascunho, enviado, aprovado, lancado, cancelado
@@ -22,20 +23,30 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { 
   ArrowLeft, Search, Edit2, Copy, FileText, Calendar, User, DollarSign,
   Edit, Send, CheckCircle, XCircle, Briefcase, MapPin, PackageCheck,
-  Link as LinkIcon, Hand
+  Link as LinkIcon, Hand, ClipboardList
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
+import ModalDadosAceitacao from '../components/ModalDadosAceitacao'
 
 export default function OrcamentosStatus() {
   const navigate = useNavigate()
   const { status } = useParams() // Pega o status da URL
-  const { user, isVendedor } = useAuth()
+  const { user, isVendedor, isAdmin, isComercialInterno } = useAuth()
   const [orcamentos, setOrcamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
+  
+  // Estado para o modal de dados da aceitação
+  const [modalAceitacao, setModalAceitacao] = useState({
+    aberto: false,
+    orcamentoId: null
+  })
+
+  // Verificar se pode ver dados da aceitação (Admin ou Comercial Interno)
+  const podeVerDadosAceitacao = () => isAdmin() || isComercialInterno()
 
   // ====================================================================================
   // CARREGAMENTO INICIAL DE DADOS
@@ -188,6 +199,23 @@ export default function OrcamentosStatus() {
   }
 
   // ====================================================================================
+  // ABRIR/FECHAR MODAL DE DADOS DA ACEITAÇÃO
+  // ====================================================================================
+  const abrirModalAceitacao = (orcamentoId) => {
+    setModalAceitacao({
+      aberto: true,
+      orcamentoId
+    })
+  }
+
+  const fecharModalAceitacao = () => {
+    setModalAceitacao({
+      aberto: false,
+      orcamentoId: null
+    })
+  }
+
+  // ====================================================================================
   // CONFIGURAÇÕES DE VISUAL POR STATUS
   // ====================================================================================
   const getStatusInfo = (statusName) => {
@@ -287,6 +315,14 @@ export default function OrcamentosStatus() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
+
+      {/* Modal de Dados da Aceitação */}
+      {modalAceitacao.aberto && (
+        <ModalDadosAceitacao 
+          orcamentoId={modalAceitacao.orcamentoId}
+          onClose={fecharModalAceitacao}
+        />
+      )}
 
       {/* ==================================================================== */}
       {/* HEADER DA PÁGINA - COM ÍCONE E COR DO STATUS */}
@@ -442,6 +478,16 @@ export default function OrcamentosStatus() {
                     
                     {/* Botões de Ação */}
                     <div className="flex gap-2">
+                      {/* Botão Ver Dados da Aceitação (só para Admin/Comercial + status aprovado) */}
+                      {orc.status === 'aprovado' && podeVerDadosAceitacao() && (
+                        <button
+                          onClick={() => abrirModalAceitacao(orc.id)}
+                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Ver Dados da Aceitação"
+                        >
+                          <ClipboardList size={18} />
+                        </button>
+                      )}
                       <button
                         onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
