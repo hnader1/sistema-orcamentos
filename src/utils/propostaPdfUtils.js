@@ -20,7 +20,14 @@ const BUCKET_NAME = 'propostas-pdf'
  */
 export const gerarPdfBlob = async (elemento, numeroProposta) => {
   // Importar html2pdf dinamicamente (para evitar problemas com SSR)
-  const html2pdf = (await import('html2pdf.js')).default
+  // Se html2pdf não estiver instalado, retorna erro amigável
+  let html2pdf
+  try {
+    html2pdf = (await import('html2pdf.js')).default
+  } catch (e) {
+    console.error('html2pdf.js não encontrado. Execute: npm install html2pdf.js')
+    throw new Error('Biblioteca html2pdf.js não instalada. Execute: npm install html2pdf.js')
+  }
   
   const options = {
     margin: [10, 10, 10, 10],
