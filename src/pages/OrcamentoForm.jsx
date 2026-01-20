@@ -1,5 +1,5 @@
 // src/pages/OrcamentoForm.jsx
-// VERSION: 2026-01-20-v4 - DESCONTO RESET FIX + LET DB GENERATE UUID
+// VERSION: 2026-01-20-v5 - FORCE UPDATE DISCOUNT AFTER INSERT
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
@@ -18,7 +18,7 @@ import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaP
 const TABELA_ITENS = 'orcamentos_itens'
 
 // 🔄 VERSION MARKER - If you see this in console, cache is cleared!
-console.log('🔄 OrcamentoForm VERSION: 2026-01-20-v4 - LET DB GENERATE UUID')
+console.log('🔄 OrcamentoForm VERSION: 2026-01-20-v5 - FORCE UPDATE DISCOUNT')
 
 // ✅ FUNÇÕES DE VALIDAÇÃO
 const validarEmail = (email) => {
@@ -664,8 +664,8 @@ function OrcamentoForm() {
   }
 
   const duplicar = async () => {
-    console.log('🔄 ========== DUPLICAR VERSION: 2026-01-20-v4 ==========')
-    console.log('🔄 DESCONTO SERÁ ZERADO! DB GERA UUID!')
+    console.log('🔄 ========== DUPLICAR VERSION: 2026-01-20-v5 ==========')
+    console.log('🔄 DESCONTO SERÁ ZERADO! FORCE UPDATE AFTER INSERT!')
     
     if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.\n\n⚠️ O desconto será zerado (nova proposta requer nova autorização).')) return
 
@@ -691,9 +691,8 @@ function OrcamentoForm() {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotal + frete
 
-      console.log('📋 [DUPLICAR v4] Criando objeto SEM id - banco vai gerar')
-      console.log('📋 [DUPLICAR v4] desconto_geral = 0')
-      console.log('📋 [DUPLICAR v4] vendedor:', user?.nome || formData.vendedor)
+      console.log('📋 [DUPLICAR v5] Criando objeto SEM id - banco vai gerar')
+      console.log('📋 [DUPLICAR v5] desconto_geral = 0')
 
       // ✅ NÃO incluir 'id' - deixar o banco gerar com gen_random_uuid()
       const novoOrcamento = {
@@ -750,8 +749,6 @@ function OrcamentoForm() {
         desconto_valor_liberado: null
       }
 
-      console.log('📋 [DUPLICAR v4] Objeto completo:', JSON.stringify(novoOrcamento, null, 2))
-
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
         .insert([novoOrcamento])
@@ -759,12 +756,34 @@ function OrcamentoForm() {
         .single()
 
       if (errorCriar) {
-        console.error('❌ [DUPLICAR v4] Erro Supabase:', errorCriar)
+        console.error('❌ [DUPLICAR v5] Erro Supabase:', errorCriar)
         throw errorCriar
       }
 
-      console.log('✅ [DUPLICAR v4] Novo orçamento criado:', orcCriado.id)
-      console.log('✅ [DUPLICAR v4] desconto_geral retornado:', orcCriado.desconto_geral)
+      console.log('✅ [DUPLICAR v5] Novo orçamento criado:', orcCriado.id)
+      console.log('✅ [DUPLICAR v5] desconto_geral retornado:', orcCriado.desconto_geral)
+
+      // ✅ FORCE UPDATE to reset discount (workaround for RLS stripping fields on INSERT)
+      if (orcCriado.desconto_geral !== 0 || orcCriado.desconto_liberado === true) {
+        console.log('⚠️ [DUPLICAR v5] Desconto não zerou! Forçando UPDATE...')
+        const { error: errorUpdate } = await supabase
+          .from('orcamentos')
+          .update({
+            desconto_geral: 0,
+            desconto_liberado: false,
+            desconto_liberado_por: null,
+            desconto_liberado_por_id: null,
+            desconto_liberado_em: null,
+            desconto_valor_liberado: null
+          })
+          .eq('id', orcCriado.id)
+        
+        if (errorUpdate) {
+          console.error('❌ [DUPLICAR v5] Erro ao forçar reset desconto:', errorUpdate)
+        } else {
+          console.log('✅ [DUPLICAR v5] Desconto forçado para 0!')
+        }
+      }
 
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcCriado.id,
