@@ -45,7 +45,8 @@ function OrcamentoForm() {
   const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
   const [descontoTravado, setDescontoTravado] = useState(false)
   const LIMITE_DESCONTO = 5
-  
+  const [salvandoObs, setSalvandoObs] = useState(false);
+
   // ✅ NOVO: Estados para controle de PDF/Proposta travada
   const [propostaTravada, setPropostaTravada] = useState(false)
   const [pdfExistente, setPdfExistente] = useState(null)
@@ -915,7 +916,7 @@ function OrcamentoForm() {
 const salvarObservacoesInternas = async () => {
   if (!id) return;
   
-  setSalvando(true);
+  setSalvandoObs(true);
   try {
     const { error } = await supabase
       .from('orcamentos')
@@ -928,9 +929,11 @@ const salvarObservacoesInternas = async () => {
     console.error('Erro ao salvar observações:', error);
     alert('Erro ao salvar observações: ' + error.message);
   } finally {
-    setSalvando(false);
+    setSalvandoObs(false);
   }
 };
+
+
   // ✅ ATUALIZADO: Salvar com verificação de permissões
   const salvar = async () => {
     // Verificar se pode salvar
@@ -1922,16 +1925,16 @@ const salvarObservacoesInternas = async () => {
               className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
               placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
             />
-            {modo === 'proposta_travada' && (
-                <button
-                  type="button"
-                  onClick={salvarObservacoesInternas}
-                  disabled={salvando}
-                  className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
-                >
-                  {salvando ? 'Salvando...' : 'Salvar Observações'}
-                </button>
-              )}
+           {modo === 'proposta_travada' && (
+              <button
+                type="button"
+                onClick={salvarObservacoesInternas}
+                disabled={salvandoObs}
+                className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+              >
+                {salvandoObs ? 'Salvando...' : 'Salvar Observações'}
+              </button>
+            )}
           </div>
         </div>
       </div>
