@@ -763,7 +763,7 @@ if (orc.frete_cidade || orc.frete_modalidade || orc.frete_manual) {
         data_validade: formData.data_validade,
         forma_pagamento_id: formData.forma_pagamento_id || null,
         prazo_entrega: formData.prazo_entrega,
-        desconto_geral: parseFloat(formData.desconto_geral) || 0,
+        desconto_geral: 0, // ✅ FORÇAR desconto zero na duplicação
         subtotal: subtotalComDesconto,
        frete: frete,
 frete_modalidade: dadosFrete?.modalidade || 'FOB',
@@ -1220,9 +1220,11 @@ frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viag
                   <span className="hidden sm:inline">Duplicar</span>
                 </button>
               )}
+              {/* ✅ CORREÇÃO: Botão Gerar Proposta desabilitado antes de salvar */}
               <button
                 onClick={() => setMostrarProposta(true)}
-                disabled={produtosSelecionados.length === 0}
+                disabled={produtosSelecionados.length === 0 || !id}
+                title={!id ? 'Salve o orçamento primeiro' : ''}
                 className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FileText size={20} />
