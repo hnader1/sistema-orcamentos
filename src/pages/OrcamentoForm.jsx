@@ -25,17 +25,13 @@ const validarEmail = (email) => {
 
 const validarTelefone = (telefone) => {
   if (!telefone) return false
-  // Remove tudo que não é número
   const numeros = telefone.replace(/\D/g, '')
-  // Deve ter pelo menos 10 dígitos (DDD + 8 números) ou 11 (DDD + 9 números)
   return numeros.length >= 10 && numeros.length <= 11
 }
 
 const formatarTelefone = (valor) => {
-  // Remove tudo que não é número
   const numeros = valor.replace(/\D/g, '')
   
-  // Aplica máscara
   if (numeros.length <= 2) {
     return numeros
   } else if (numeros.length <= 6) {
@@ -72,7 +68,6 @@ function OrcamentoForm() {
   const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
   const [descontoTravado, setDescontoTravado] = useState(false)
   
-  // ✅ Estados de erro para validação visual
   const [erroEmail, setErroEmail] = useState(false)
   const [erroTelefone, setErroTelefone] = useState(false)
   
@@ -128,8 +123,6 @@ function OrcamentoForm() {
         .order('nome')
 
       if (error) throw error
-      
-      console.log('📋 Vendedores carregados:', data?.length || 0)
       setVendedores(data || [])
     } catch (error) {
       console.error('❌ Erro ao carregar vendedores:', error)
@@ -146,7 +139,6 @@ function OrcamentoForm() {
         vendedor_telefone: vendedorSelecionado.telefone || '',
         vendedor_email: vendedorSelecionado.email || ''
       }))
-      console.log('✅ Vendedor selecionado:', vendedorSelecionado.nome)
     } else {
       setFormData(prev => ({
         ...prev,
@@ -177,9 +169,6 @@ function OrcamentoForm() {
       if (resultado.temConflito) {
         setConflitosDetectados(resultado)
         setMostrarAlertaConcorrencia(true)
-        console.log('⚠️ Conflitos detectados:', resultado.totalConflitos)
-      } else {
-        console.log('✅ Nenhum conflito detectado')
       }
     } catch (error) {
       console.error('Erro ao verificar concorrência:', error)
@@ -279,8 +268,6 @@ function OrcamentoForm() {
     try {
       setLoading(true)
       
-      console.log('🔍 [CARREGAR] Iniciando carregamento do orçamento ID:', id)
-      
       const { data: orc, error: errorOrc } = await supabase
         .from('orcamentos')
         .select('*')
@@ -288,17 +275,6 @@ function OrcamentoForm() {
         .single()
 
       if (errorOrc) throw errorOrc
-
-      console.log('✅ [CARREGAR] Orçamento carregado:', orc.numero)
-      
-      console.log('🚚 [CARREGAR] Dados de frete do banco:', {
-        frete_modalidade: orc.frete_modalidade,
-        frete_tipo_caminhao: orc.frete_tipo_caminhao,
-        frete_cidade: orc.frete_cidade,
-        frete_qtd_viagens: orc.frete_qtd_viagens,
-        frete_valor_viagem: orc.frete_valor_viagem,
-        frete: orc.frete
-      })
 
       setFormData({
         numero: orc.numero,
@@ -370,7 +346,6 @@ function OrcamentoForm() {
             data: orc.desconto_liberado_em ? new Date(orc.desconto_liberado_em).toLocaleString('pt-BR') : '',
             valor: orc.desconto_valor_liberado
           })
-          console.log('📋 Desconto foi liberado por:', orc.desconto_liberado_por, 'em', orc.desconto_liberado_em)
         }
       }
 
@@ -391,11 +366,8 @@ function OrcamentoForm() {
           qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1,
           observacao_frete_manual: orc.observacao_frete_manual || ''
         }
-        console.log('🚚 [CARREGAR] setDadosFrete com:', dadosFreteCarregados)
         setDadosFrete(dadosFreteCarregados)
       }
-
-      console.log(`🔍 [CARREGAR] Buscando itens para orcamento_id: ${id}`)
 
       const { data: itens, error: errorItens } = await supabase
         .from(TABELA_ITENS)
@@ -403,12 +375,7 @@ function OrcamentoForm() {
         .eq('orcamento_id', id)
         .order('ordem', { ascending: true })
 
-      if (errorItens) {
-        console.error('❌ [CARREGAR] Erro ao buscar itens:', errorItens)
-        throw errorItens
-      }
-
-      console.log('📦 [CARREGAR] Itens encontrados:', itens?.length || 0)
+      if (errorItens) throw errorItens
 
       if (itens && itens.length > 0) {
         const produtosCarregados = itens.map(item => ({
@@ -422,17 +389,13 @@ function OrcamentoForm() {
           peso_unitario: item.peso_unitario,
           qtd_por_pallet: item.qtd_por_pallet
         }))
-        
-        console.log('✅ [CARREGAR] Produtos carregados com sucesso')
         setProdutosSelecionados(produtosCarregados)
       } else {
-        console.log('⚠️ [CARREGAR] Nenhum item encontrado')
         setProdutosSelecionados([])
       }
 
       if (isVendedor() && orc.status === 'lancado') {
         setIsReadOnly(true)
-        console.log('🔒 [MODO LEITURA] Vendedor visualizando orçamento lançado')
       }
     } catch (error) {
       console.error('❌ [CARREGAR] Erro ao carregar orçamento:', error)
@@ -470,47 +433,30 @@ function OrcamentoForm() {
     try {
       console.log('🔐 ========== INICIANDO VALIDAÇÃO ==========')
       console.log('🔐 Usuário digitado:', `"${usuarioLiberacao}"`)
-      console.log('🔐 Senha digitada:', `"${senhaLiberacao}"`)
       
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select('id, nome, email, senha, senha_hash, tipo')
         .eq('ativo', true)
 
-      if (error) {
-        console.error('❌ Erro na busca:', error)
-        throw error
-      }
+      if (error) throw error
 
       console.log('📋 Total de usuários ativos:', usuarios?.length)
-      
-      usuarios?.forEach((u, i) => {
-        console.log(`   [${i}] Nome: "${u.nome}" | Email: "${u.email}" | Tipo: "${u.tipo}"`)
-      })
 
       const inputLower = usuarioLiberacao.toLowerCase().trim()
-      console.log('🔍 Buscando por:', `"${inputLower}"`)
       
       const usuarioEncontrado = usuarios?.find(u => {
         const nomeLower = (u.nome || '').toLowerCase().trim()
         const emailLower = (u.email || '').toLowerCase().trim()
         
-        const nomeExato = nomeLower === inputLower
-        const emailExato = emailLower === inputLower
-        const nomeContem = nomeLower.includes(inputLower)
-        const emailContem = emailLower.includes(inputLower)
-        
-        const match = nomeExato || emailExato || nomeContem || emailContem
-        
-        if (match) {
-          console.log(`   ✓ Match encontrado: "${u.nome}" (${u.email})`)
-        }
-        
-        return match
+        return nomeLower === inputLower || 
+               emailLower === inputLower || 
+               nomeLower.includes(inputLower) || 
+               emailLower.includes(inputLower)
       })
 
       if (!usuarioEncontrado) {
-        console.log('❌ Nenhum usuário encontrado com esse nome/email')
+        console.log('❌ Nenhum usuário encontrado')
         setErroSenha(true)
         setValidandoSenha(false)
         return
@@ -518,15 +464,9 @@ function OrcamentoForm() {
 
       console.log('✅ Usuário encontrado:', usuarioEncontrado.nome)
       console.log('   Tipo:', usuarioEncontrado.tipo)
-      console.log('   senha_hash:', usuarioEncontrado.senha_hash)
-      console.log('   senha:', usuarioEncontrado.senha)
 
       const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
       const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
-      
-      console.log('🔒 Verificando permissão...')
-      console.log('   Tipo do usuário:', `"${tipoLower}"`)
-      console.log('   Tipos permitidos:', perfisPermitidos)
       
       if (!perfisPermitidos.includes(tipoLower)) {
         console.log('❌ Tipo sem permissão!')
@@ -537,11 +477,12 @@ function OrcamentoForm() {
 
       console.log('✅ Tipo autorizado!')
 
-      const senhaCorreta = usuarioEncontrado.senha_hash ? usuarioEncontrado.senha_hash : usuarioEncontrado.senha
+      // ✅ CORREÇÃO: Priorizar campo 'senha' (onde estão as senhas reais)
+      const senhaCorreta = usuarioEncontrado.senha ? usuarioEncontrado.senha : usuarioEncontrado.senha_hash
       
       console.log('🔑 Verificando senha...')
-      console.log('   Campo senha_hash:', `"${usuarioEncontrado.senha_hash}"`)
       console.log('   Campo senha:', `"${usuarioEncontrado.senha}"`)
+      console.log('   Campo senha_hash:', `"${usuarioEncontrado.senha_hash}"`)
       console.log('   Usando:', `"${senhaCorreta}"`)
       console.log('   Digitada:', `"${senhaLiberacao}"`)
       console.log('   São iguais?', senhaCorreta === senhaLiberacao)
@@ -579,8 +520,6 @@ function OrcamentoForm() {
       setSenhaLiberacao('')
       
       console.log('🎉 ========== DESCONTO LIBERADO ==========')
-      console.log(`   Por: ${usuarioEncontrado.nome}`)
-      console.log(`   Data/Hora: ${dataHora}`)
 
     } catch (error) {
       console.error('❌ Erro ao validar senha:', error)
@@ -738,7 +677,6 @@ function OrcamentoForm() {
 
     try {
       setLoading(true)
-      console.log('📋 Duplicando orçamento:', formData.numero)
 
       const { data: ultimoOrc, error: errorUltimo } = await supabase
         .from('orcamentos')
@@ -815,12 +753,6 @@ function OrcamentoForm() {
         desconto_valor_liberado: null
       }
 
-      console.log('🚚 [DUPLICAR] Dados de frete:', {
-        frete_modalidade: novoOrcamento.frete_modalidade,
-        frete_tipo_caminhao: novoOrcamento.frete_tipo_caminhao,
-        frete_cidade: novoOrcamento.frete_cidade
-      })
-
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
         .insert([novoOrcamento])
@@ -828,8 +760,6 @@ function OrcamentoForm() {
         .single()
 
       if (errorCriar) throw errorCriar
-
-      console.log('✅ Orçamento duplicado:', novoNumero)
 
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcCriado.id,
@@ -864,7 +794,6 @@ function OrcamentoForm() {
 
   const salvar = async () => {
     try {
-      // ✅ VALIDAÇÃO CNPJ/CPF OBRIGATÓRIO
       const temCnpjCpfPreenchido = dadosCNPJCPF?.cnpj_cpf && dadosCNPJCPF.cnpj_cpf.trim() !== ''
       const marcouNaoInformar = dadosCNPJCPF?.cnpj_cpf_nao_informado === true
       const cnpjCpfOk = cnpjCpfValido || temCnpjCpfPreenchido || marcouNaoInformar
@@ -879,7 +808,6 @@ function OrcamentoForm() {
         return
       }
 
-      // ✅ VALIDAÇÃO EMAIL - FORMATO
       if (!formData.cliente_email) {
         alert('Por favor, informe o email do cliente!')
         setErroEmail(true)
@@ -893,7 +821,6 @@ function OrcamentoForm() {
       }
       setErroEmail(false)
 
-      // ✅ VALIDAÇÃO TELEFONE - FORMATO
       if (!formData.cliente_telefone) {
         alert('Por favor, informe o telefone do cliente!')
         setErroTelefone(true)
@@ -912,7 +839,6 @@ function OrcamentoForm() {
         return
       }
 
-      // ✅ VALIDAÇÃO FRETE MANUAL - OBSERVAÇÃO OBRIGATÓRIA
       if (dadosFrete?.frete_manual) {
         const observacaoFrete = dadosFrete.observacao_frete_manual?.trim()
         if (!observacaoFrete) {
@@ -942,11 +868,9 @@ function OrcamentoForm() {
             }
           } else {
             numeroProposta = await gerarNumeroProposta(user?.id, codigoVendedor)
-            console.log('✅ [SALVAR] Número de proposta gerado:', numeroProposta)
           }
         } catch (error) {
-          console.error('❌ [SALVAR] Erro ao gerar número de proposta:', error)
-          alert('Erro ao gerar número de proposta. Continuando sem numeração...')
+          console.error('❌ Erro ao gerar número de proposta:', error)
         }
       }
 
@@ -1008,17 +932,6 @@ function OrcamentoForm() {
         desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null
       }
 
-      console.log('🚚 [SALVAR] Dados de frete a serem salvos:', {
-        frete_modalidade: dadosOrcamento.frete_modalidade,
-        frete_tipo_caminhao: dadosOrcamento.frete_tipo_caminhao,
-        frete_cidade: dadosOrcamento.frete_cidade,
-        frete_qtd_viagens: dadosOrcamento.frete_qtd_viagens,
-        frete_valor_viagem: dadosOrcamento.frete_valor_viagem,
-        frete: dadosOrcamento.frete,
-        frete_manual: dadosOrcamento.frete_manual,
-        observacao_frete_manual: dadosOrcamento.observacao_frete_manual
-      })
-
       if (!id) {
         dadosOrcamento.usuario_id = user?.id || null
       } else {
@@ -1032,31 +945,21 @@ function OrcamentoForm() {
       let orcamentoId = id
 
       if (id) {
-        console.log('📝 [EDITAR] Atualizando orçamento ID:', id)
-        
         const { error } = await supabase
           .from('orcamentos')
           .update(dadosOrcamento)
           .eq('id', id)
 
         if (error) throw error
-        console.log('✅ [EDITAR] Orçamento atualizado')
 
-        console.log('🗑️ [EDITAR] Deletando itens antigos...')
         const { error: errorDelete } = await supabase
           .from(TABELA_ITENS)
           .delete()
           .eq('orcamento_id', id)
 
-        if (errorDelete) {
-          console.error('❌ [EDITAR] Erro ao deletar:', errorDelete)
-          throw errorDelete
-        }
-        console.log('✅ [EDITAR] Itens deletados')
+        if (errorDelete) throw errorDelete
 
       } else {
-        console.log('✨ [CRIAR] Criando novo orçamento')
-        
         const { data, error } = await supabase
           .from('orcamentos')
           .insert([dadosOrcamento])
@@ -1064,9 +967,7 @@ function OrcamentoForm() {
           .single()
 
         if (error) throw error
-        
         orcamentoId = data.id
-        console.log('✅ [CRIAR] Orçamento criado com ID:', orcamentoId)
       }
 
       const itens = produtosSelecionados.map((item, index) => ({
@@ -1084,19 +985,11 @@ function OrcamentoForm() {
         ordem: index
       }))
 
-      console.log(`💾 [INSERT] Inserindo ${itens.length} itens...`)
-
       const { error: errorItens } = await supabase
         .from(TABELA_ITENS)
         .insert(itens)
 
-      if (errorItens) {
-        console.error('❌ [INSERT] Erro:', errorItens)
-        throw errorItens
-      }
-
-      console.log('✅ [INSERT] Itens inseridos')
-      console.log('🎉 Salvamento concluído!')
+      if (errorItens) throw errorItens
 
       alert('Orçamento salvo com sucesso!')
       
@@ -1112,14 +1005,12 @@ function OrcamentoForm() {
     }
   }
 
-  // ✅ Handler para telefone com máscara
   const handleTelefoneChange = (e) => {
     const valorFormatado = formatarTelefone(e.target.value)
     setFormData({ ...formData, cliente_telefone: valorFormatado })
     setErroTelefone(false)
   }
 
-  // ✅ Handler para email com validação visual
   const handleEmailChange = (e) => {
     setFormData({ ...formData, cliente_email: e.target.value })
     setErroEmail(false)
@@ -1609,7 +1500,6 @@ function OrcamentoForm() {
             pesoTotal={calcularPesoTotal()}
             totalPallets={calcularTotalPallets()}
             onFreteChange={(dados) => {
-              console.log('🚚 FRETE RECEBIDO no OrcamentoForm:', dados)
               setDadosFrete(dados)
             }}
             freteAtual={dadosFrete}
