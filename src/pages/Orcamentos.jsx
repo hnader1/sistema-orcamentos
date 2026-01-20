@@ -13,6 +13,7 @@
 // - Soft delete (marca como cancelado, não exclui do banco)
 // - Permissões: Vendedor vê apenas seus orçamentos, outros veem todos
 // - NOVO: Botão para ver dados da aceitação (Admin/Comercial Interno)
+// - NOVO: Badge de origem da aprovação (Link/Manual)
 //
 // MELHORIAS RECENTES:
 // - Layout compacto (2 linhas por orçamento)
@@ -21,13 +22,15 @@
 // - Cidade do cadastro incluída nas informações
 // - Função duplicar corrigida: desconto zerado + campos de liberação resetados
 // - Botão "Ver Dados da Aceitação" para orçamentos aprovados (Admin/Comercial)
+// - Badge diferenciando aprovação via link vs manual
 // ====================================================================================
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, FileText, Plus, Search, Edit2, Copy, Ban, Calendar, User, DollarSign,
-  Edit, Send, CheckCircle, XCircle, Briefcase, TrendingUp, MapPin, PackageCheck, ClipboardList
+  Edit, Send, CheckCircle, XCircle, Briefcase, TrendingUp, MapPin, PackageCheck, ClipboardList,
+  Link as LinkIcon, Hand
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -269,7 +272,9 @@ export default function Orcamentos() {
         desconto_liberado_por: null,
         desconto_liberado_por_id: null,
         desconto_liberado_em: null,
-        desconto_valor_liberado: null
+        desconto_valor_liberado: null,
+        // ✅ APROVAÇÃO - NÃO COPIA
+        aprovado_via: null
       }
 
       console.log('📦 [DUPLICAR] Dados do novo orçamento (desconto zerado)')
@@ -364,6 +369,33 @@ export default function Orcamentos() {
   }
 
   // ====================================================================================
+  // COMPONENTE DE BADGE DE ORIGEM DA APROVAÇÃO
+  // ====================================================================================
+  const getAprovadoViaBadge = (aprovadoVia) => {
+    if (!aprovadoVia) return null
+    
+    if (aprovadoVia === 'link') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+          <LinkIcon size={12} />
+          Cliente
+        </span>
+      )
+    }
+    
+    if (aprovadoVia === 'manual') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+          <Hand size={12} />
+          Manual
+        </span>
+      )
+    }
+    
+    return null
+  }
+
+  // ====================================================================================
   // COMPONENTE DE CARD DE ORÇAMENTO (REUTILIZÁVEL)
   // ====================================================================================
   const OrcamentoCard = ({ orc }) => (
@@ -430,10 +462,13 @@ export default function Orcamentos() {
           </div>
         </div>
         
-        {/* Coluna Direita: Badge Status + Botões de Ação */}
+        {/* Coluna Direita: Badge Status + Badge Origem + Botões de Ação */}
         <div className="flex flex-col items-end gap-2">
-          {/* Badge de Status */}
-          {getStatusBadge(orc.status)}
+          {/* Badges de Status e Origem */}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(orc.status)}
+            {orc.status === 'aprovado' && getAprovadoViaBadge(orc.aprovado_via)}
+          </div>
           
           {/* Botões de Ação */}
           <div className="flex gap-2">
