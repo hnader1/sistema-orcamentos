@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 
-function CNPJCPFForm({ valores, onChange, onValidacao }) {
+function CNPJCPFForm({ valores, onChange, onValidacao, disabled = false }) {
   const [cnpjCpf, setCnpjCpf] = useState('');
   const [naoInformar, setNaoInformar] = useState(false);
   const [aceiteTermos, setAceiteTermos] = useState(false);
@@ -28,8 +28,8 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
   useEffect(() => {
     const dadosValidos = validarDados();
     
-    // Só notifica onChange se já foi inicializado
-    if (inicializado.current) {
+    // Só notifica onChange se já foi inicializado e não estiver disabled
+    if (inicializado.current && !disabled) {
       onChange({
         cnpj_cpf: naoInformar ? null : cnpjCpf,
         cnpj_cpf_nao_informado: naoInformar,
@@ -40,7 +40,7 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
     if (onValidacao) {
       onValidacao(dadosValidos);
     }
-  }, [cnpjCpf, naoInformar, aceiteTermos, erroValidacao]);
+  }, [cnpjCpf, naoInformar, aceiteTermos, erroValidacao, disabled]);
 
   const validarDados = () => {
     // Se marcou "não informar", precisa aceitar os termos
@@ -158,6 +158,7 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
   };
 
   const handleCnpjCpfChange = (e) => {
+    if (disabled) return;
     const valorFormatado = formatarCNPJCPF(e.target.value);
     setCnpjCpf(valorFormatado);
     
@@ -166,6 +167,7 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
   };
 
   const handleNaoInformarChange = (e) => {
+    if (disabled) return;
     const marcado = e.target.checked;
     setNaoInformar(marcado);
     
@@ -194,9 +196,9 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
               onChange={handleCnpjCpfChange}
               placeholder="00.000.000/0000-00 ou 000.000.000-00"
               maxLength={18}
-              disabled={naoInformar}
+              disabled={disabled || naoInformar}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                naoInformar ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''
+                disabled || naoInformar ? 'bg-gray-100 cursor-not-allowed text-gray-500 opacity-60' : ''
               } ${erroValidacao && !naoInformar ? 'border-red-500' : 'border-gray-300'}`}
             />
             {erroValidacao && !naoInformar && (
@@ -205,11 +207,14 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
           </div>
 
           {/* Checkbox "Não informar" */}
-          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap">
+          <label className={`flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap ${
+            disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+          }`}>
             <input
               type="checkbox"
               checked={naoInformar}
               onChange={handleNaoInformarChange}
+              disabled={disabled}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
             <span className="text-sm font-medium text-gray-700">Não informar</span>
@@ -218,14 +223,14 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
       </div>
 
       {/* Alerta - MAIS COMPACTO */}
-      {!naoInformar && (
+      {!naoInformar && !disabled && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800">
           💡 <strong>Importante:</strong> O CNPJ/CPF é usado para detectar se outro vendedor já está atendendo este cliente, evitando concorrência interna.
         </div>
       )}
 
       {/* Alerta de Termo de Responsabilidade */}
-      {naoInformar && (
+      {naoInformar && !disabled && (
         <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 animate-fadeIn">
           <div className="flex gap-3">
             <div className="flex-shrink-0">
@@ -258,7 +263,11 @@ function CNPJCPFForm({ valores, onChange, onValidacao }) {
                     <input
                       type="checkbox"
                       checked={aceiteTermos}
-                      onChange={(e) => setAceiteTermos(e.target.checked)}
+                      onChange={(e) => {
+                        if (disabled) return;
+                        setAceiteTermos(e.target.checked);
+                      }}
+                      disabled={disabled}
                       required
                       className="w-5 h-5 mt-0.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
