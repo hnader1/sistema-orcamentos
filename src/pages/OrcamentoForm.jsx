@@ -1,5 +1,5 @@
 // src/pages/OrcamentoForm.jsx
-// VERSION: 2026-01-20-v3 - DESCONTO RESET FIX + UUID FIX
+// VERSION: 2026-01-20-v4 - DESCONTO RESET FIX + LET DB GENERATE UUID
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy } from 'lucide-react'
@@ -18,7 +18,7 @@ import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaP
 const TABELA_ITENS = 'orcamentos_itens'
 
 // 🔄 VERSION MARKER - If you see this in console, cache is cleared!
-console.log('🔄 OrcamentoForm VERSION: 2026-01-20-v3 - DESCONTO RESET + UUID FIX')
+console.log('🔄 OrcamentoForm VERSION: 2026-01-20-v4 - LET DB GENERATE UUID')
 
 // ✅ FUNÇÕES DE VALIDAÇÃO
 const validarEmail = (email) => {
@@ -77,11 +77,7 @@ function OrcamentoForm() {
   
   const LIMITE_DESCONTO = 5
 
-  // ✅ Verifica se usuário pode ver código do sistema (admin ou comercial_interno)
   const podeVerCodigoSistema = () => {
-    console.log('🔍 [podeVerCodigoSistema] user:', user)
-    console.log('🔍 [podeVerCodigoSistema] user?.tipo:', user?.tipo)
-    console.log('🔍 [podeVerCodigoSistema] podeAcessarLancamento():', podeAcessarLancamento())
     return podeAcessarLancamento()
   }
   
@@ -291,7 +287,6 @@ function OrcamentoForm() {
       if (errorOrc) throw errorOrc
 
       console.log('📦 [CARREGAR] Desconto no banco:', orc.desconto_geral)
-      console.log('📦 [CARREGAR] Numero proposta:', orc.numero_proposta)
 
       setFormData({
         numero: orc.numero,
@@ -452,17 +447,12 @@ function OrcamentoForm() {
     setErroSenha(false)
 
     try {
-      console.log('🔐 ========== INICIANDO VALIDAÇÃO ==========')
-      console.log('🔐 Usuário digitado:', `"${usuarioLiberacao}"`)
-      
       const { data: usuarios, error } = await supabase
         .from('usuarios')
         .select('id, nome, email, senha, senha_hash, tipo')
         .eq('ativo', true)
 
       if (error) throw error
-
-      console.log('📋 Total de usuários ativos:', usuarios?.length)
 
       const inputLower = usuarioLiberacao.toLowerCase().trim()
       
@@ -477,44 +467,27 @@ function OrcamentoForm() {
       })
 
       if (!usuarioEncontrado) {
-        console.log('❌ Nenhum usuário encontrado')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
-
-      console.log('✅ Usuário encontrado:', usuarioEncontrado.nome)
-      console.log('   Tipo:', usuarioEncontrado.tipo)
 
       const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
       const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
       
       if (!perfisPermitidos.includes(tipoLower)) {
-        console.log('❌ Tipo sem permissão!')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
-
-      console.log('✅ Tipo autorizado!')
 
       const senhaCorreta = usuarioEncontrado.senha ? usuarioEncontrado.senha : usuarioEncontrado.senha_hash
       
-      console.log('🔑 Verificando senha...')
-      console.log('   Campo senha:', `"${usuarioEncontrado.senha}"`)
-      console.log('   Campo senha_hash:', `"${usuarioEncontrado.senha_hash}"`)
-      console.log('   Usando:', `"${senhaCorreta}"`)
-      console.log('   Digitada:', `"${senhaLiberacao}"`)
-      console.log('   São iguais?', senhaCorreta === senhaLiberacao)
-      
       if (!senhaCorreta || senhaCorreta !== senhaLiberacao) {
-        console.log('❌ Senha incorreta!')
         setErroSenha(true)
         setValidandoSenha(false)
         return
       }
-
-      console.log('✅ Senha correta!')
 
       const agora = new Date()
       const dataHora = agora.toLocaleString('pt-BR')
@@ -538,8 +511,6 @@ function OrcamentoForm() {
       setMostrarModalSenha(false)
       setUsuarioLiberacao('')
       setSenhaLiberacao('')
-      
-      console.log('🎉 ========== DESCONTO LIBERADO ==========')
 
     } catch (error) {
       console.error('❌ Erro ao validar senha:', error)
@@ -693,9 +664,8 @@ function OrcamentoForm() {
   }
 
   const duplicar = async () => {
-    // 🔄 VERSION CHECK
-    console.log('🔄 ========== DUPLICAR VERSION: 2026-01-20-v3 ==========')
-    console.log('🔄 DESCONTO SERÁ ZERADO + UUID GERADO NO CLIENTE!')
+    console.log('🔄 ========== DUPLICAR VERSION: 2026-01-20-v4 ==========')
+    console.log('🔄 DESCONTO SERÁ ZERADO! DB GERA UUID!')
     
     if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.\n\n⚠️ O desconto será zerado (nova proposta requer nova autorização).')) return
 
@@ -721,13 +691,12 @@ function OrcamentoForm() {
       const frete = dadosFrete?.valor_total_frete || 0
       const total = subtotal + frete
 
-      // ✅ GERA UUID NO CLIENTE (fix para default do banco não funcionar)
-      const novoId = crypto.randomUUID()
-      console.log('📋 [DUPLICAR v3] Gerando UUID no cliente:', novoId)
-      console.log('📋 [DUPLICAR v3] desconto_geral = 0')
+      console.log('📋 [DUPLICAR v4] Criando objeto SEM id - banco vai gerar')
+      console.log('📋 [DUPLICAR v4] desconto_geral = 0')
+      console.log('📋 [DUPLICAR v4] vendedor:', user?.nome || formData.vendedor)
 
+      // ✅ NÃO incluir 'id' - deixar o banco gerar com gen_random_uuid()
       const novoOrcamento = {
-        id: novoId, // ✅ UUID GERADO NO CLIENTE
         numero: novoNumero,
         numero_proposta: null,
         cliente_nome: formData.cliente_nome,
@@ -781,16 +750,21 @@ function OrcamentoForm() {
         desconto_valor_liberado: null
       }
 
+      console.log('📋 [DUPLICAR v4] Objeto completo:', JSON.stringify(novoOrcamento, null, 2))
+
       const { data: orcCriado, error: errorCriar } = await supabase
         .from('orcamentos')
         .insert([novoOrcamento])
         .select()
         .single()
 
-      if (errorCriar) throw errorCriar
+      if (errorCriar) {
+        console.error('❌ [DUPLICAR v4] Erro Supabase:', errorCriar)
+        throw errorCriar
+      }
 
-      console.log('📋 [DUPLICAR v3] Novo orçamento criado:', orcCriado.id)
-      console.log('📋 [DUPLICAR v3] desconto_geral retornado:', orcCriado.desconto_geral)
+      console.log('✅ [DUPLICAR v4] Novo orçamento criado:', orcCriado.id)
+      console.log('✅ [DUPLICAR v4] desconto_geral retornado:', orcCriado.desconto_geral)
 
       const itens = produtosSelecionados.map((item, index) => ({
         orcamento_id: orcCriado.id,
@@ -1070,9 +1044,6 @@ function OrcamentoForm() {
       </>
     )
   }
-
-  console.log('🔍 [RENDER] podeVerCodigoSistema():', podeVerCodigoSistema())
-  console.log('🔍 [RENDER] formData.numero_proposta:', formData.numero_proposta)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1598,7 +1569,6 @@ function OrcamentoForm() {
                   </span>
                 </div>
 
-
                 <div className="flex justify-between items-center">
                   <label className="text-sm text-gray-600 flex items-center gap-1 flex-wrap">
                     Desconto (%):
@@ -1608,7 +1578,7 @@ function OrcamentoForm() {
                       </span>
                     )}
                     {descontoTravado && descontoLiberadoPor && (
-                      <span className="text-xs text-blue-600 flex items-center gap-0.5" title={`Liberado por ${descontoLiberadoPor.nome} em ${descontoLiberadoPor.data}\nPara alterar, clique no campo.`}>
+                      <span className="text-xs text-blue-600 flex items-center gap-0.5">
                         🔒 {descontoLiberadoPor.nome} ({descontoLiberadoPor.data})
                       </span>
                     )}
@@ -1642,7 +1612,6 @@ function OrcamentoForm() {
                         type="button"
                         onClick={() => setMostrarModalSenha(true)}
                         className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                        title="Alterar desconto (requer autorização)"
                       >
                         <Lock size={14} />
                       </button>
