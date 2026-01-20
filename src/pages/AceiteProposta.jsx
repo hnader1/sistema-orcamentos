@@ -11,6 +11,7 @@ import { supabase } from '../services/supabase';
 // 3. Download PDF na tela de sucesso
 // 4. Resumo com valores corretos (produtos, frete, viagens)
 // 5. Bloqueio de edições após aceite (só número ERP)
+// 6. ✅ NOVO: Salvar dados extras na tabela aceites (contribuinte, IE, tipo_cliente)
 // =====================================================
 
 export default function AceiteProposta() {
@@ -281,7 +282,7 @@ export default function AceiteProposta() {
     setDocumentos(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Aceitar proposta
+  // ✅ ACEITAR PROPOSTA - ATUALIZADO PARA SALVAR DADOS EXTRAS
   const handleAceitar = async () => {
     if (!termoAceito || !lgpdAceito) {
       alert('Você precisa aceitar os termos para continuar.');
@@ -291,6 +292,7 @@ export default function AceiteProposta() {
     setEnviando(true);
 
     try {
+      // Obter IP do cliente
       let ipCliente = '';
       try {
         const ipResponse = await fetch('https://api.ipify.org?format=json');
@@ -300,6 +302,12 @@ export default function AceiteProposta() {
         ipCliente = 'não disponível';
       }
 
+      // Obter dados do cliente
+      const dadosOriginais = proposta.dados_cliente_proposta?.[0];
+      const emailCliente = dadosOriginais?.email || proposta.orcamentos?.cliente_email || '';
+      const cpfCnpjCliente = dadosOriginais?.cpf_cnpj || proposta.orcamentos?.cliente_cpf_cnpj || '';
+
+      // ✅ INSERIR ACEITE COM TODOS OS DADOS EXTRAS
       const { error: erroAceite } = await supabase
         .from('aceites')
         .insert({
@@ -307,9 +315,17 @@ export default function AceiteProposta() {
           tipo: proposta.valor_total <= 5000 ? 'simples' : 'assinatura_digital',
           ip_cliente: ipCliente,
           user_agent: navigator.userAgent,
+          // ✅ NOVOS CAMPOS: dados editáveis do cliente
+          email_aprovador: emailCliente,
+          nome_aprovador: dadosEditaveis.razao_social || dadosEditaveis.nome_fantasia,
+          contribuinte_icms: dadosEditaveis.contribuinte_icms,
+          inscricao_estadual: dadosEditaveis.inscricao_estadual || null,
+          tipo_cliente: dadosEditaveis.tipo_cliente,
+          // Dados confirmados (backup em JSON)
           dados_confirmados: {
             ...dadosEditaveis,
-            cpf_cnpj: proposta.dados_cliente_proposta?.[0]?.cpf_cnpj || proposta.orcamentos?.cliente_cpf_cnpj
+            cpf_cnpj: cpfCnpjCliente,
+            email: emailCliente
           },
           observacao_cliente: observacaoCliente,
           lgpd_aceito: lgpdAceito,
@@ -319,7 +335,7 @@ export default function AceiteProposta() {
 
       if (erroAceite) throw erroAceite;
 
-      const dadosOriginais = proposta.dados_cliente_proposta?.[0];
+      // Verificar se houve alteração nos dados e criar registro em dados_cliente_proposta
       const houveAlteracao = 
         dadosEditaveis.razao_social !== dadosOriginais?.razao_social ||
         dadosEditaveis.nome_fantasia !== dadosOriginais?.nome_fantasia ||
@@ -332,7 +348,7 @@ export default function AceiteProposta() {
           .from('dados_cliente_proposta')
           .insert({
             proposta_id: proposta.id,
-            cpf_cnpj: dadosOriginais?.cpf_cnpj || proposta.orcamentos?.cliente_cpf_cnpj,
+            cpf_cnpj: cpfCnpjCliente,
             razao_social: dadosEditaveis.razao_social,
             nome_fantasia: dadosEditaveis.nome_fantasia,
             inscricao_estadual: dadosEditaveis.inscricao_estadual,
@@ -343,12 +359,14 @@ export default function AceiteProposta() {
             bairro: dadosOriginais?.bairro || proposta.orcamentos?.bairro_entrega,
             cidade: dadosOriginais?.cidade || proposta.orcamentos?.cidade_entrega,
             uf: dadosOriginais?.uf || proposta.orcamentos?.uf_entrega,
-            email: dadosOriginais?.email || proposta.orcamentos?.cliente_email,
+            email: emailCliente,
             telefone: dadosOriginais?.telefone || proposta.orcamentos?.cliente_telefone,
-            origem: 'cliente'
+            origem: 'cliente'  // ✅ Marca que foi preenchido pelo cliente
           });
       }
 
+      // Atualizar status da proposta para aceita
+      // O trigger no banco vai automaticamente mudar o status do orçamento para 'aprovado'
       await supabase
         .from('propostas')
         .update({ status: 'aceita', data_aceite: new Date().toISOString() })
