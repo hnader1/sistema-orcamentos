@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react'
 import { Truck, Package, AlertCircle, CheckCircle, Search } from 'lucide-react'
 
-export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, freteAtual }) {
+export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, freteAtual, disabled = false }) {
   const [fretes, setFretes] = useState([])
   const [localidades, setLocalidades] = useState([])
   const [buscaCidade, setBuscaCidade] = useState('')
@@ -162,6 +162,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   ).slice(0, 10)
 
   const selecionarCidade = (cidade) => {
+    if (disabled) return
     setCidadeSelecionada(cidade)
     setBuscaCidade(cidade)
     setMostrarSugestoes(false)
@@ -310,12 +311,13 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   }
 
   const notificarFrete = (dadosFrete) => {
-    if (onFreteChange) {
+    if (onFreteChange && !disabled) {
       onFreteChange(dadosFrete)
     }
   }
 
   const resetarSelecoes = () => {
+    if (disabled) return
     setTipoVeiculo('')
     setCidadeSelecionada('')
     setBuscaCidade('')
@@ -412,13 +414,17 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             <select
               value={modalidade}
               onChange={(e) => {
+                if (disabled) return
                 setModalidade(e.target.value)
                 if (e.target.value === 'FOB') {
                   resetarSelecoes()
                   setModalidade('FOB')
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              disabled={disabled}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                disabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+              }`}
             >
               <option value="">Selecione...</option>
               {modalidadesUnicas.map(m => (
@@ -436,9 +442,14 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             </label>
             <select
               value={tipoVeiculo}
-              onChange={(e) => setTipoVeiculo(e.target.value)}
-              disabled={!modalidade || modalidade === 'FOB'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              onChange={(e) => {
+                if (disabled) return
+                setTipoVeiculo(e.target.value)
+              }}
+              disabled={disabled || !modalidade || modalidade === 'FOB'}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                disabled || !modalidade || modalidade === 'FOB' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+              }`}
             >
               <option value="">Selecione...</option>
               {tiposVeiculoUnicos.map(v => (
@@ -459,19 +470,22 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               type="text"
               value={buscaCidade}
               onChange={(e) => {
+                if (disabled) return
                 setBuscaCidade(e.target.value)
                 setCidadeSelecionada('')
                 setMostrarSugestoes(true)
               }}
-              onFocus={() => setMostrarSugestoes(true)}
+              onFocus={() => !disabled && setMostrarSugestoes(true)}
               onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
-              disabled={!modalidade || modalidade === 'FOB'}
+              disabled={disabled || !modalidade || modalidade === 'FOB'}
               placeholder="Ex: Betim, BH Centro, Contagem..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                disabled || !modalidade || modalidade === 'FOB' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+              }`}
             />
             
             {/* Dropdown de sugestões */}
-            {mostrarSugestoes && cidadesFiltradas.length > 0 && (
+            {!disabled && mostrarSugestoes && cidadesFiltradas.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {cidadesFiltradas.map((cidade, idx) => (
                   <button
@@ -537,14 +551,15 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
           </div>
         )}
 
-        {/* Checkbox para frete manual - só mostra se não for FOB */}
+        {/* Checkbox para frete manual - só mostra se não for FOB e não estiver disabled */}
         {modalidade && modalidade !== 'FOB' && (
           <div className="border-t border-gray-200 pt-4">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className={`flex items-center gap-2 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={freteManual}
                 onChange={(e) => {
+                  if (disabled) return
                   setFreteManual(e.target.checked)
                   if (!e.target.checked) {
                     // Limpar valores manuais ao desmarcar
@@ -552,6 +567,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                     setQtdManualViagens(1)
                   }
                 }}
+                disabled={disabled}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">Definir valor de frete manualmente</span>
@@ -569,11 +585,17 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                     <input
                       type="number"
                       value={valorManualViagem}
-                      onChange={(e) => setValorManualViagem(e.target.value)}
+                      onChange={(e) => {
+                        if (disabled) return
+                        setValorManualViagem(e.target.value)
+                      }}
                       placeholder="Ex: 500.00"
                       min="0"
                       step="0.01"
-                      className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+                      disabled={disabled}
+                      className={`w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg ${
+                        disabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+                      }`}
                     />
                   </div>
 
@@ -585,10 +607,16 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                     <input
                       type="number"
                       value={qtdManualViagens}
-                      onChange={(e) => setQtdManualViagens(Math.max(1, parseInt(e.target.value) || 1))}
+                      onChange={(e) => {
+                        if (disabled) return
+                        setQtdManualViagens(Math.max(1, parseInt(e.target.value) || 1))
+                      }}
                       min="1"
                       step="1"
-                      className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+                      disabled={disabled}
+                      className={`w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg ${
+                        disabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+                      }`}
                     />
                   </div>
                 </div>
