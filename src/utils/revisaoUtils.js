@@ -242,7 +242,7 @@ export async function verificarPDFExistente(orcamentoId) {
 
 /**
  * Exclui PDF e prepara orçamento para nova edição
- * AGORA INCREMENTA A REVISÃO IMEDIATAMENTE
+ * AGORA INCREMENTA A REVISÃO E INVALIDA O LINK ANTERIOR
  */
 export async function prepararEdicaoComRevisao({
   orcamentoId,
@@ -272,40 +272,56 @@ export async function prepararEdicaoComRevisao({
     console.log(`🔄 Preparando edição: Rev.${revisaoAtual} → Rev.${proximaRevisao}`);
     console.log(`📝 Número: ${numeroPropostaAtual} → ${novoNumeroProposta}`);
 
-    // 3. Guardar referência do PDF antigo no histórico (se existir)
-    if (pdfPath && propostaId) {
+    // 3. ⚠️ CRÍTICO: INVALIDAR A PROPOSTA ANTERIOR
+    if (propostaId) {
       try {
+        // Guardar referência do PDF antigo no histórico
         const { data: proposta } = await supabase
           .from('propostas')
-          .select('pdf_path_historico')
+          .select('pdf_path, pdf_path_historico, token_aceite')
           .eq('id', propostaId)
           .single();
 
         const historico = proposta?.pdf_path_historico || [];
-        historico.push({
-          path: pdfPath,
-          excluido_em: new Date().toISOString(),
-          excluido_por: usuarioNome,
-          revisao: revisaoAtual
-        });
+        if (pdfPath) {
+          historico.push({
+            path: pdfPath,
+            excluido_em: new Date().toISOString(),
+            excluido_por: usuarioNome,
+            revisao: revisaoAtual,
+            token_invalidado: proposta?.token_aceite
+          });
+        }
 
-        // Limpar PDF atual e guardar no histórico
-        await supabase
+        // ⚠️ IMPORTANTE: Limpar PDF, INVALIDAR TOKEN e marcar como revisada
+        const { error: erroProposta } = await supabase
           .from('propostas')
           .update({
             pdf_path: null,
-            pdf_path_historico: historico
+            pdf_path_historico: historico,
+            status: 'revisada',  // ⚠️ NOVO STATUS - Link antigo não funciona mais!
+            token_aceite: null,  // ⚠️ LIMPAR TOKEN - Invalida o link!
+            revisada_em: new Date().toISOString(),
+            revisada_por: usuarioNome,
+            motivo_revisao: motivo
           })
           .eq('id', propostaId);
 
-        // Excluir arquivo do storage
-        await supabase.storage
-          .from('propostas-pdf')
-          .remove([pdfPath]);
+        if (erroProposta) {
+          console.error('Erro ao invalidar proposta:', erroProposta);
+        } else {
+          console.log('✅ Proposta anterior INVALIDADA - Link antigo não funciona mais!');
+        }
 
-        console.log('✅ PDF antigo excluído e arquivado');
+        // Excluir arquivo do storage
+        if (pdfPath) {
+          await supabase.storage
+            .from('propostas-pdf')
+            .remove([pdfPath]);
+          console.log('✅ PDF antigo excluído do storage');
+        }
       } catch (e) {
-        console.warn('Aviso ao processar PDF antigo:', e);
+        console.warn('Aviso ao processar proposta anterior:', e);
       }
     }
 
@@ -314,7 +330,9 @@ export async function prepararEdicaoComRevisao({
       .from('orcamentos')
       .update({
         revisao: proximaRevisao,
-        numero_proposta: novoNumeroProposta
+        numero_proposta: novoNumeroProposta,
+        // Voltar status para rascunho ou manter enviado?
+        // Mantém o status atual, mas a proposta fica inválida até gerar novo PDF
       })
       .eq('id', orcamentoId);
 
@@ -343,11 +361,13 @@ export async function prepararEdicaoComRevisao({
     }
 
     console.log(`✅ Edição preparada! Nova revisão: ${proximaRevisao}, Novo número: ${novoNumeroProposta}`);
+    console.log('⚠️ LINK ANTERIOR FOI INVALIDADO - Cliente precisa receber novo link!');
 
     return { 
       sucesso: true,
       novaRevisao: proximaRevisao,
-      novoNumeroProposta: novoNumeroProposta
+      novoNumeroProposta: novoNumeroProposta,
+      linkAnteriorInvalidado: true
     };
 
   } catch (error) {

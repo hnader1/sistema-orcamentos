@@ -1,275 +1,277 @@
 // src/components/LogRevisoes.jsx
 // =====================================================
 // COMPONENTE: Log de Revisões da Proposta
-// Mostra histórico de todas as alterações após envio
+// VERSÃO CORRIGIDA - Filtra campos internos e mostra alterações reais
 // =====================================================
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Clock, 
-  User, 
-  FileEdit, 
-  ChevronDown, 
-  ChevronUp,
-  Eye,
-  History,
-  AlertCircle
-} from 'lucide-react';
-import { supabase } from '../services/supabase';
+import React, { useState, useEffect } from 'react'
+import { History, ChevronDown, ChevronUp, User, Calendar, FileText } from 'lucide-react'
+import { supabase } from '../services/supabase'
 
-export default function LogRevisoes({ orcamentoId, revisaoAtual }) {
-  const [revisoes, setRevisoes] = useState([]);
-  const [carregando, setCarregando] = useState(true);
-  const [expandido, setExpandido] = useState(null);
-  const [mostrarTodos, setMostrarTodos] = useState(false);
+// Tradução dos nomes dos campos para exibição
+const TRADUCAO_CAMPOS = {
+  cliente_nome: 'Nome do Cliente',
+  cliente_empresa: 'Empresa/Contato',
+  cliente_email: 'Email',
+  cliente_telefone: 'Telefone',
+  endereco_entrega: 'Endereço de Entrega',
+  observacoes: 'Observações',
+  forma_pagamento_id: 'Forma de Pagamento',
+  prazo_entrega: 'Prazo de Entrega',
+  desconto_geral: 'Desconto (%)',
+  validade_dias: 'Validade (dias)',
+  frete: 'Valor do Frete',
+  frete_cidade: 'Cidade do Frete',
+  frete_modalidade: 'Modalidade do Frete',
+  frete_tipo_caminhao: 'Tipo de Caminhão',
+  frete_qtd_viagens: 'Qtd. Viagens',
+  obra_cep: 'CEP da Obra',
+  obra_cidade: 'Cidade da Obra',
+  obra_bairro: 'Bairro da Obra',
+  obra_logradouro: 'Logradouro da Obra',
+  obra_numero: 'Número da Obra',
+  cnpj_cpf: 'CNPJ/CPF',
+  numero_proposta: 'Número da Proposta',
+  status: 'Status'
+}
+
+// Campos internos que não devem ser exibidos
+const CAMPOS_INTERNOS = ['_inicio_revisao']
+
+function LogRevisoes({ orcamentoId, revisaoAtual = 0 }) {
+  const [revisoes, setRevisoes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [expandido, setExpandido] = useState({})
 
   useEffect(() => {
     if (orcamentoId) {
-      carregarRevisoes();
+      carregarRevisoes()
     }
-  }, [orcamentoId]);
+  }, [orcamentoId])
 
   const carregarRevisoes = async () => {
     try {
-      setCarregando(true);
-      
       const { data, error } = await supabase
         .from('propostas_revisoes')
         .select('*')
         .eq('orcamento_id', orcamentoId)
-        .order('created_at', { ascending: false });
+        .order('numero_revisao', { ascending: false })
 
-      if (error) throw error;
-      setRevisoes(data || []);
+      if (error) {
+        console.warn('Tabela propostas_revisoes pode não existir:', error)
+        setRevisoes([])
+        return
+      }
+
+      setRevisoes(data || [])
     } catch (error) {
-      console.error('Erro ao carregar revisões:', error);
+      console.error('Erro ao carregar revisões:', error)
     } finally {
-      setCarregando(false);
+      setLoading(false)
     }
-  };
-
-  // Formatar data
-  const formatarData = (dataISO) => {
-    if (!dataISO) return '-';
-    const data = new Date(dataISO);
-    return data.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Traduzir nome do campo
-  const traduzirCampo = (campo) => {
-    const traducoes = {
-      cliente_nome: 'Nome do Cliente',
-      cliente_empresa: 'Nome do Contato',
-      cliente_email: 'Email',
-      cliente_telefone: 'Telefone',
-      endereco_entrega: 'Endereço de Entrega',
-      observacoes: 'Observações',
-      observacoes_internas: 'Observações Internas',
-      forma_pagamento_id: 'Forma de Pagamento',
-      prazo_entrega: 'Prazo de Entrega',
-      desconto_geral: 'Desconto Geral',
-      validade_dias: 'Validade (dias)',
-      frete: 'Frete',
-      frete_cidade: 'Cidade do Frete',
-      itens: 'Itens do Orçamento',
-      status: 'Status'
-    };
-    return traducoes[campo] || campo;
-  };
-
-  // Se não tem revisões, mostrar mensagem
-  if (!carregando && revisoes.length === 0) {
-    if (revisaoAtual === 0) {
-      return null; // Não mostrar nada se é a versão original e sem revisões
-    }
-    return (
-      <div className="bg-gray-50 rounded-lg p-4 text-center text-gray-500">
-        <History className="w-8 h-8 mx-auto mb-2 opacity-50" />
-        <p className="text-sm">Nenhuma revisão registrada</p>
-      </div>
-    );
   }
 
-  // Revisões a mostrar (limitadas ou todas)
-  const revisoesVisiveis = mostrarTodos ? revisoes : revisoes.slice(0, 3);
+  const toggleExpandir = (id) => {
+    setExpandido(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const formatarValor = (valor) => {
+    if (valor === null || valor === undefined) return '-'
+    if (valor === '') return '(vazio)'
+    if (typeof valor === 'boolean') return valor ? 'Sim' : 'Não'
+    if (typeof valor === 'number') {
+      // Se parece ser dinheiro
+      if (valor > 100) {
+        return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      }
+      return valor.toString()
+    }
+    return String(valor)
+  }
+
+  const traduzirCampo = (campo) => {
+    return TRADUCAO_CAMPOS[campo] || campo
+  }
+
+  // Filtrar campos internos e retornar apenas alterações reais
+  const getAlteracoesReais = (revisao) => {
+    const campos = revisao.campos_alterados || {}
+    const anteriores = revisao.valores_anteriores || {}
+    const novos = revisao.valores_novos || {}
+    
+    const alteracoes = []
+    
+    for (const campo of Object.keys(campos)) {
+      // Ignorar campos internos
+      if (CAMPOS_INTERNOS.includes(campo)) continue
+      
+      alteracoes.push({
+        campo,
+        antes: anteriores[campo],
+        depois: novos[campo]
+      })
+    }
+    
+    return alteracoes
+  }
+
+  // Verificar se é apenas um registro de início (sem alterações reais)
+  const isApenasInicio = (revisao) => {
+    const campos = Object.keys(revisao.campos_alterados || {})
+    return campos.length === 1 && campos[0] === '_inicio_revisao'
+  }
+
+  if (loading) {
+    return (
+      <div className="animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+        <div className="h-20 bg-gray-100 rounded"></div>
+      </div>
+    )
+  }
+
+  if (revisoes.length === 0) {
+    return null // Não mostrar nada se não há revisões
+  }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Cabeçalho */}
-      <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white rounded-lg shadow-sm">
-              <History className="w-5 h-5 text-slate-600" />
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900">Histórico de Revisões</h3>
-              <p className="text-sm text-gray-500">
-                {revisoes.length} revisão(ões) • Versão atual: Rev.{revisaoAtual || 0}
-              </p>
-            </div>
-          </div>
-          
-          {revisaoAtual > 0 && (
-            <span className="px-3 py-1 bg-amber-100 text-amber-700 text-sm font-medium rounded-full">
-              Documento Revisado
-            </span>
-          )}
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <History className="text-gray-500" size={20} />
+          <h2 className="text-lg font-semibold">Histórico de Revisões</h2>
+          <span className="text-sm text-gray-500">
+            {revisoes.length} revisão(ões) • Versão atual: Rev.{revisaoAtual}
+          </span>
         </div>
+        
+        {revisaoAtual > 0 && (
+          <span className="px-3 py-1 bg-orange-100 text-orange-700 text-sm font-medium rounded-full">
+            Documento Revisado
+          </span>
+        )}
       </div>
 
-      {/* Loading */}
-      {carregando && (
-        <div className="p-8 text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" />
-          <p className="text-sm text-gray-500 mt-2">Carregando histórico...</p>
-        </div>
-      )}
-
-      {/* Lista de Revisões */}
-      {!carregando && (
-        <div className="divide-y divide-gray-100">
-          {revisoesVisiveis.map((rev, idx) => (
+      <div className="space-y-3">
+        {revisoes.map((revisao) => {
+          const alteracoesReais = getAlteracoesReais(revisao)
+          const apenasInicio = isApenasInicio(revisao)
+          
+          return (
             <div 
-              key={rev.id}
-              className={`transition-all ${
-                expandido === rev.id ? 'bg-blue-50/30' : 'hover:bg-gray-50'
-              }`}
+              key={revisao.id}
+              className="border border-gray-200 rounded-lg overflow-hidden"
             >
-              {/* Linha Principal */}
+              {/* Cabeçalho da revisão */}
               <div 
-                className="px-6 py-4 cursor-pointer flex items-center justify-between"
-                onClick={() => setExpandido(expandido === rev.id ? null : rev.id)}
+                className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100"
+                onClick={() => toggleExpandir(revisao.id)}
               >
-                <div className="flex items-center gap-4">
-                  {/* Badge da Revisão */}
-                  <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-                    <span className="text-white font-bold">
-                      {rev.numero_revisao}
-                    </span>
-                  </div>
-
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full text-sm font-bold">
+                    {revisao.numero_revisao}
+                  </span>
                   <div>
-                    <p className="font-semibold text-gray-900">
-                      Revisão {rev.numero_revisao}
-                    </p>
-                    <div className="flex items-center gap-3 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        {rev.editado_por_nome || 'Sistema'}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatarData(rev.editado_em)}
+                    <span className="font-medium">Revisão {revisao.numero_revisao}</span>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <User size={12} />
+                      <span>{revisao.editado_por_nome || 'Sistema'}</span>
+                      <Calendar size={12} />
+                      <span>
+                        {new Date(revisao.editado_em).toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
                       </span>
                     </div>
                   </div>
                 </div>
-
-                {/* Resumo dos campos alterados */}
-                <div className="flex items-center gap-4">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-sm text-gray-600">
-                      {Object.keys(rev.campos_alterados || {}).length} campo(s) alterado(s)
-                    </p>
-                    {rev.status_anterior !== rev.status_novo && (
-                      <p className="text-xs text-amber-600">
-                        Status: {rev.status_anterior} → {rev.status_novo}
-                      </p>
-                    )}
-                  </div>
-                  
-                  {expandido === rev.id ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                
+                <div className="flex items-center gap-2">
+                  {apenasInicio ? (
+                    <span className="text-sm text-gray-500">
+                      Edição iniciada
+                    </span>
                   ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                    <span className="text-sm text-gray-500">
+                      {alteracoesReais.length} campo(s) alterado(s)
+                    </span>
                   )}
+                  {expandido[revisao.id] ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                 </div>
               </div>
 
-              {/* Detalhes Expandidos */}
-              {expandido === rev.id && (
-                <div className="px-6 pb-4 border-t border-gray-100 bg-white">
-                  <div className="mt-4 space-y-3">
-                    {/* Motivo da Revisão */}
-                    {rev.motivo && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                        <p className="text-sm text-amber-800">
-                          <strong>Motivo:</strong> {rev.motivo}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Campos Alterados */}
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-gray-700">Alterações:</p>
-                      <div className="bg-gray-50 rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-gray-100">
-                            <tr>
-                              <th className="text-left px-4 py-2 font-medium text-gray-600">Campo</th>
-                              <th className="text-left px-4 py-2 font-medium text-gray-600">Antes</th>
-                              <th className="text-left px-4 py-2 font-medium text-gray-600">Depois</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {Object.keys(rev.campos_alterados || {}).map(campo => (
-                              <tr key={campo}>
-                                <td className="px-4 py-2 font-medium text-gray-700">
-                                  {traduzirCampo(campo)}
-                                </td>
-                                <td className="px-4 py-2 text-red-600">
-                                  <del>
-                                    {formatarValor(rev.valores_anteriores?.[campo])}
-                                  </del>
-                                </td>
-                                <td className="px-4 py-2 text-green-600">
-                                  {formatarValor(rev.valores_novos?.[campo])}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+              {/* Detalhes expandidos */}
+              {expandido[revisao.id] && (
+                <div className="p-4 border-t border-gray-200">
+                  {/* Motivo */}
+                  {revisao.motivo && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <span className="text-amber-800 font-medium">Motivo:</span>{' '}
+                      <span className="text-amber-700">{revisao.motivo}</span>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Tabela de alterações */}
+                  {alteracoesReais.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 mb-2">Alterações:</p>
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Campo</th>
+                            <th className="px-3 py-2 text-left">Antes</th>
+                            <th className="px-3 py-2 text-left">Depois</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {alteracoesReais.map((alt, idx) => (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-3 py-2 font-medium">{traduzirCampo(alt.campo)}</td>
+                              <td className="px-3 py-2 text-red-600">{formatarValor(alt.antes)}</td>
+                              <td className="px-3 py-2 text-green-600">{formatarValor(alt.depois)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : apenasInicio ? (
+                    <div className="text-sm text-gray-500 italic">
+                      <FileText size={16} className="inline mr-2" />
+                      Revisão iniciada - PDF anterior excluído para permitir edição.
+                      <br />
+                      As alterações serão registradas quando o orçamento for salvo.
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">
+                      Nenhuma alteração de campo registrada nesta revisão.
+                    </p>
+                  )}
+
+                  {/* Status anterior/novo */}
+                  {(revisao.status_anterior || revisao.status_novo) && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 text-sm">
+                      <span className="text-gray-600">Status: </span>
+                      {revisao.status_anterior && (
+                        <span className="text-red-600">{revisao.status_anterior}</span>
+                      )}
+                      {revisao.status_anterior && revisao.status_novo && ' → '}
+                      {revisao.status_novo && (
+                        <span className="text-green-600">{revisao.status_novo}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Botão Ver Mais */}
-      {!carregando && revisoes.length > 3 && (
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
-          <button
-            onClick={() => setMostrarTodos(!mostrarTodos)}
-            className="w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium"
-          >
-            {mostrarTodos 
-              ? 'Mostrar menos' 
-              : `Ver todas as ${revisoes.length} revisões`
-            }
-          </button>
-        </div>
-      )}
+          )
+        })}
+      </div>
     </div>
-  );
+  )
 }
 
-// Helper para formatar valores
-function formatarValor(valor) {
-  if (valor === null || valor === undefined) return '-';
-  if (typeof valor === 'boolean') return valor ? 'Sim' : 'Não';
-  if (typeof valor === 'number') return valor.toLocaleString('pt-BR');
-  if (typeof valor === 'object') return JSON.stringify(valor).substring(0, 50) + '...';
-  if (String(valor).length > 100) return String(valor).substring(0, 100) + '...';
-  return String(valor);
-}
+export default LogRevisoes

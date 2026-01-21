@@ -232,7 +232,7 @@ function OrcamentoForm() {
         }))
       }
 
-      alert(`✅ PDF excluído! Agora você pode editar.\n\nNovo número da proposta: ${resultado.novoNumeroProposta || formData.numero_proposta}`)
+      alert(`✅ PDF excluído e proposta editável!\n\n⚠️ IMPORTANTE: O link enviado ao cliente FOI INVALIDADO.\n\nApós editar, gere um novo PDF e envie novamente ao cliente.\n\nNovo número: ${resultado.novoNumeroProposta || formData.numero_proposta}`)
 
     } catch (error) {
       console.error('❌ Erro:', error)
@@ -1136,6 +1136,63 @@ const salvarObservacoesInternas = async () => {
       }
 
       setLoading(true)
+
+      // ✅ NOVO: Detectar e registrar alterações se já houve revisão
+      if (id && dadosOriginais && revisaoAtual > 0) {
+        try {
+          // Montar dados atuais para comparação
+          const dadosAtuais = {
+            cliente_nome: formData.cliente_nome,
+            cliente_empresa: formData.cliente_empresa,
+            cliente_email: formData.cliente_email,
+            cliente_telefone: formData.cliente_telefone,
+            endereco_entrega: formData.endereco_entrega,
+            observacoes: formData.observacoes,
+            forma_pagamento_id: formData.forma_pagamento_id,
+            prazo_entrega: formData.prazo_entrega,
+            desconto_geral: parseFloat(formData.desconto_geral) || 0,
+            validade_dias: parseInt(formData.validade_dias) || 15,
+            frete: dadosFrete?.valor_total_frete || 0,
+            frete_cidade: dadosFrete?.localidade || '',
+            frete_modalidade: dadosFrete?.modalidade || '',
+            obra_cep: dadosEndereco?.obra_cep || '',
+            obra_cidade: dadosEndereco?.obra_cidade || '',
+            obra_bairro: dadosEndereco?.obra_bairro || '',
+            cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || ''
+          }
+
+          // Detectar alterações
+          const alteracoes = detectarAlteracoes(dadosOriginais, dadosAtuais)
+          
+          // Se houve alterações, atualizar o registro de revisão existente
+          if (Object.keys(alteracoes.campos).length > 0) {
+            console.log('📝 Alterações detectadas:', alteracoes.campos)
+            
+            // Atualizar o registro de revisão mais recente com as alterações reais
+            const { error: erroUpdate } = await supabase
+              .from('propostas_revisoes')
+              .update({
+                campos_alterados: alteracoes.campos,
+                valores_anteriores: alteracoes.valoresAnteriores,
+                valores_novos: alteracoes.valoresNovos
+              })
+              .eq('orcamento_id', id)
+              .eq('numero_revisao', revisaoAtual)
+
+            if (erroUpdate) {
+              console.warn('Aviso ao atualizar revisão:', erroUpdate)
+            } else {
+              console.log('✅ Revisão atualizada com alterações reais')
+            }
+
+            // Atualizar snapshot para próximas comparações
+            setDadosOriginais(dadosAtuais)
+          }
+        } catch (erroRevisao) {
+          console.warn('Erro ao processar revisão:', erroRevisao)
+          // Continua salvando mesmo se falhar o registro de revisão
+        }
+      }
 
       let numeroProposta = formData.numero_proposta
       

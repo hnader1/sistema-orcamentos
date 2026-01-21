@@ -22,6 +22,7 @@ export default function AceiteProposta() {
   
   // Estado para proposta expirada
   const [propostaExpirada, setPropostaExpirada] = useState(false);
+  const [propostaRevisada, setPropostaRevisada] = useState(false); // ✅ NOVO: Proposta foi revisada
   
   // Estado para URL do PDF
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -94,6 +95,14 @@ export default function AceiteProposta() {
       
       if (dataExpiracao < agora) {
         setPropostaExpirada(true);
+        setProposta(propostaData);
+        setCarregando(false);
+        return;
+      }
+
+      // ✅ NOVO: Verificar se a proposta foi REVISADA (link invalidado)
+      if (propostaData.status === 'revisada' || (!propostaData.pdf_path && propostaData.status !== 'aceita')) {
+        setPropostaRevisada(true);
         setProposta(propostaData);
         setCarregando(false);
         return;
@@ -498,6 +507,48 @@ export default function AceiteProposta() {
           {orcamento?.vendedor_telefone && (
             <a 
               href={`https://wa.me/55${orcamento.vendedor_telefone.replace(/\D/g, '')}?text=Olá! A proposta ${proposta?.numero_proposta} expirou. Poderia me enviar uma nova?`}
+              style={styles.whatsappButton}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              📱 Falar com Vendedor no WhatsApp
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ NOVO: TELA DE PROPOSTA REVISADA (Link invalidado)
+  if (propostaRevisada) {
+    return (
+      <div style={styles.expiredContainer}>
+        <div style={{...styles.expiredIcon, background: 'linear-gradient(135deg, #f59e0b, #d97706)'}}>🔄</div>
+        <h1 style={{...styles.expiredTitle, color: '#d97706'}}>Proposta em Revisão</h1>
+        <p style={styles.expiredText}>
+          Esta proposta está sendo <strong>atualizada pelo vendedor</strong>.
+        </p>
+        <p style={{...styles.expiredText, marginTop: '10px', fontSize: '14px', color: '#666'}}>
+          Os valores ou condições podem ter sido alterados.<br/>
+          Aguarde o envio de uma <strong>nova proposta atualizada</strong>.
+        </p>
+        <div style={styles.expiredInfo}>
+          <p><strong>Proposta Original:</strong> {proposta?.numero_proposta}</p>
+          {proposta?.revisada_em && (
+            <p><strong>Revisada em:</strong> {formatarData(proposta.revisada_em)}</p>
+          )}
+          {proposta?.motivo_revisao && (
+            <p><strong>Motivo:</strong> {proposta.motivo_revisao}</p>
+          )}
+        </div>
+        <div style={styles.expiredAction}>
+          <p style={styles.expiredHint}>
+            ⚠️ <strong>Este link não é mais válido.</strong><br/>
+            Você receberá um novo link quando a proposta atualizada for enviada.
+          </p>
+          {orcamento?.vendedor_telefone && (
+            <a 
+              href={`https://wa.me/55${orcamento.vendedor_telefone.replace(/\D/g, '')}?text=Olá! Vi que a proposta ${proposta?.numero_proposta} está em revisão. Pode me informar sobre a atualização?`}
               style={styles.whatsappButton}
               target="_blank"
               rel="noopener noreferrer"
