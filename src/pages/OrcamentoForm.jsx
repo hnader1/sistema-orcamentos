@@ -1,7 +1,10 @@
 // src/pages/OrcamentoForm.jsx
+// =====================================================
+// VERSÃO COM NOVO FLUXO DE STATUS E SISTEMA DE REVISÕES
+// =====================================================
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send, CheckCircle, Edit3, AlertTriangle, Eye } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send, CheckCircle, Edit3, AlertTriangle, Eye, History } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
@@ -14,6 +17,15 @@ import { gerarNumeroProposta, buscarCodigoVendedor } from '../utils/numeracaoPro
 import ModalAlertaConcorrencia from '../components/ModalAlertaConcorrencia'
 import SearchableSelectFormaPagamento from '../components/SearchableSelectFormaPagamento'
 import BotaoEnviarProposta from '../components/BotaoEnviarProposta'
+// ✅ NOVOS IMPORTS PARA SISTEMA DE REVISÕES
+import StatusWorkflow from '../components/StatusWorkflow'
+import LogRevisoes from '../components/LogRevisoes'
+import { 
+  requerRevisao, 
+  criarRevisao, 
+  detectarAlteracoes,
+  prepararEdicaoComRevisao 
+} from '../utils/revisaoUtils'
 
 const TABELA_ITENS = 'orcamentos_itens'
 
@@ -47,10 +59,16 @@ function OrcamentoForm() {
   const LIMITE_DESCONTO = 5
   const [salvandoObs, setSalvandoObs] = useState(false);
 
-  // ✅ NOVO: Estados para controle de PDF/Proposta travada
+  // ✅ Estados para controle de PDF/Proposta travada
   const [propostaTravada, setPropostaTravada] = useState(false)
   const [pdfExistente, setPdfExistente] = useState(null)
   const [propostaIdAtual, setPropostaIdAtual] = useState(null)
+
+  // ✅ NOVOS ESTADOS PARA SISTEMA DE REVISÕES
+  const [revisaoAtual, setRevisaoAtual] = useState(0)
+  const [dadosOriginais, setDadosOriginais] = useState(null) // Snapshot ao carregar
+  const [motivoRevisao, setMotivoRevisao] = useState('')
+  const [mostrarModalRevisao, setMostrarModalRevisao] = useState(false)
   
   const [formData, setFormData] = useState({
     numero: '',
@@ -163,57 +181,125 @@ function OrcamentoForm() {
     }
   }
 
-  // ✅ NOVO: Função para editar proposta (exclui PDF e libera edição)
-  const editarProposta = async () => {
-    if (!propostaIdAtual || !pdfExistente) {
-      alert('Não há proposta com PDF para editar.')
+  // ✅ NOVO: Função para solicitar edição (abre modal de motivo)
+  const solicitarEdicao = async () => {
+    if (!propostaTravada) {
+      // Não tem PDF, pode editar normalmente
       return
     }
+    // Mostrar modal pedindo motivo da revisão
+    setMostrarModalRevisao(true)
+  }
 
-    const confirmacao = confirm(
-      '⚠️ ATENÇÃO!\n\n' +
-      'Ao editar a proposta, o PDF atual será EXCLUÍDO.\n' +
-      'Você precisará gerar um novo PDF após as alterações.\n\n' +
-      'Deseja continuar?'
-    )
-
-    if (!confirmacao) return
+  // ✅ NOVO: Confirmar edição com criação de revisão
+  const confirmarEdicaoComRevisao = async () => {
+    if (!motivoRevisao.trim()) {
+      alert('Por favor, informe o motivo da revisão.')
+      return
+    }
 
     try {
       setLoading(true)
 
-      // 1. Excluir o PDF do Storage
-      const { error: erroStorage } = await supabase.storage
-        .from('propostas-pdf')
-        .remove([pdfExistente])
+      // Preparar para edição (exclui PDF, cria log)
+      const resultado = await prepararEdicaoComRevisao({
+        orcamentoId: id,
+        propostaId: propostaIdAtual,
+        pdfPath: pdfExistente,
+        usuarioId: user?.id,
+        usuarioNome: user?.nome,
+        motivo: motivoRevisao
+      })
 
-      if (erroStorage) {
-        console.error('Erro ao excluir PDF do storage:', erroStorage)
-        // Continua mesmo se falhar a exclusão do storage
+      if (!resultado.sucesso) {
+        throw new Error(resultado.erro)
       }
 
-      // 2. Limpar referência do PDF na proposta
-      const { error: erroUpdate } = await supabase
-        .from('propostas')
-        .update({ pdf_path: null })
-        .eq('id', propostaIdAtual)
-
-      if (erroUpdate) {
-        throw erroUpdate
-      }
-
-      // 3. Atualizar estados locais
+      // Atualizar estados locais
       setPdfExistente(null)
       setPropostaTravada(false)
+      setMostrarModalRevisao(false)
+      setMotivoRevisao('')
 
-      alert('✅ PDF excluído! Agora você pode editar o orçamento.\nLembre-se de gerar um novo PDF após as alterações.')
+      alert('✅ PDF excluído! Agora você pode editar.\nO número da proposta será atualizado com Rev. ao salvar.')
 
     } catch (error) {
-      console.error('❌ Erro ao editar proposta:', error)
-      alert('Erro ao editar proposta: ' + error.message)
+      console.error('❌ Erro:', error)
+      alert('Erro: ' + error.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  // ✅ NOVO: Handler para avançar status
+  const handleAvancarStatus = async (novoStatus) => {
+    try {
+      setLoading(true)
+
+      // Validações específicas por status
+      if (novoStatus === 'enviado' && !propostaTravada) {
+        alert('Gere o PDF da proposta antes de marcar como enviado.')
+        setLoading(false)
+        return
+      }
+
+      let dadosUpdate = { status: novoStatus }
+
+      if (novoStatus === 'aprovado') {
+        // Registrar aprovação manual
+        dadosUpdate = { 
+          ...dadosUpdate,
+          aprovado_via: 'manual',
+          aprovado_em: new Date().toISOString(),
+          aprovado_por: user?.nome
+        }
+      }
+
+      const { error } = await supabase
+        .from('orcamentos')
+        .update(dadosUpdate)
+        .eq('id', id)
+
+      if (error) throw error
+
+      setFormData(prev => ({ ...prev, status: novoStatus }))
+      alert(`✅ Status alterado para "${novoStatus.toUpperCase()}"`)
+
+    } catch (error) {
+      console.error('Erro ao avançar status:', error)
+      alert('Erro: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ✅ NOVO: Handler para voltar status
+  const handleVoltarStatus = async (novoStatus) => {
+    try {
+      setLoading(true)
+
+      const { error } = await supabase
+        .from('orcamentos')
+        .update({ status: novoStatus })
+        .eq('id', id)
+
+      if (error) throw error
+
+      setFormData(prev => ({ ...prev, status: novoStatus }))
+      alert(`✅ Status retornado para "${novoStatus.toUpperCase()}"`)
+
+    } catch (error) {
+      console.error('Erro ao voltar status:', error)
+      alert('Erro: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ✅ ANTIGO: Função para editar proposta (exclui PDF e libera edição) - MANTIDA PARA COMPATIBILIDADE
+  const editarProposta = async () => {
+    // Agora chama o novo fluxo com modal
+    solicitarEdicao()
   }
 
   const carregarVendedores = async () => {
@@ -427,6 +513,31 @@ function OrcamentoForm() {
         desconto_valor_liberado: orc.desconto_valor_liberado || null
       })
 
+      // ✅ NOVO: Guardar snapshot dos dados originais para comparação em revisões
+      setDadosOriginais({
+        cliente_nome: orc.cliente_nome || '',
+        cliente_empresa: orc.cliente_empresa || '',
+        cliente_email: orc.cliente_email || '',
+        cliente_telefone: orc.cliente_telefone || '',
+        endereco_entrega: orc.endereco_entrega || '',
+        observacoes: orc.observacoes || '',
+        forma_pagamento_id: orc.forma_pagamento_id || '',
+        prazo_entrega: orc.prazo_entrega || '',
+        desconto_geral: orc.desconto_geral || 0,
+        validade_dias: orc.validade_dias || 15,
+        frete: orc.frete || 0,
+        frete_cidade: orc.frete_cidade || '',
+        frete_modalidade: orc.frete_modalidade || '',
+        obra_cep: orc.obra_cep || '',
+        obra_cidade: orc.obra_cidade || '',
+        obra_bairro: orc.obra_bairro || '',
+        cnpj_cpf: orc.cnpj_cpf || '',
+        status: orc.status || 'rascunho'
+      })
+
+      // ✅ NOVO: Carregar revisão atual
+      setRevisaoAtual(orc.revisao || 0)
+
       setDadosCNPJCPF({
         cnpj_cpf: orc.cnpj_cpf || null,
         cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
@@ -498,171 +609,35 @@ function OrcamentoForm() {
           peso_unitario: item.peso_unitario,
           qtd_por_pallet: item.qtd_por_pallet
         }))
-        
         setProdutosSelecionados(produtosCarregados)
-      } else {
-        setProdutosSelecionados([])
       }
 
     } catch (error) {
       console.error('❌ Erro ao carregar orçamento:', error)
-      alert('Erro ao carregar orçamento: ' + error.message)
+      alert('Erro ao carregar orçamento!')
+      navigate('/orcamentos')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDescontoChange = (valor) => {
-    const novoValor = parseFloat(valor) || 0
-    
-    if (descontoTravado && novoValor !== parseFloat(formData.desconto_geral)) {
-      setMostrarModalSenha(true)
-      return
-    }
-    
-    if (novoValor > LIMITE_DESCONTO && !descontoLiberado) {
-      setMostrarModalSenha(true)
-      return
-    }
-    
-    setFormData({ ...formData, desconto_geral: valor })
-  }
-
-  const validarSenha = async () => {
-    if (!usuarioLiberacao || !senhaLiberacao) {
-      setErroSenha(true)
+  const adicionarProduto = (produto) => {
+    const jaExiste = produtosSelecionados.find(p => p.produto_id === produto.id)
+    if (jaExiste) {
+      alert('Produto já adicionado!')
       return
     }
 
-    setValidandoSenha(true)
-    setErroSenha(false)
-
-    try {
-      const { data: usuarios, error } = await supabase
-        .from('usuarios')
-        .select('id, nome, email, senha, senha_hash, tipo')
-        .eq('ativo', true)
-
-      if (error) throw error
-
-      const inputLower = usuarioLiberacao.toLowerCase().trim()
-      
-      const usuarioEncontrado = usuarios?.find(u => {
-        const nomeLower = (u.nome || '').toLowerCase().trim()
-        const emailLower = (u.email || '').toLowerCase().trim()
-        return nomeLower === inputLower || emailLower === inputLower || 
-               nomeLower.includes(inputLower) || emailLower.includes(inputLower)
-      })
-
-      if (!usuarioEncontrado) {
-        setErroSenha(true)
-        setValidandoSenha(false)
-        return
-      }
-
-      const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
-      const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
-      
-      if (!perfisPermitidos.includes(tipoLower)) {
-        setErroSenha(true)
-        setValidandoSenha(false)
-        return
-      }
-
-      const senhaCorreta = usuarioEncontrado.senha_hash ? usuarioEncontrado.senha_hash : usuarioEncontrado.senha
-      
-      if (!senhaCorreta || senhaCorreta !== senhaLiberacao) {
-        setErroSenha(true)
-        setValidandoSenha(false)
-        return
-      }
-
-      const agora = new Date()
-      const dataHora = agora.toLocaleString('pt-BR')
-      
-      setDescontoLiberado(true)
-      setDescontoTravado(false)
-      setDescontoLiberadoPor({
-        id: usuarioEncontrado.id,
-        nome: usuarioEncontrado.nome,
-        data: dataHora
-      })
-      
-      setFormData(prev => ({
-        ...prev,
-        desconto_liberado: true,
-        desconto_liberado_por: usuarioEncontrado.nome,
-        desconto_liberado_por_id: usuarioEncontrado.id,
-        desconto_liberado_em: agora.toISOString()
-      }))
-
-      setMostrarModalSenha(false)
-      setUsuarioLiberacao('')
-      setSenhaLiberacao('')
-
-    } catch (error) {
-      console.error('❌ Erro ao validar senha:', error)
-      setErroSenha(true)
-    } finally {
-      setValidandoSenha(false)
-    }
-  }
-
-  const cancelarSenha = () => {
-    setMostrarModalSenha(false)
-    setUsuarioLiberacao('')
-    setSenhaLiberacao('')
-    setErroSenha(false)
-  }
-
-  const getProdutosUnicos = () => {
-    const unicos = [...new Set(produtos.map(p => p.produto))]
-    return unicos.sort()
-  }
-
-  const getClassesDisponiveis = (nomeProduto) => {
-    if (!nomeProduto) return []
-    const classes = [...new Set(
-      produtos
-        .filter(p => p.produto === nomeProduto)
-        .map(p => p.classe)
-    )]
-    return classes.sort()
-  }
-
-  const getMPAsDisponiveis = (nomeProduto, classe) => {
-    if (!nomeProduto || !classe) return []
-    const mpas = [...new Set(
-      produtos
-        .filter(p => p.produto === nomeProduto && p.classe === classe)
-        .map(p => p.mpa)
-    )]
-    return mpas.sort((a, b) => {
-      const numA = parseFloat(a.replace(/[^\d.]/g, ''))
-      const numB = parseFloat(b.replace(/[^\d.]/g, ''))
-      return numA - numB
-    })
-  }
-
-  const getProdutoCompleto = (nomeProduto, classe, mpa) => {
-    return produtos.find(p => 
-      p.produto === nomeProduto && 
-      p.classe === classe && 
-      p.mpa === mpa
-    )
-  }
-
-  const adicionarProduto = () => {
     setProdutosSelecionados([...produtosSelecionados, {
-      produto_id: '',
-      codigo: '',
-      produto: '',
-      classe: '',
-      mpa: '',
+      produto_id: produto.id,
+      codigo: produto.codigo,
+      produto: produto.produto,
+      classe: produto.classe,
+      mpa: produto.mpa,
       quantidade: 1,
-      preco: 0,
-      peso_unitario: 0,
-      qtd_por_pallet: 0
+      preco: produto.preco || 0,
+      peso_unitario: produto.peso_unitario || 0,
+      qtd_por_pallet: produto.qtd_por_pallet || 0
     }])
   }
 
@@ -670,116 +645,49 @@ function OrcamentoForm() {
     setProdutosSelecionados(produtosSelecionados.filter((_, i) => i !== index))
   }
 
-  const atualizarProduto = (index, campo, valor) => {
+  const atualizarQuantidade = (index, quantidade) => {
     const novos = [...produtosSelecionados]
-    
-    if (campo === 'produto') {
-      novos[index] = {
-        ...novos[index],
-        produto: valor,
-        classe: '',
-        mpa: '',
-        produto_id: '',
-        codigo: '',
-        preco: 0,
-        peso_unitario: 0,
-        qtd_por_pallet: 0
-      }
-    } else if (campo === 'classe') {
-      novos[index] = {
-        ...novos[index],
-        classe: valor,
-        mpa: '',
-        produto_id: '',
-        codigo: '',
-        preco: 0,
-        peso_unitario: 0,
-        qtd_por_pallet: 0
-      }
-    } else if (campo === 'mpa') {
-      const produtoCompleto = getProdutoCompleto(
-        novos[index].produto,
-        novos[index].classe,
-        valor
-      )
-      
-      if (produtoCompleto) {
-        novos[index] = {
-          ...novos[index],
-          mpa: valor,
-          produto_id: produtoCompleto.id,
-          codigo: produtoCompleto.codigo_sistema,
-          preco: produtoCompleto.preco,
-          peso_unitario: produtoCompleto.peso_unitario,
-          qtd_por_pallet: produtoCompleto.qtd_por_pallet
-        }
-      }
-    } else {
-      novos[index] = { ...novos[index], [campo]: valor }
-    }
-    
+    novos[index].quantidade = quantidade
     setProdutosSelecionados(novos)
   }
 
-  const calcularPesoTotal = () => {
-    return produtosSelecionados.reduce((sum, item) => {
-      const pesoItem = parseFloat(item.peso_unitario) || 0
-      const quantidade = parseInt(item.quantidade) || 0
-      return sum + (pesoItem * quantidade)
-    }, 0)
-  }
-
-  const calcularTotalPallets = () => {
-    return produtosSelecionados.reduce((sum, item) => {
-      const quantidade = parseInt(item.quantidade) || 0
-      const qtdPorPallet = parseInt(item.qtd_por_pallet) || 1
-      return sum + (quantidade / qtdPorPallet)
-    }, 0)
+  const atualizarPreco = (index, preco) => {
+    const novos = [...produtosSelecionados]
+    novos[index].preco = preco
+    setProdutosSelecionados(novos)
   }
 
   const calcularSubtotal = () => {
-    return produtosSelecionados.reduce((sum, item) => {
-      return sum + (item.quantidade * item.preco)
+    return produtosSelecionados.reduce((acc, item) => {
+      return acc + (item.quantidade * item.preco)
     }, 0)
   }
 
-  const calcularTotal = () => {
-    const subtotal = calcularSubtotal()
-    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-    const subtotalComDesconto = subtotal - desconto
-    const frete = dadosFrete?.valor_total_frete || 0
-    return subtotalComDesconto + frete
+  const calcularPesoTotal = () => {
+    return produtosSelecionados.reduce((acc, item) => {
+      return acc + (item.quantidade * (item.peso_unitario || 0))
+    }, 0)
   }
 
   const duplicar = async () => {
-    if (!confirm('Deseja duplicar este orçamento? Será criada uma cópia em modo RASCUNHO.')) return
+    if (!id) {
+      alert('Salve o orçamento primeiro!')
+      return
+    }
+
+    if (!confirm('Deseja DUPLICAR este orçamento?\n\nSerá criado um novo orçamento com todos os dados atuais, mas sem número de proposta e com desconto zerado.')) {
+      return
+    }
 
     try {
       setLoading(true)
 
-      const { data: ultimoOrc, error: errorUltimo } = await supabase
-        .from('orcamentos')
-        .select('numero')
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      if (errorUltimo) throw errorUltimo
-
-      let novoNumero = 'ORC-0001'
-      if (ultimoOrc && ultimoOrc.length > 0) {
-        const ultimoNumero = ultimoOrc[0].numero
-        const numero = parseInt(ultimoNumero.split('-')[1]) + 1
-        novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
-      }
-
       const subtotal = calcularSubtotal()
-      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-      const subtotalComDesconto = subtotal - desconto
       const frete = dadosFrete?.valor_total_frete || 0
-      const total = subtotalComDesconto + frete
+      const total = subtotal + frete
 
       const novoOrcamento = {
-        numero: novoNumero,
+        numero: 'TEMP',
         numero_proposta: null,
         cliente_nome: formData.cliente_nome,
         cliente_empresa: formData.cliente_empresa,
@@ -787,16 +695,16 @@ function OrcamentoForm() {
         cliente_telefone: formData.cliente_telefone,
         cliente_cpf_cnpj: formData.cliente_cpf_cnpj,
         endereco_entrega: formData.endereco_entrega,
-        vendedor: user?.nome || formData.vendedor,
-        vendedor_telefone: user?.telefone || formData.vendedor_telefone,
-        vendedor_email: user?.email || formData.vendedor_email,
+        vendedor: formData.vendedor,
+        vendedor_telefone: formData.vendedor_telefone,
+        vendedor_email: formData.vendedor_email,
         data_orcamento: new Date().toISOString().split('T')[0],
-        validade_dias: parseInt(formData.validade_dias) || 15,
+        validade_dias: parseInt(formData.validade_dias),
         data_validade: formData.data_validade,
-        forma_pagamento_id: formData.forma_pagamento_id || null,
+        forma_pagamento_id: formData.forma_pagamento_id,
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: 0,
-        subtotal: subtotalComDesconto,
+        subtotal: subtotal,
         frete: frete,
         frete_modalidade: dadosFrete?.modalidade || 'FOB',
         frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
@@ -808,72 +716,86 @@ function OrcamentoForm() {
         frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
         total,
         observacoes: formData.observacoes,
-        observacoes_internas: formData.observacoes_internas, 
+        observacoes_internas: '',
         status: 'rascunho',
-        numero_lancamento_erp: null,
-        usuario_id: user?.id,
-        excluido: false,
-        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || formData.cnpj_cpf || null,
-        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || formData.cnpj_cpf_nao_informado || false,
-        cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || formData.cnpj_cpf_nao_informado_aceite_data || null,
-        cnpj_cpf_nao_informado_aceite_ip: null,
-        obra_cep: dadosEndereco?.obra_cep || formData.obra_cep || null,
-        obra_cidade: dadosEndereco?.obra_cidade || formData.obra_cidade || null,
-        obra_bairro: dadosEndereco?.obra_bairro || formData.obra_bairro || null,
-        obra_logradouro: dadosEndereco?.obra_logradouro || formData.obra_logradouro || null,
-        obra_numero: dadosEndereco?.obra_numero || formData.obra_numero || null,
-        obra_complemento: dadosEndereco?.obra_complemento || formData.obra_complemento || null,
-        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || formData.obra_endereco_validado || false,
+        usuario_id: user?.id || null,
+        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || null,
+        cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado || false,
+        cnpj_cpf_nao_informado_aceite_data: dadosCNPJCPF?.cnpj_cpf_nao_informado_aceite_data || null,
+        obra_cep: dadosEndereco?.obra_cep || null,
+        obra_cidade: dadosEndereco?.obra_cidade || null,
+        obra_bairro: dadosEndereco?.obra_bairro || null,
+        obra_logradouro: dadosEndereco?.obra_logradouro || null,
+        obra_numero: dadosEndereco?.obra_numero || null,
+        obra_complemento: dadosEndereco?.obra_complemento || null,
+        obra_endereco_validado: dadosEndereco?.obra_endereco_validado || false,
         desconto_liberado: false,
         desconto_liberado_por: null,
         desconto_liberado_por_id: null,
         desconto_liberado_em: null,
-        desconto_valor_liberado: null
+        desconto_valor_liberado: null,
+        revisao: 0 // ✅ NOVO: Sem revisão na duplicação
       }
 
-      const { data: orcCriado, error: errorCriar } = await supabase
+      const { data: inserted, error } = await supabase
         .from('orcamentos')
-        .insert([novoOrcamento])
+        .insert(novoOrcamento)
         .select()
         .single()
 
-      if (errorCriar) throw errorCriar
+      if (error) throw error
 
-      const itens = produtosSelecionados.map((item, index) => ({
-        orcamento_id: orcCriado.id,
-        produto_id: item.produto_id,
-        produto_codigo: item.codigo,
-        produto: item.produto,
-        classe: item.classe,
-        mpa: item.mpa,
-        quantidade: parseInt(item.quantidade),
-        preco_unitario: parseFloat(item.preco),
-        peso_unitario: parseFloat(item.peso_unitario),
-        qtd_por_pallet: parseInt(item.qtd_por_pallet),
-        subtotal: item.quantidade * item.preco,
-        ordem: index
-      }))
+      const numero = parseInt(inserted.id.toString().slice(-4)) || inserted.id
+      const novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
 
-      const { error: errorItens } = await supabase
-        .from(TABELA_ITENS)
-        .insert(itens)
+      await supabase
+        .from('orcamentos')
+        .update({ numero: novoNumero })
+        .eq('id', inserted.id)
 
-      if (errorItens) throw errorItens
+      if (produtosSelecionados.length > 0) {
+        const itensParaInserir = produtosSelecionados.map((item, index) => ({
+          orcamento_id: inserted.id,
+          produto_id: item.produto_id,
+          produto_codigo: item.codigo,
+          produto: item.produto,
+          classe: item.classe,
+          mpa: item.mpa,
+          quantidade: item.quantidade,
+          preco_unitario: item.preco,
+          subtotal: item.quantidade * item.preco,
+          peso_unitario: item.peso_unitario,
+          qtd_por_pallet: item.qtd_por_pallet,
+          ordem: index + 1
+        }))
 
-      alert(`Orçamento duplicado com sucesso!\nNovo número: ${novoNumero}`)
-      navigate(`/orcamentos/editar/${orcCriado.id}`)
+        const { error: errorItens } = await supabase
+          .from(TABELA_ITENS)
+          .insert(itensParaInserir)
+
+        if (errorItens) throw errorItens
+      }
+
+      alert('✅ Orçamento duplicado com sucesso!')
+      navigate(`/orcamentos/${inserted.id}`)
+
     } catch (error) {
       console.error('❌ Erro ao duplicar:', error)
-      alert('Erro ao duplicar orçamento: ' + error.message)
+      alert('Erro ao duplicar: ' + error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  // ✅ APROVAR MANUAL - Admin/Comercial Interno
   const aprovarManual = async () => {
     if (!id) {
       alert('Salve o orçamento primeiro!')
+      return
+    }
+
+    // ✅ NOVO: Verificar se tem PDF gerado
+    if (!propostaTravada) {
+      alert('⚠️ Gere o PDF da proposta antes de aprovar!\n\nO cliente precisa receber a proposta formatada.')
       return
     }
 
@@ -888,7 +810,9 @@ function OrcamentoForm() {
         .from('orcamentos')
         .update({ 
           status: 'aprovado',
-          aprovado_via: 'manual'
+          aprovado_via: 'manual',
+          aprovado_em: new Date().toISOString(),
+          aprovado_por: user?.nome
         })
         .eq('id', id)
 
@@ -905,13 +829,16 @@ function OrcamentoForm() {
     }
   }
 
-  // Verificar se pode aprovar manualmente
+  // ✅ ATUALIZADO: Verificar se pode aprovar manualmente
   const podeAprovarManual = () => {
     if (!id) return false
     if (!isAdmin() && !isComercialInterno()) return false
     if (['aprovado', 'lancado', 'cancelado', 'finalizado'].includes(formData.status)) return false
+    // ✅ NOVO: Só pode aprovar se tiver PDF gerado
+    if (!propostaTravada) return false
     return true
   }
+
 // Função para salvar apenas observações internas quando proposta travada
 const salvarObservacoesInternas = async () => {
   if (!id) return;
@@ -934,7 +861,7 @@ const salvarObservacoesInternas = async () => {
 };
 
 
-  // ✅ ATUALIZADO: Salvar com verificação de permissões
+  // ✅ ATUALIZADO: Salvar com verificação de permissões E CRIAÇÃO DE REVISÃO
   const salvar = async () => {
     // Verificar se pode salvar
     const modo = getModoVisualizacao()
@@ -1004,6 +931,56 @@ const salvarObservacoesInternas = async () => {
       }
 
       setLoading(true)
+
+      // ✅ NOVO: Verificar se precisa criar revisão
+      let novaRevisao = revisaoAtual
+      
+      if (id && dadosOriginais && requerRevisao(dadosOriginais.status)) {
+        // Detectar alterações
+        const dadosAtuais = {
+          cliente_nome: formData.cliente_nome,
+          cliente_empresa: formData.cliente_empresa,
+          cliente_email: formData.cliente_email,
+          cliente_telefone: formData.cliente_telefone,
+          endereco_entrega: formData.endereco_entrega,
+          observacoes: formData.observacoes,
+          forma_pagamento_id: formData.forma_pagamento_id,
+          prazo_entrega: formData.prazo_entrega,
+          desconto_geral: formData.desconto_geral,
+          validade_dias: formData.validade_dias,
+          frete: dadosFrete?.valor_total_frete || 0,
+          frete_cidade: dadosFrete?.localidade || '',
+          frete_modalidade: dadosFrete?.modalidade || '',
+          obra_cep: dadosEndereco?.obra_cep || '',
+          obra_cidade: dadosEndereco?.obra_cidade || '',
+          obra_bairro: dadosEndereco?.obra_bairro || '',
+          cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || '',
+          status: formData.status
+        }
+
+        const alteracoes = detectarAlteracoes(dadosOriginais, dadosAtuais)
+        
+        if (Object.keys(alteracoes.campos).length > 0) {
+          // Criar revisão
+          const resultadoRevisao = await criarRevisao({
+            orcamentoId: id,
+            propostaId: propostaIdAtual,
+            usuarioId: user?.id,
+            usuarioNome: user?.nome,
+            dadosOriginais: dadosOriginais,
+            dadosNovos: dadosAtuais,
+            statusAnterior: dadosOriginais.status,
+            statusNovo: formData.status,
+            motivo: motivoRevisao || 'Alteração via formulário'
+          })
+
+          if (resultadoRevisao.sucesso && resultadoRevisao.revisaoCriada) {
+            novaRevisao = resultadoRevisao.numeroRevisao
+            setRevisaoAtual(novaRevisao)
+            console.log(`✅ Revisão ${novaRevisao} criada`)
+          }
+        }
+      }
 
       let numeroProposta = formData.numero_proposta
       
@@ -1085,7 +1062,8 @@ const salvarObservacoesInternas = async () => {
         desconto_liberado_por: formData.desconto_liberado_por || null,
         desconto_liberado_por_id: formData.desconto_liberado_por_id || null,
         desconto_liberado_em: formData.desconto_liberado_em || null,
-        desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null
+        desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null,
+        revisao: novaRevisao // ✅ NOVO: Salvar revisão
       }
 
       if (!id) {
@@ -1107,296 +1085,307 @@ const salvarObservacoesInternas = async () => {
           .eq('id', id)
 
         if (error) throw error
-
-        const { error: errorDelete } = await supabase
-          .from(TABELA_ITENS)
-          .delete()
-          .eq('orcamento_id', id)
-
-        if (errorDelete) throw errorDelete
-
       } else {
-        const { data, error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('orcamentos')
-          .insert([dadosOrcamento])
+          .insert(dadosOrcamento)
           .select()
           .single()
 
         if (error) throw error
+        orcamentoId = inserted.id
+
+        const numero = parseInt(inserted.id.toString().slice(-4)) || inserted.id
+        const novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
         
-        orcamentoId = data.id
+        await supabase
+          .from('orcamentos')
+          .update({ numero: novoNumero })
+          .eq('id', orcamentoId)
       }
 
-      const itens = produtosSelecionados.map((item, index) => ({
-        orcamento_id: orcamentoId,
-        produto_id: item.produto_id,
-        produto_codigo: item.codigo,
-        produto: item.produto,
-        classe: item.classe,
-        mpa: item.mpa,
-        quantidade: parseInt(item.quantidade),
-        preco_unitario: parseFloat(item.preco),
-        peso_unitario: parseFloat(item.peso_unitario),
-        qtd_por_pallet: parseInt(item.qtd_por_pallet),
-        subtotal: item.quantidade * item.preco,
-        ordem: index
-      }))
-
-      const { error: errorItens } = await supabase
+      await supabase
         .from(TABELA_ITENS)
-        .insert(itens)
+        .delete()
+        .eq('orcamento_id', orcamentoId)
 
-      if (errorItens) throw errorItens
+      if (produtosSelecionados.length > 0) {
+        const itensParaInserir = produtosSelecionados.map((item, index) => ({
+          orcamento_id: orcamentoId,
+          produto_id: item.produto_id,
+          produto_codigo: item.codigo,
+          produto: item.produto,
+          classe: item.classe,
+          mpa: item.mpa,
+          quantidade: item.quantidade,
+          preco_unitario: item.preco,
+          subtotal: item.quantidade * item.preco,
+          peso_unitario: item.peso_unitario,
+          qtd_por_pallet: item.qtd_por_pallet,
+          ordem: index + 1
+        }))
 
-      if (numeroProposta) {
+        const { error: errorItens } = await supabase
+          .from(TABELA_ITENS)
+          .insert(itensParaInserir)
+
+        if (errorItens) throw errorItens
+      }
+
+      // ✅ NOVO: Atualizar snapshot após salvar
+      setDadosOriginais({
+        cliente_nome: formData.cliente_nome,
+        cliente_empresa: formData.cliente_empresa,
+        cliente_email: formData.cliente_email,
+        cliente_telefone: formData.cliente_telefone,
+        endereco_entrega: formData.endereco_entrega,
+        observacoes: formData.observacoes,
+        forma_pagamento_id: formData.forma_pagamento_id,
+        prazo_entrega: formData.prazo_entrega,
+        desconto_geral: formData.desconto_geral,
+        validade_dias: formData.validade_dias,
+        frete: dadosFrete?.valor_total_frete || 0,
+        frete_cidade: dadosFrete?.localidade || '',
+        frete_modalidade: dadosFrete?.modalidade || '',
+        obra_cep: dadosEndereco?.obra_cep || '',
+        obra_cidade: dadosEndereco?.obra_cidade || '',
+        obra_bairro: dadosEndereco?.obra_bairro || '',
+        cnpj_cpf: dadosCNPJCPF?.cnpj_cpf || '',
+        status: formData.status
+      })
+
+      if (numeroProposta && !formData.numero_proposta) {
         setFormData(prev => ({ ...prev, numero_proposta: numeroProposta }))
       }
 
-      alert('Orçamento salvo com sucesso!')
-      
+      alert('✅ Orçamento salvo com sucesso!')
+
       if (!id) {
-        navigate(`/orcamentos/editar/${orcamentoId}`)
+        navigate(`/orcamentos/${orcamentoId}`)
       }
 
     } catch (error) {
       console.error('❌ Erro ao salvar:', error)
-      alert('Erro ao salvar orçamento: ' + error.message)
+      alert('Erro ao salvar: ' + error.message)
     } finally {
       setLoading(false)
     }
   }
 
+  const handleDescontoChange = async (valor) => {
+    const novoDesconto = parseFloat(valor) || 0
+
+    if (novoDesconto > LIMITE_DESCONTO && !descontoLiberado) {
+      setMostrarModalSenha(true)
+      return
+    }
+
+    if (descontoTravado && novoDesconto > formData.desconto_valor_liberado) {
+      alert(`Desconto máximo liberado: ${formData.desconto_valor_liberado}%`)
+      return
+    }
+
+    setFormData(prev => ({ ...prev, desconto_geral: novoDesconto }))
+  }
+
+  const validarSenhaLiberacao = async () => {
+    if (!usuarioLiberacao || !senhaLiberacao) {
+      setErroSenha(true)
+      return
+    }
+
+    setValidandoSenha(true)
+    setErroSenha(false)
+
+    try {
+      const { data: usuario, error } = await supabase
+        .from('usuarios')
+        .select('id, nome, senha_liberacao, pode_liberar_desconto')
+        .eq('nome', usuarioLiberacao)
+        .single()
+
+      if (error || !usuario) {
+        setErroSenha(true)
+        setValidandoSenha(false)
+        return
+      }
+
+      if (!usuario.pode_liberar_desconto) {
+        alert('Este usuário não tem permissão para liberar descontos!')
+        setValidandoSenha(false)
+        return
+      }
+
+      if (usuario.senha_liberacao !== senhaLiberacao) {
+        setErroSenha(true)
+        setValidandoSenha(false)
+        return
+      }
+
+      setDescontoLiberado(true)
+      setMostrarModalSenha(false)
+      setUsuarioLiberacao('')
+      setSenhaLiberacao('')
+      
+      setFormData(prev => ({
+        ...prev,
+        desconto_liberado: true,
+        desconto_liberado_por: usuario.nome,
+        desconto_liberado_por_id: usuario.id,
+        desconto_liberado_em: new Date().toISOString()
+      }))
+
+      setDescontoLiberadoPor({
+        nome: usuario.nome,
+        data: new Date().toLocaleString('pt-BR')
+      })
+
+      alert(`✅ Desconto liberado por ${usuario.nome}!\nAgora você pode inserir descontos acima de ${LIMITE_DESCONTO}%.`)
+
+    } catch (error) {
+      console.error('Erro ao validar senha:', error)
+      setErroSenha(true)
+    } finally {
+      setValidandoSenha(false)
+    }
+  }
+
   const podeGerarProposta = () => {
+    if (!formData.cliente_nome) return false
+    if (!cnpjCpfValido && !dadosCNPJCPF?.cnpj_cpf_nao_informado) return false
     if (produtosSelecionados.length === 0) return false
-    if (!id) return false
-    if (!formData.numero_proposta) return false
+    if (!formData.forma_pagamento_id) return false
     return true
   }
 
   const getTooltipGerarProposta = () => {
-    if (produtosSelecionados.length === 0) {
-      return 'Adicione produtos primeiro'
-    }
-    if (!id) {
-      return 'Salve o orçamento primeiro'
-    }
-    if (!formData.numero_proposta) {
-      return 'Salve o orçamento para gerar o número da proposta'
-    }
-    return ''
+    if (!formData.cliente_nome) return 'Preencha o nome do cliente'
+    if (!cnpjCpfValido && !dadosCNPJCPF?.cnpj_cpf_nao_informado) return 'Preencha CNPJ/CPF ou marque "Não informar"'
+    if (produtosSelecionados.length === 0) return 'Adicione ao menos um produto'
+    if (!formData.forma_pagamento_id) return 'Selecione uma forma de pagamento'
+    return 'Gerar Proposta Comercial'
   }
 
-  // ✅ Callback quando PDF é gerado - trava a proposta
-  const handlePdfGerado = (pdfUrl, pdfPath) => {
-    console.log('✅ PDF gerado, travando proposta:', pdfPath)
-    setPdfExistente(pdfPath)
-    setPropostaTravada(true)
-  }
-
-  // ✅ Função para montar dados do orçamento para o botão enviar
-  const getOrcamentoParaEnvio = () => {
-    return {
-      id: id,
-      numero: formData.numero,
-      numero_proposta: formData.numero_proposta,
-      cliente_nome: formData.cliente_nome,
-      cliente_empresa: formData.cliente_empresa,
-      cliente_email: formData.cliente_email,
-      cliente_telefone: formData.cliente_telefone,
-      cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
-      obra_cep: dadosEndereco?.obra_cep,
-      obra_logradouro: dadosEndereco?.obra_logradouro,
-      obra_bairro: dadosEndereco?.obra_bairro,
-      obra_cidade: dadosEndereco?.obra_cidade,
-      usuario_id: formData.usuario_id_original || user?.id,
-      validade_dias: formData.validade_dias,
-      frete_modalidade: dadosFrete?.modalidade || 'FOB',
-      total: calcularTotal(),
-      total_geral: calcularTotal()
-    }
-  }
-
-  // ✅ Função para montar dados completos para PropostaComercial (incluindo id!)
   const getDadosOrcamentoParaProposta = () => {
+    const subtotal = calcularSubtotal()
+    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+    const subtotalComDesconto = subtotal - desconto
+    const frete = dadosFrete?.valor_total_frete || 0
+    const total = subtotalComDesconto + frete
+
     return {
+      id,
       ...formData,
-      id: id
+      subtotal: subtotalComDesconto,
+      frete,
+      total,
+      cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
+      cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado,
+      obra_cidade: dadosEndereco?.obra_cidade,
+      obra_bairro: dadosEndereco?.obra_bairro,
+      obra_logradouro: dadosEndereco?.obra_logradouro,
+      obra_numero: dadosEndereco?.obra_numero,
+      obra_complemento: dadosEndereco?.obra_complemento,
+      obra_cep: dadosEndereco?.obra_cep
     }
   }
 
-  // ✅ Obter mensagem de bloqueio
-  const getMensagemBloqueio = () => {
-    const modo = getModoVisualizacao()
-    
+  const handlePdfGerado = (propostaData) => {
+    console.log('✅ PDF gerado com sucesso:', propostaData)
+    if (propostaData?.pdf_path) {
+      setPdfExistente(propostaData.pdf_path)
+      setPropostaTravada(true)
+      setPropostaIdAtual(propostaData.id)
+    }
+  }
+
+  const getOrcamentoParaEnvio = () => {
+    const subtotal = calcularSubtotal()
+    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
+    const subtotalComDesconto = subtotal - desconto
+    const frete = dadosFrete?.valor_total_frete || 0
+    const total = subtotalComDesconto + frete
+
+    return {
+      id,
+      ...formData,
+      subtotal: subtotalComDesconto,
+      frete,
+      total,
+      cnpj_cpf: dadosCNPJCPF?.cnpj_cpf,
+      cnpj_cpf_nao_informado: dadosCNPJCPF?.cnpj_cpf_nao_informado,
+      itens: produtosSelecionados
+    }
+  }
+
+  const modo = getModoVisualizacao()
+
+  // Mensagens de alerta por modo
+  const AlertaModo = () => {
     if (modo === 'visualizacao') {
-      return {
-        titulo: 'Modo Visualização',
-        descricao: `Este orçamento está com status "${formData.status.toUpperCase()}" e você não tem permissão para editá-lo. Use "Duplicar" para criar uma nova proposta baseada neste orçamento.`,
-        cor: 'blue',
-        icone: Eye
-      }
+      return (
+        <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <Lock className="text-orange-500 flex-shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="font-bold text-orange-800">🔒 Modo Somente Visualização</h3>
+            <p className="text-orange-700 text-sm mt-1">
+              Este orçamento está com status "{formData.status.toUpperCase()}" e você não tem permissão para editá-lo. Use "Duplicar" para criar uma nova proposta baseada neste orçamento.
+            </p>
+          </div>
+        </div>
+      )
     }
-    
+
     if (modo === 'proposta_travada') {
-      return {
-        titulo: 'Proposta Travada - PDF Gerado',
-        descricao: 'Este orçamento possui um PDF gerado e está travado para edição. Para fazer alterações, clique em "Editar Proposta" - isso excluirá o PDF atual.',
-        cor: 'amber',
-        icone: Lock
-      }
+      return (
+        <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <FileText className="text-blue-500 flex-shrink-0 mt-1" size={24} />
+          <div className="flex-1">
+            <h3 className="font-bold text-blue-800">📋 Proposta com PDF Gerado</h3>
+            <p className="text-blue-700 text-sm mt-1">
+              Este orçamento possui PDF gerado e está travado para edição. 
+              {revisaoAtual > 0 && ` (Revisão atual: Rev.${revisaoAtual})`}
+            </p>
+            <button
+              onClick={solicitarEdicao}
+              className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Edit3 size={18} />
+              Editar Proposta (Nova Revisão)
+            </button>
+          </div>
+        </div>
+      )
     }
-    
+
     if (modo === 'apenas_erp') {
-      return {
-        titulo: 'Edição Restrita',
-        descricao: `Este orçamento está com status "${formData.status.toUpperCase()}". Apenas o número do ERP pode ser alterado.`,
-        cor: 'purple',
-        icone: AlertTriangle
-      }
+      return (
+        <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertTriangle className="text-purple-500 flex-shrink-0 mt-1" size={24} />
+          <div>
+            <h3 className="font-bold text-purple-800">⚙️ Modo Edição ERP</h3>
+            <p className="text-purple-700 text-sm mt-1">
+              Este orçamento está com status "{formData.status.toUpperCase()}". Apenas o número do ERP pode ser alterado.
+            </p>
+          </div>
+        </div>
+      )
     }
-    
+
     return null
   }
 
-  if (loading && id) {
-    return (
-      <>
-        <Header />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-gray-500">Carregando...</div>
-        </div>
-      </>
-    )
-  }
-
-  const mensagemBloqueio = getMensagemBloqueio()
-  const modo = getModoVisualizacao()
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-100">
       <Header />
 
-      {mostrarModalSenha && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-yellow-100 rounded-full">
-                <Lock className="text-yellow-600" size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900">Desconto acima de {LIMITE_DESCONTO}%</h3>
-                <p className="text-sm text-gray-500">Requer autorização de um administrador</p>
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuário (Admin/Comercial)
-                </label>
-                <input
-                  type="text"
-                  value={usuarioLiberacao}
-                  onChange={(e) => {
-                    setUsuarioLiberacao(e.target.value)
-                    setErroSenha(false)
-                  }}
-                  placeholder="Nome ou email do autorizador..."
-                  className={`w-full px-4 py-3 border rounded-lg ${
-                    erroSenha ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                  autoFocus
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Senha
-                </label>
-                <input
-                  type="password"
-                  value={senhaLiberacao}
-                  onChange={(e) => {
-                    setSenhaLiberacao(e.target.value)
-                    setErroSenha(false)
-                  }}
-                  onKeyPress={(e) => e.key === 'Enter' && validarSenha()}
-                  placeholder="Senha do autorizador..."
-                  className={`w-full px-4 py-3 border rounded-lg ${
-                    erroSenha ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                />
-              </div>
-            </div>
-            
-            {erroSenha && (
-              <p className="text-red-600 text-sm mt-3">
-                ❌ Usuário ou senha inválidos, ou sem permissão para liberar desconto.
-              </p>
-            )}
-            
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={cancelarSenha}
-                disabled={validandoSenha}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={validarSenha}
-                disabled={validandoSenha || !usuarioLiberacao || !senhaLiberacao}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {validandoSenha ? (
-                  <>
-                    <span className="animate-spin">⏳</span>
-                    Validando...
-                  </>
-                ) : (
-                  'Confirmar'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
+      <div className="bg-white shadow-sm border-b sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          
-          {/* ✅ NOVO: Banner de bloqueio */}
-          {mensagemBloqueio && (
-            <div className={`mb-4 bg-${mensagemBloqueio.cor}-50 border border-${mensagemBloqueio.cor}-200 rounded-lg p-4`}>
-              <div className="flex items-center gap-3">
-                <mensagemBloqueio.icone className={`text-${mensagemBloqueio.cor}-600`} size={24} />
-                <div className="flex-1">
-                  <h3 className={`font-semibold text-${mensagemBloqueio.cor}-900`}>{mensagemBloqueio.titulo}</h3>
-                  <p className={`text-sm text-${mensagemBloqueio.cor}-700`}>
-                    {mensagemBloqueio.descricao}
-                  </p>
-                </div>
-                
-                {/* ✅ Botão Editar Proposta (quando travada por PDF) */}
-                {modo === 'proposta_travada' && (isAdmin() || isComercialInterno() || !isStatusBloqueado()) && (
-                  <button
-                    onClick={editarProposta}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
-                  >
-                    <Edit3 size={18} />
-                    Editar Proposta
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/orcamentos')}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <ArrowLeft size={24} className="text-gray-600" />
               </button>
@@ -1418,19 +1407,6 @@ const salvarObservacoesInternas = async () => {
                 <Copy size={20} />
                 <span className="hidden sm:inline">Duplicar</span>
               </button>
-              
-              {/* ✅ BOTÃO APROVAR MANUAL - Admin/Comercial Interno (não em status bloqueado) */}
-              {podeAprovarManual() && (
-                <button
-                  onClick={aprovarManual}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                  title="Aprovar orçamento manualmente"
-                >
-                  <CheckCircle size={20} />
-                  <span className="hidden sm:inline">Aprovar</span>
-                </button>
-              )}
               
               {/* ✅ BOTÃO GERAR PROPOSTA - não em modo visualização puro */}
               {modo !== 'visualizacao' && (
@@ -1475,13 +1451,35 @@ const salvarObservacoesInternas = async () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <AlertaModo />
+
+        {/* ✅ NOVO: COMPONENTE DE FLUXO DE STATUS */}
+        {id && (
+          <div className="mb-6">
+            <StatusWorkflow
+              statusAtual={formData.status}
+              temPDF={propostaTravada}
+              isVendedor={isVendedor()}
+              isAdmin={isAdmin()}
+              isComercialInterno={isComercialInterno()}
+              onAvancar={handleAvancarStatus}
+              onVoltar={handleVoltarStatus}
+              disabled={loading}
+              orcamentoId={id}
+            />
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Dados do Orçamento</h2>
             <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg shadow-sm">
               <span className="text-sm font-semibold text-purple-700">📋 Proposta:</span>
               {formData.numero_proposta ? (
-                <span className="text-2xl font-bold text-purple-900 tracking-wider">{formData.numero_proposta}</span>
+                <span className="text-2xl font-bold text-purple-900 tracking-wider">
+                  {formData.numero_proposta}
+                  {revisaoAtual > 0 && <span className="text-sm ml-2 text-purple-600">Rev.{revisaoAtual}</span>}
+                </span>
               ) : (
                 <span className="text-sm italic text-purple-600">Será gerado ao salvar</span>
               )}
@@ -1500,18 +1498,13 @@ const salvarObservacoesInternas = async () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor *</label>
-              <select
-                value={formData.vendedor}
-                onChange={(e) => handleVendedorChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={modo !== 'edicao'}
-              >
-                <option value="">Selecione...</option>
-                {vendedores.map(v => (
-                  <option key={v.id} value={v.nome}>{v.nome}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Validade</label>
+              <input
+                type="date"
+                value={formData.data_validade}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Validade (dias)</label>
@@ -1522,27 +1515,6 @@ const salvarObservacoesInternas = async () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 disabled={modo !== 'edicao'}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={modo !== 'edicao' || isVendedor()}
-              >
-                <option value="rascunho">Rascunho</option>
-                <option value="enviado">Enviado</option>
-                <option value="aprovado">Aprovado</option>
-                {podeAcessarLancamento() && (
-                  <option value="lancado">Lançado</option>
-                )}
-                {podeAcessarLancamento() && (
-                  <option value="finalizado">Finalizado</option>
-                )}
-                <option value="rejeitado">Rejeitado</option>
-                <option value="cancelado">Cancelado</option>
-              </select>
             </div>
             
             {/* ✅ Campo ERP - editável mesmo em modo apenas_erp */}
@@ -1604,18 +1576,6 @@ const salvarObservacoesInternas = async () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Telefone <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.cliente_telefone}
-                onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={modo !== 'edicao'}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email <span className="text-red-500">*</span>
               </label>
               <input
@@ -1626,16 +1586,27 @@ const salvarObservacoesInternas = async () => {
                 disabled={modo !== 'edicao'}
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Telefone <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                value={formData.cliente_telefone}
+                onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={modo !== 'edicao'}
+              />
+            </div>
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <EnderecoObraForm
-            valores={formData}
+            valores={dadosEndereco}
             onChange={(dados) => {
               if (modo === 'edicao') {
                 setDadosEndereco(dados)
-                setFormData(prev => ({ ...prev, ...dados }))
               }
             }}
             disabled={modo !== 'edicao'}
@@ -1643,259 +1614,199 @@ const salvarObservacoesInternas = async () => {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Vendedor Responsável</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
+              <select
+                value={formData.vendedor}
+                onChange={(e) => handleVendedorChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={modo !== 'edicao'}
+              >
+                <option value="">Selecione...</option>
+                {vendedores.map(v => (
+                  <option key={v.id} value={v.nome}>{v.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+              <input
+                type="tel"
+                value={formData.vendedor_telefone}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={formData.vendedor_email}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Produtos</h2>
-            <button
-              onClick={adicionarProduto}
-              disabled={modo !== 'edicao'}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus size={18} />
-              Adicionar Produto
-            </button>
+            {modo === 'edicao' && (
+              <select
+                onChange={(e) => {
+                  const produto = produtos.find(p => p.id === e.target.value)
+                  if (produto) adicionarProduto(produto)
+                  e.target.value = ''
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">+ Adicionar Produto</option>
+                {produtos.map(p => (
+                  <option key={p.id} value={p.id}>{p.codigo} - {p.produto}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {produtosSelecionados.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-              Clique em "Adicionar Produto" para incluir produtos no orçamento
+            <div className="text-center py-8 text-gray-500">
+              Nenhum produto adicionado
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
+              <table className="w-full">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
-                    <th className="px-2 py-2"></th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Preço</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                    {modo === 'edicao' && <th className="px-4 py-3"></th>}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-200">
                   {produtosSelecionados.map((item, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-2 py-1">
-                        <select
-                          value={item.produto}
-                          onChange={(e) => atualizarProduto(index, 'produto', e.target.value)}
-                          disabled={modo !== 'edicao'}
-                          className="w-40 px-2 py-1 border rounded text-sm"
-                        >
-                          <option value="">Selecione...</option>
-                          {getProdutosUnicos().map(p => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
-                        <select
-                          value={item.classe}
-                          onChange={(e) => atualizarProduto(index, 'classe', e.target.value)}
-                          disabled={!item.produto || modo !== 'edicao'}
-                          className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
-                        >
-                          <option value="">-</option>
-                          {getClassesDisponiveis(item.produto).map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
-                        <select
-                          value={item.mpa}
-                          onChange={(e) => atualizarProduto(index, 'mpa', e.target.value)}
-                          disabled={!item.classe || modo !== 'edicao'}
-                          className="w-full px-2 py-1 border rounded text-sm disabled:bg-gray-100"
-                        >
-                          <option value="">-</option>
-                          {getMPAsDisponiveis(item.produto, item.classe).map(m => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
+                    <tr key={index}>
+                      <td className="px-4 py-3 text-sm">{item.codigo}</td>
+                      <td className="px-4 py-3 text-sm">{item.produto}</td>
+                      <td className="px-4 py-3 text-center">
                         <input
                           type="number"
-                          value={item.quantidade}
-                          onChange={(e) => atualizarProduto(index, 'quantidade', e.target.value)}
-                          disabled={modo !== 'edicao'}
-                          className="w-20 px-2 py-1 border rounded text-sm text-center"
                           min="1"
+                          value={item.quantidade}
+                          onChange={(e) => atualizarQuantidade(index, parseInt(e.target.value) || 1)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                          disabled={modo !== 'edicao'}
                         />
                       </td>
-                      <td className="px-2 py-1 text-right text-gray-600">
-                        {item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
-                      </td>
-                      <td className="px-2 py-1 text-right text-gray-600">
-                        {item.peso_unitario ? `${item.peso_unitario} kg` : '-'}
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        {item.qtd_por_pallet ? (
-                          <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold min-w-[40px]">
-                            {item.qtd_por_pallet}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1 text-right text-gray-600">
-                        {item.peso_unitario && item.quantidade 
-                          ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
-                          : '-'} 
-                      </td>
-                      <td className="px-2 py-1 text-right font-semibold text-gray-900">
-                        {item.preco && item.quantidade 
-                          ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
-                          : '-'}
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold">
-                          {item.qtd_por_pallet && item.quantidade 
-                            ? (item.quantidade / item.qtd_por_pallet).toFixed(2) 
-                            : '-'}
-                        </span>
-                      </td>
-                      <td className="px-2 py-1">
-                        <button
-                          onClick={() => removerProduto(index)}
+                      <td className="px-4 py-3 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={item.preco}
+                          onChange={(e) => atualizarPreco(index, parseFloat(e.target.value) || 0)}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
                           disabled={modo !== 'edicao'}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        />
                       </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        R$ {(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                      {modo === 'edicao' && (
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => removerProduto(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+
+          <div className="mt-4 text-right">
+            <p className="text-gray-600">
+              Peso Total: <span className="font-bold">{calcularPesoTotal().toLocaleString('pt-BR')} kg</span>
+            </p>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <FreteSelector 
+          <FreteSelector
             pesoTotal={calcularPesoTotal()}
-            totalPallets={calcularTotalPallets()}
             onFreteChange={(dados) => {
               if (modo === 'edicao') {
                 setDadosFrete(dados)
               }
             }}
-            freteAtual={dadosFrete}
+            dadosIniciais={dadosFrete}
             disabled={modo !== 'edicao'}
           />
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Observações</h2>
-              <textarea
-                value={formData.observacoes}
-                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                rows="10"
-                disabled={modo !== 'edicao'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Observações adicionais que aparecerão na proposta comercial..."
-              />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h2 className="text-lg font-semibold mb-4">Resumo Financeiro</h2>
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal (sem desconto):</span>
-                  <span className="font-medium">
-                    R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal:</span>
+                  <span className="font-medium">R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
-
                 <div className="flex justify-between items-center">
-                  <label className="text-sm text-gray-600 flex items-center gap-1 flex-wrap">
-                    Desconto (%):
-                    {!descontoLiberado && !descontoTravado && (
-                      <span className="text-xs text-yellow-600 flex items-center gap-0.5">
-                        <Lock size={10} /> máx {LIMITE_DESCONTO}%
-                      </span>
-                    )}
-                    {descontoTravado && descontoLiberadoPor && (
-                      <span className="text-xs text-blue-600 flex items-center gap-0.5" title={`Liberado por ${descontoLiberadoPor.nome} em ${descontoLiberadoPor.data}\nPara alterar, clique no campo.`}>
-                        🔒 {descontoLiberadoPor.nome} ({descontoLiberadoPor.data})
-                      </span>
-                    )}
-                    {descontoLiberado && !descontoTravado && descontoLiberadoPor && (
-                      <span className="text-xs text-green-600">
-                        ✓ liberado por {descontoLiberadoPor.nome}
-                      </span>
-                    )}
-                    {descontoLiberado && !descontoLiberadoPor && (
-                      <span className="text-xs text-green-600">✓ liberado</span>
-                    )}
-                  </label>
-                  <div className="flex items-center gap-1">
+                  <span className="text-gray-600">Desconto (%):</span>
+                  <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      step="0.01"
-                      max={descontoLiberado ? 100 : LIMITE_DESCONTO}
+                      step="0.1"
+                      min="0"
+                      max="100"
                       value={formData.desconto_geral}
                       onChange={(e) => handleDescontoChange(e.target.value)}
+                      className="w-20 px-2 py-1 border border-gray-300 rounded text-right"
                       disabled={modo !== 'edicao'}
-                      className={`w-20 px-2 py-1 border rounded text-center text-sm ${
-                        descontoTravado 
-                          ? 'border-blue-400 bg-blue-50 cursor-pointer' 
-                          : formData.desconto_geral > LIMITE_DESCONTO 
-                            ? 'border-yellow-400 bg-yellow-50' 
-                            : 'border-gray-300'
-                      }`}
                     />
-                    {descontoTravado && modo === 'edicao' && (
-                      <button
-                        type="button"
-                        onClick={() => setMostrarModalSenha(true)}
-                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                        title="Alterar desconto (requer autorização)"
-                      >
-                        <Lock size={14} />
-                      </button>
+                    {descontoLiberadoPor && (
+                      <span className="text-xs text-green-600">
+                        ✓ Liberado por {descontoLiberadoPor.nome}
+                      </span>
                     )}
                   </div>
                 </div>
-
-                <div className="flex justify-between text-sm border-t pt-2">
-                  <span className="text-gray-700 font-medium">Subtotal de Produtos:</span>
-                  <span className="font-semibold">
-                    R$ {(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Frete:</span>
+                  <span className="font-medium">R$ {(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-lg font-bold">TOTAL:</span>
+                  <span className="text-lg font-bold text-green-600">
+                    R$ {(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100) + (dadosFrete?.valor_total_frete || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
+              </div>
+            </div>
 
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Total Frete:</span>
-                  <span className="font-medium">
-                    R$ {(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center border-t-2 border-blue-200 pt-3 mt-2">
-                  <span className="text-lg font-bold text-gray-900">Total Geral:</span>
-                  <span className="text-2xl font-bold text-blue-600">
-                    R$ {calcularTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Condições</h2>
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Condições de Pagamento *
+                    Forma de Pagamento <span className="text-red-500">*</span>
                   </label>
                   <SearchableSelectFormaPagamento
                     value={formData.forma_pagamento_id}
-                    onChange={(id) => {
+                    onChange={(value) => {
                       if (modo === 'edicao') {
-                        setFormData({ ...formData, forma_pagamento_id: id })
+                        setFormData({ ...formData, forma_pagamento_id: value })
                       }
                     }}
                     placeholder="Digite para buscar (ex: 28, pix, boleto)..."
@@ -1905,39 +1816,171 @@ const salvarObservacoesInternas = async () => {
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mt-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">🔒</span>
-              <h2 className="text-lg font-semibold text-yellow-800">Observações Internas</h2>
-              <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded-full">
-                NÃO aparece na proposta
-              </span>
-            </div>
-            <p className="text-sm text-yellow-700 mb-3">
-              Use este campo para anotações da equipe (ex: negociação, pendências, alertas sobre o cliente).
-            </p>
-            <textarea
-              value={formData.observacoes_internas}
-              onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
-              rows="4"
-              disabled={modo === 'visualizacao'}
-              className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
-              placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Observações (Aparece na Proposta)</h2>
+          <textarea
+            value={formData.observacoes}
+            onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+            rows="4"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder="Observações que aparecerão na proposta..."
+            disabled={modo !== 'edicao'}
+          />
+        </div>
+
+        <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl">🔒</span>
+            <h2 className="text-lg font-semibold text-yellow-800">Observações Internas</h2>
+            <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-medium rounded-full">
+              NÃO aparece na proposta
+            </span>
+          </div>
+          <p className="text-sm text-yellow-700 mb-3">
+            Use este campo para anotações da equipe (ex: negociação, pendências, alertas sobre o cliente).
+          </p>
+          <textarea
+            value={formData.observacoes_internas}
+            onChange={(e) => setFormData({ ...formData, observacoes_internas: e.target.value })}
+            rows="4"
+            disabled={modo === 'visualizacao'}
+            className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 bg-white"
+            placeholder="Ex: Cliente solicitou desconto adicional, aguardando aprovação do gerente..."
+          />
+         {modo === 'proposta_travada' && (
+            <button
+              type="button"
+              onClick={salvarObservacoesInternas}
+              disabled={salvandoObs}
+              className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+            >
+              {salvandoObs ? 'Salvando...' : 'Salvar Observações'}
+            </button>
+          )}
+        </div>
+
+        {/* ✅ NOVO: LOG DE REVISÕES */}
+        {id && requerRevisao(formData.status) && (
+          <div className="mt-6">
+            <LogRevisoes 
+              orcamentoId={id}
+              revisaoAtual={revisaoAtual}
             />
-           {modo === 'proposta_travada' && (
+          </div>
+        )}
+      </div>
+
+      {/* Modal Senha Liberação Desconto */}
+      {mostrarModalSenha && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold mb-4">🔐 Liberar Desconto Acima de {LIMITE_DESCONTO}%</h3>
+            <p className="text-gray-600 mb-4">
+              Solicite a um gerente ou usuário autorizado para liberar este desconto.
+            </p>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
+                <input
+                  type="text"
+                  value={usuarioLiberacao}
+                  onChange={(e) => setUsuarioLiberacao(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg ${erroSenha ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Nome do usuário"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Senha de Liberação</label>
+                <input
+                  type="password"
+                  value={senhaLiberacao}
+                  onChange={(e) => setSenhaLiberacao(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg ${erroSenha ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Senha"
+                />
+              </div>
+              {erroSenha && (
+                <p className="text-red-500 text-sm">Usuário ou senha incorretos!</p>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
               <button
-                type="button"
-                onClick={salvarObservacoesInternas}
-                disabled={salvandoObs}
-                className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+                onClick={() => {
+                  setMostrarModalSenha(false)
+                  setUsuarioLiberacao('')
+                  setSenhaLiberacao('')
+                  setErroSenha(false)
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
               >
-                {salvandoObs ? 'Salvando...' : 'Salvar Observações'}
+                Cancelar
               </button>
-            )}
+              <button
+                onClick={validarSenhaLiberacao}
+                disabled={validandoSenha}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+              >
+                {validandoSenha ? 'Validando...' : 'Liberar'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ✅ NOVO: Modal Motivo da Revisão */}
+      {mostrarModalRevisao && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <History className="w-6 h-6 text-blue-600" />
+              <h3 className="text-lg font-bold">Motivo da Edição</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-4">
+              Esta proposta já foi enviada ao cliente. 
+              Por favor, informe o motivo da alteração para registro.
+            </p>
+
+            <textarea
+              value={motivoRevisao}
+              onChange={(e) => setMotivoRevisao(e.target.value)}
+              placeholder="Ex: Cliente solicitou alteração de quantidade..."
+              className="w-full px-3 py-2 border rounded-lg mb-4 h-24"
+              autoFocus
+            />
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-800">
+                ⚠️ O PDF atual será excluído e você precisará gerar um novo.
+                O número da proposta será atualizado para incluir "Rev.{revisaoAtual + 1}".
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setMostrarModalRevisao(false)
+                  setMotivoRevisao('')
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEdicaoComRevisao}
+                disabled={!motivoRevisao.trim() || loading}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+              >
+                {loading ? 'Processando...' : 'Confirmar Edição'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ✅ CORRIGIDO: Passar callback onPdfGerado */}
       <PropostaComercial
