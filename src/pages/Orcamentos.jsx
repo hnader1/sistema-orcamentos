@@ -77,6 +77,7 @@ export default function Orcamentos() {
       console.log('🔍 Carregando orçamentos (excluido = false)')
       
       // Query base: busca todos os orçamentos não excluídos
+      // ✅ ATUALIZADO: Inclui itens para permitir busca por produto
       let query = supabase
       .from('orcamentos')
       .select(`
@@ -85,7 +86,11 @@ export default function Orcamentos() {
           id,
           descricao,
           categoria
-    )
+        ),
+        orcamentos_itens (
+          produto,
+          produto_codigo
+        )
   `)
   .eq('excluido', false)
       
@@ -125,12 +130,24 @@ export default function Orcamentos() {
   // FILTROS E BUSCAS
   // ====================================================================================
   const orcamentosFiltrados = orcamentos.filter(orc => {
-    // Filtro de busca por texto (número, nome do cliente ou empresa)
+    // Filtro de busca por texto (número, cliente, empresa, ERP, cidade, bairro, produto)
+    const buscaLower = busca.toLowerCase()
     const matchBusca = !busca || 
-      orc.numero?.toLowerCase().includes(busca.toLowerCase()) ||
-      orc.numero_proposta?.toLowerCase().includes(busca.toLowerCase()) ||
-      orc.cliente_nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      orc.cliente_empresa?.toLowerCase().includes(busca.toLowerCase())
+      orc.numero?.toLowerCase().includes(buscaLower) ||
+      orc.numero_proposta?.toLowerCase().includes(buscaLower) ||
+      orc.cliente_nome?.toLowerCase().includes(buscaLower) ||
+      orc.cliente_empresa?.toLowerCase().includes(buscaLower) ||
+      // ✅ NOVO: Busca por código ERP
+      orc.numero_lancamento_erp?.toLowerCase().includes(buscaLower) ||
+      // ✅ NOVO: Busca por cidade e bairro da obra
+      orc.obra_cidade?.toLowerCase().includes(buscaLower) ||
+      orc.obra_bairro?.toLowerCase().includes(buscaLower) ||
+      orc.frete_cidade?.toLowerCase().includes(buscaLower) ||
+      // ✅ NOVO: Busca por produto (nome ou código)
+      orc.orcamentos_itens?.some(item => 
+        item.produto?.toLowerCase().includes(buscaLower) ||
+        item.produto_codigo?.toLowerCase().includes(buscaLower)
+      )
     
     // Filtro de status
     const matchStatus = filtroStatus === 'todos' || orc.status === filtroStatus
@@ -691,7 +708,7 @@ export default function Orcamentos() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar por número, proposta, cliente ou empresa..."
+              placeholder="Buscar por número, cliente, ERP, cidade, bairro ou produto..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
