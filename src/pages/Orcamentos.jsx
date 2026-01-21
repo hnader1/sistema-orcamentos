@@ -484,13 +484,14 @@ export default function Orcamentos() {
           {/* Badges de Status e Origem */}
           <div className="flex items-center gap-2">
             {getStatusBadge(orc.status)}
-            {orc.status === 'aprovado' && getAprovadoViaBadge(orc.aprovado_via)}
+            {/* ✅ CORRIGIDO: Mostrar badge de aprovação em aprovado, lançado e finalizado */}
+            {['aprovado', 'lancado', 'finalizado'].includes(orc.status) && getAprovadoViaBadge(orc.aprovado_via)}
           </div>
           
           {/* Botões de Ação */}
           <div className="flex gap-2">
-            {/* ✅ NOVO: Botão Ver Dados da Aceitação (só para Admin/Comercial + status aprovado) */}
-            {orc.status === 'aprovado' && podeVerDadosAceitacao() && (
+            {/* ✅ CORRIGIDO: Botão Ver Dados da Aceitação (em aprovado, lançado e finalizado) */}
+            {['aprovado', 'lancado', 'finalizado'].includes(orc.status) && podeVerDadosAceitacao() && (
               <button
                 onClick={() => abrirModalAceitacao(orc.id)}
                 className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
