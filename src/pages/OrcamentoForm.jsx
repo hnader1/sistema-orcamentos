@@ -191,7 +191,7 @@ function OrcamentoForm() {
     setMostrarModalRevisao(true)
   }
 
-  // ✅ NOVO: Confirmar edição com criação de revisão
+  // ✅ CORRIGIDO: Confirmar edição com criação de revisão - ATUALIZA NÚMERO IMEDIATAMENTE
   const confirmarEdicaoComRevisao = async () => {
     if (!motivoRevisao.trim()) {
       alert('Por favor, informe o motivo da revisão.')
@@ -201,7 +201,7 @@ function OrcamentoForm() {
     try {
       setLoading(true)
 
-      // Preparar para edição (exclui PDF, cria log)
+      // Preparar para edição (exclui PDF, cria revisão, ATUALIZA NÚMERO)
       const resultado = await prepararEdicaoComRevisao({
         orcamentoId: id,
         propostaId: propostaIdAtual,
@@ -221,7 +221,18 @@ function OrcamentoForm() {
       setMostrarModalRevisao(false)
       setMotivoRevisao('')
 
-      alert('✅ PDF excluído! Agora você pode editar.\nO número da proposta será atualizado com Rev. ao salvar.')
+      // ✅ CORREÇÃO: Atualizar revisão e número da proposta no estado LOCAL
+      if (resultado.novaRevisao) {
+        setRevisaoAtual(resultado.novaRevisao)
+      }
+      if (resultado.novoNumeroProposta) {
+        setFormData(prev => ({ 
+          ...prev, 
+          numero_proposta: resultado.novoNumeroProposta 
+        }))
+      }
+
+      alert(`✅ PDF excluído! Agora você pode editar.\n\nNovo número da proposta: ${resultado.novoNumeroProposta || formData.numero_proposta}`)
 
     } catch (error) {
       console.error('❌ Erro:', error)

@@ -1,6 +1,7 @@
 // src/utils/revisaoUtils.js
 // =====================================================
 // UTILITÁRIOS: Gerenciamento de Revisões de Propostas
+// VERSÃO CORRIGIDA - Atualiza numero_proposta diretamente
 // =====================================================
 
 import { supabase } from '../services/supabase';
@@ -79,6 +80,18 @@ function normalizar(valor) {
 }
 
 /**
+ * Formata número da proposta com sufixo de revisão
+ */
+export function formatarNumeroPropostaComRevisao(numeroBase, revisao) {
+  if (!numeroBase) return numeroBase;
+  if (!revisao || revisao === 0) return numeroBase;
+  
+  // Remove revisão anterior se existir
+  const numeroLimpo = numeroBase.replace(/ Rev\.\d+$/, '');
+  return `${numeroLimpo} Rev.${revisao}`;
+}
+
+/**
  * Cria uma nova revisão no banco de dados
  */
 export async function criarRevisao({
@@ -102,17 +115,25 @@ export async function criarRevisao({
       return { sucesso: true, revisaoCriada: false };
     }
 
-    // 2. Buscar próximo número de revisão
-    const { data: ultimaRevisao } = await supabase
-      .from('propostas_revisoes')
-      .select('numero_revisao')
-      .eq('orcamento_id', orcamentoId)
-      .order('numero_revisao', { ascending: false })
-      .limit(1);
+    // 2. Buscar dados atuais do orçamento (revisão e numero_proposta)
+    const { data: orcamentoAtual, error: erroOrcamento } = await supabase
+      .from('orcamentos')
+      .select('revisao, numero_proposta')
+      .eq('id', orcamentoId)
+      .single();
 
-    const proximaRevisao = (ultimaRevisao?.[0]?.numero_revisao || 0) + 1;
+    if (erroOrcamento) throw erroOrcamento;
 
-    // 3. Inserir registro de revisão
+    const revisaoAtual = orcamentoAtual?.revisao || 0;
+    const numeroPropostaAtual = orcamentoAtual?.numero_proposta || '';
+    const proximaRevisao = revisaoAtual + 1;
+
+    // 3. Calcular novo número da proposta com Rev.X
+    const novoNumeroProposta = formatarNumeroPropostaComRevisao(numeroPropostaAtual, proximaRevisao);
+
+    console.log(`📝 Criando revisão ${proximaRevisao}: ${numeroPropostaAtual} → ${novoNumeroProposta}`);
+
+    // 4. Inserir registro de revisão
     const { data: revisao, error: erroRevisao } = await supabase
       .from('propostas_revisoes')
       .insert({
@@ -132,40 +153,32 @@ export async function criarRevisao({
       .select()
       .single();
 
-    if (erroRevisao) throw erroRevisao;
+    if (erroRevisao) {
+      console.warn('Aviso: Erro ao inserir revisão (tabela pode não existir):', erroRevisao);
+      // Continua mesmo se a tabela não existir
+    }
 
-    // 4. Atualizar número de revisão no orçamento
-    const { error: erroOrcamento } = await supabase
+    // 5. Atualizar orçamento com nova revisão E novo numero_proposta
+    const { error: erroUpdateOrcamento } = await supabase
       .from('orcamentos')
       .update({
         revisao: proximaRevisao,
-        historico_revisoes: supabase.sql`
-          COALESCE(historico_revisoes, '[]'::jsonb) || 
-          ${JSON.stringify([{
-            rev: proximaRevisao,
-            data: new Date().toISOString(),
-            por: usuarioNome,
-            campos: Object.keys(alteracoes.campos).length
-          }])}::jsonb
-        `
+        numero_proposta: novoNumeroProposta
       })
       .eq('id', orcamentoId);
 
-    if (erroOrcamento) {
-      console.warn('Aviso: Não foi possível atualizar historico_revisoes no orçamento:', erroOrcamento);
-      // Tentar update simples
-      await supabase
-        .from('orcamentos')
-        .update({ revisao: proximaRevisao })
-        .eq('id', orcamentoId);
+    if (erroUpdateOrcamento) {
+      console.error('Erro ao atualizar orçamento com revisão:', erroUpdateOrcamento);
+      throw erroUpdateOrcamento;
     }
 
-    console.log(`✅ Revisão ${proximaRevisao} criada com sucesso`);
+    console.log(`✅ Revisão ${proximaRevisao} criada com sucesso. Novo número: ${novoNumeroProposta}`);
     
     return {
       sucesso: true,
       revisaoCriada: true,
       numeroRevisao: proximaRevisao,
+      novoNumeroProposta: novoNumeroProposta,
       revisao: revisao
     };
 
@@ -228,7 +241,8 @@ export async function verificarPDFExistente(orcamentoId) {
 }
 
 /**
- * Exclui PDF e prepara orçamento para nova edição (cria revisão)
+ * Exclui PDF e prepara orçamento para nova edição
+ * AGORA INCREMENTA A REVISÃO IMEDIATAMENTE
  */
 export async function prepararEdicaoComRevisao({
   orcamentoId,
@@ -239,67 +253,105 @@ export async function prepararEdicaoComRevisao({
   motivo
 }) {
   try {
-    // 1. Guardar referência do PDF antigo no histórico
-    if (pdfPath) {
-      const { data: proposta } = await supabase
-        .from('propostas')
-        .select('pdf_path_historico')
-        .eq('id', propostaId)
-        .single();
+    // 1. Buscar dados atuais do orçamento
+    const { data: orcamentoAtual, error: erroOrcamento } = await supabase
+      .from('orcamentos')
+      .select('revisao, numero_proposta')
+      .eq('id', orcamentoId)
+      .single();
 
-      const historico = proposta?.pdf_path_historico || [];
-      historico.push({
-        path: pdfPath,
-        excluido_em: new Date().toISOString(),
-        excluido_por: usuarioNome
-      });
+    if (erroOrcamento) throw erroOrcamento;
 
-      // 2. Limpar PDF atual e guardar no histórico
-      await supabase
-        .from('propostas')
-        .update({
-          pdf_path: null,
-          pdf_path_historico: historico
-        })
-        .eq('id', propostaId);
+    const revisaoAtual = orcamentoAtual?.revisao || 0;
+    const numeroPropostaAtual = orcamentoAtual?.numero_proposta || '';
+    const proximaRevisao = revisaoAtual + 1;
 
-      // 3. Excluir arquivo do storage
-      await supabase.storage
-        .from('propostas-pdf')
-        .remove([pdfPath]);
+    // 2. Calcular novo número da proposta com Rev.X
+    const novoNumeroProposta = formatarNumeroPropostaComRevisao(numeroPropostaAtual, proximaRevisao);
+
+    console.log(`🔄 Preparando edição: Rev.${revisaoAtual} → Rev.${proximaRevisao}`);
+    console.log(`📝 Número: ${numeroPropostaAtual} → ${novoNumeroProposta}`);
+
+    // 3. Guardar referência do PDF antigo no histórico (se existir)
+    if (pdfPath && propostaId) {
+      try {
+        const { data: proposta } = await supabase
+          .from('propostas')
+          .select('pdf_path_historico')
+          .eq('id', propostaId)
+          .single();
+
+        const historico = proposta?.pdf_path_historico || [];
+        historico.push({
+          path: pdfPath,
+          excluido_em: new Date().toISOString(),
+          excluido_por: usuarioNome,
+          revisao: revisaoAtual
+        });
+
+        // Limpar PDF atual e guardar no histórico
+        await supabase
+          .from('propostas')
+          .update({
+            pdf_path: null,
+            pdf_path_historico: historico
+          })
+          .eq('id', propostaId);
+
+        // Excluir arquivo do storage
+        await supabase.storage
+          .from('propostas-pdf')
+          .remove([pdfPath]);
+
+        console.log('✅ PDF antigo excluído e arquivado');
+      } catch (e) {
+        console.warn('Aviso ao processar PDF antigo:', e);
+      }
     }
 
-    // 4. Criar registro de início de revisão
-    await supabase
-      .from('propostas_revisoes')
-      .insert({
-        orcamento_id: orcamentoId,
-        proposta_id: propostaId,
-        numero_revisao: 0, // Será atualizado ao salvar
-        editado_por_id: usuarioId,
-        editado_por_nome: usuarioNome,
-        editado_em: new Date().toISOString(),
-        campos_alterados: { _inicio_revisao: true },
-        valores_anteriores: {},
-        valores_novos: {},
-        motivo: motivo || 'Edição solicitada após envio'
-      });
+    // 4. ATUALIZAR ORÇAMENTO COM NOVA REVISÃO E NÚMERO
+    const { error: erroUpdate } = await supabase
+      .from('orcamentos')
+      .update({
+        revisao: proximaRevisao,
+        numero_proposta: novoNumeroProposta
+      })
+      .eq('id', orcamentoId);
 
-    return { sucesso: true };
+    if (erroUpdate) throw erroUpdate;
+
+    // 5. Registrar início da revisão (opcional - se tabela existir)
+    try {
+      await supabase
+        .from('propostas_revisoes')
+        .insert({
+          orcamento_id: orcamentoId,
+          proposta_id: propostaId,
+          numero_revisao: proximaRevisao,
+          editado_por_id: usuarioId,
+          editado_por_nome: usuarioNome,
+          editado_em: new Date().toISOString(),
+          campos_alterados: { _inicio_revisao: true },
+          valores_anteriores: { numero_proposta: numeroPropostaAtual },
+          valores_novos: { numero_proposta: novoNumeroProposta },
+          motivo: motivo || 'Edição solicitada após envio',
+          status_anterior: null,
+          status_novo: null
+        });
+    } catch (e) {
+      console.warn('Aviso: Não foi possível registrar revisão (tabela pode não existir):', e);
+    }
+
+    console.log(`✅ Edição preparada! Nova revisão: ${proximaRevisao}, Novo número: ${novoNumeroProposta}`);
+
+    return { 
+      sucesso: true,
+      novaRevisao: proximaRevisao,
+      novoNumeroProposta: novoNumeroProposta
+    };
 
   } catch (error) {
     console.error('Erro ao preparar edição com revisão:', error);
     return { sucesso: false, erro: error.message };
   }
-}
-
-/**
- * Atualiza número da proposta com sufixo de revisão
- */
-export function formatarNumeroPropostaComRevisao(numeroBase, revisao) {
-  if (!revisao || revisao === 0) return numeroBase;
-  
-  // Remove revisão anterior se existir
-  const numeroLimpo = numeroBase.replace(/ Rev\.\d+$/, '');
-  return `${numeroLimpo} Rev.${revisao}`;
 }
