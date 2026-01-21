@@ -1697,7 +1697,6 @@ const salvarObservacoesInternas = async () => {
               {formData.numero_proposta ? (
                 <span className="text-2xl font-bold text-purple-900 tracking-wider">
                   {formData.numero_proposta}
-                  {revisaoAtual > 0 && <span className="text-sm ml-2 text-purple-600">Rev.{revisaoAtual}</span>}
                 </span>
               ) : (
                 <span className="text-sm italic text-purple-600">Será gerado ao salvar</span>
