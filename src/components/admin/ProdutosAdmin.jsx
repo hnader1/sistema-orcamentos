@@ -250,55 +250,54 @@ export default function ProdutosAdmin() {
           {produtosFiltrados.map((produto) => (
             <div
               key={produto.id}
-              className={`bg-white border rounded-lg p-3 hover:shadow-md transition-shadow ${
+              className={`bg-white border rounded px-3 py-2 hover:shadow-sm transition-shadow ${
                 produto.ativo ? 'border-gray-200' : 'border-red-200 bg-red-50'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold text-gray-900">
-                      {produto.produto}
-                    </h3>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                        produto.ativo
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {produto.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-                    <span><strong>Classe:</strong> {produto.classe}</span>
-                    <span><strong>MPa:</strong> {produto.mpa}</span>
-                    <span><strong>Cód:</strong> {produto.codigo_sistema}</span>
-                    <span className="text-green-600 font-semibold">R$ {parseFloat(produto.preco).toFixed(2)}/{produto.unidade || 'Unid.'}</span>
-                    <span><strong>Peso:</strong> {produto.peso_unitario} kg</span>
-                    <span><strong>Qtd/Pallet:</strong> {produto.qtd_por_pallet} {produto.unidade || 'Unid.'}</span>
-                  </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap flex-1 text-sm">
+                  <span className="font-semibold text-gray-900">{produto.produto}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-gray-600">{produto.classe}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-gray-600">{produto.mpa}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-gray-500">{produto.codigo_sistema}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-green-600 font-semibold">R$ {parseFloat(produto.preco).toFixed(2)}/{produto.unidade || 'Unid.'}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-gray-600">{produto.peso_unitario}kg</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-gray-600">{produto.qtd_por_pallet}/{produto.unidade || 'Unid.'}/pallet</span>
                 </div>
 
-                <div className="flex gap-2 ml-4">
+                <div className="flex items-center gap-1">
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                      produto.ativo
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {produto.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
                   <button
                     onClick={() => abrirModal(produto)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                     title="Editar"
                   >
-                    <Edit2 size={20} />
+                    <Edit2 size={16} />
                   </button>
                   <button
                     onClick={() => toggleAtivo(produto)}
-                    className={`p-2 rounded-lg transition-colors ${
+                    className={`p-1.5 rounded transition-colors ${
                       produto.ativo
                         ? 'text-red-600 hover:bg-red-50'
                         : 'text-green-600 hover:bg-green-50'
                     }`}
                     title={produto.ativo ? 'Desativar' : 'Ativar'}
                   >
-                    <Power size={20} />
+                    <Power size={16} />
                   </button>
                 </div>
               </div>
