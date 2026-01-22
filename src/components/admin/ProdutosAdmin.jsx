@@ -20,6 +20,7 @@ export default function ProdutosAdmin() {
     qtd_por_pallet: '',
     peso_pallet: '',
     unidade: 'Unid.',
+    tipo: 'Bloco',
     ativo: true
   })
 
@@ -90,6 +91,7 @@ export default function ProdutosAdmin() {
         qtd_por_pallet: produto.qtd_por_pallet || '',
         peso_pallet: produto.peso_pallet || '',
         unidade: produto.unidade || 'Unid.',
+        tipo: produto.tipo || 'Bloco',
         ativo: produto.ativo !== false
       })
     } else {
@@ -104,6 +106,7 @@ export default function ProdutosAdmin() {
         qtd_por_pallet: '',
         peso_pallet: '',
         unidade: 'Unid.',
+        tipo: 'Bloco',
         ativo: true
       })
     }
@@ -160,6 +163,7 @@ export default function ProdutosAdmin() {
         qtd_por_pallet: qtdPorPallet,
         peso_pallet: pesoPallet,
         unidade: formData.unidade,
+        tipo: formData.tipo,
         ativo: formData.ativo
       }
 
@@ -271,6 +275,11 @@ export default function ProdutosAdmin() {
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap flex-1 text-sm">
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                    produto.tipo === 'Piso' ? 'bg-purple-100 text-purple-800' :
+                    produto.tipo === 'Argamassa' ? 'bg-orange-100 text-orange-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>{produto.tipo || 'Bloco'}</span>
                   <span className="font-semibold text-gray-900">{produto.produto}</span>
                   <span className="text-gray-400">|</span>
                   <span className="text-gray-600">{produto.classe}</span>
@@ -499,6 +508,22 @@ export default function ProdutosAdmin() {
                   <option value="Unid.">Unid.</option>
                   <option value="M²">M²</option>
                   <option value="Saco">Saco</option>
+                </select>
+              </div>
+
+              {/* Tipo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo *
+                </label>
+                <select
+                  value={formData.tipo}
+                  onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Bloco">Bloco</option>
+                  <option value="Piso">Piso</option>
+                  <option value="Argamassa">Argamassa</option>
                 </select>
               </div>
 
