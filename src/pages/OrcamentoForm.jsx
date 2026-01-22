@@ -1361,52 +1361,97 @@ const salvarObservacoesInternas = async () => {
 // ====================================================================================
   // EXPORTAR ORÇAMENTO PARA EXCEL
   // ====================================================================================
+  // ====================================================================================
+  // EXPORTAR ORÇAMENTO PARA EXCEL - COMPLETO
+  // ====================================================================================
   const exportarExcel = () => {
-    const dados = [{
-      numero: formData.numero,
-      numero_proposta: formData.numero_proposta || '',
-      data: formData.data_orcamento || '',
-      cliente: formData.cliente_nome || '',
-      empresa: formData.cliente_empresa || '',
-      cpf_cnpj: dadosCNPJCPF?.cnpj_cpf || formData.cnpj_cpf || '',
-      cidade: dadosEndereco?.obra_cidade || '',
-      vendedor: formData.vendedor || '',
-      status: formData.status || '',
-    }]
+    const formatarValor = (valor) => {
+      if (!valor && valor !== 0) return '0,00'
+      return parseFloat(valor).toFixed(2).replace('.', ',')
+    }
 
-    const itensData = produtosSelecionados.map(item => ({
-      produto_codigo: item.codigo || '',
-      produto: item.produto || '',
-      quantidade: item.quantidade || '',
-      valor_unitario: item.preco || '',
-      subtotal: (item.quantidade * item.preco) || 0
-    }))
+    const linhas = [
+      // CABEÇALHO DO ORÇAMENTO
+      ['ORÇAMENTO', formData.numero || ''],
+      ['PROPOSTA', formData.numero_proposta || ''],
+      ['DATA', formData.data_orcamento || ''],
+      ['VALIDADE', formData.data_validade || ''],
+      ['STATUS', formData.status || ''],
+      [''],
+      // VENDEDOR
+      ['VENDEDOR', formData.vendedor || ''],
+      ['TELEFONE VENDEDOR', formData.vendedor_telefone || ''],
+      ['EMAIL VENDEDOR', formData.vendedor_email || ''],
+      [''],
+      // CLIENTE
+      ['CLIENTE', formData.cliente_nome || ''],
+      ['EMPRESA', formData.cliente_empresa || ''],
+      ['CPF/CNPJ', dadosCNPJCPF?.cnpj_cpf || formData.cnpj_cpf || ''],
+      ['TELEFONE', formData.cliente_telefone || ''],
+      ['EMAIL', formData.cliente_email || ''],
+      [''],
+      // ENDEREÇO DA OBRA
+      ['ENDEREÇO DA OBRA', ''],
+      ['CEP', dadosEndereco?.obra_cep || formData.obra_cep || ''],
+      ['CIDADE', dadosEndereco?.obra_cidade || formData.obra_cidade || ''],
+      ['BAIRRO', dadosEndereco?.obra_bairro || formData.obra_bairro || ''],
+      ['LOGRADOURO', dadosEndereco?.obra_logradouro || formData.obra_logradouro || ''],
+      ['NÚMERO', dadosEndereco?.obra_numero || formData.obra_numero || ''],
+      ['COMPLEMENTO', dadosEndereco?.obra_complemento || formData.obra_complemento || ''],
+      [''],
+      // FRETE
+      ['FRETE', ''],
+      ['MODALIDADE', dadosFrete?.modalidade || formData.frete_modalidade || 'FOB'],
+      ['TIPO VEÍCULO', dadosFrete?.tipo_veiculo || formData.frete_tipo_caminhao || ''],
+      ['CIDADE FRETE', dadosFrete?.cidade || formData.frete_cidade || ''],
+      ['QTD VIAGENS', dadosFrete?.qtd_viagens || formData.frete_qtd_viagens || ''],
+      ['VALOR POR VIAGEM', formatarValor(dadosFrete?.valor_viagem || formData.frete_valor_viagem)],
+      ['VALOR TOTAL FRETE', formatarValor(dadosFrete?.valor_total_frete || formData.frete)],
+      ['TIPO DESCARGA', dadosFrete?.tipo_descarga || ''],
+      [''],
+      // PRODUTOS - CABEÇALHO
+      ['PRODUTOS', '', '', '', '', ''],
+      ['CÓDIGO', 'PRODUTO', 'CLASSE', 'MPA', 'QTD', 'VALOR UNIT.', 'SUBTOTAL'],
+    ]
 
-    const headers = ['Cód. Produto', 'Produto', 'Qtd', 'Valor Unit.', 'Subtotal']
-    const csvContent = [
-      `Orçamento: ${formData.numero} | Proposta: ${formData.numero_proposta || '-'} | Cliente: ${formData.cliente_nome || '-'}`,
-      `Vendedor: ${formData.vendedor || '-'} | Data: ${formData.data_orcamento || '-'} | Status: ${formData.status || '-'}`,
-      '',
-      headers.join(';'),
-      ...itensData.map(row => [
-        row.produto_codigo,
-        row.produto,
-        row.quantidade,
-        row.valor_unitario,
-        row.subtotal
-      ].join(';')),
-      '',
-      `Subtotal:;${calcularSubtotal()}`,
-      `Frete:;${dadosFrete?.valor_total_frete || 0}`,
-      `Desconto:;${formData.desconto_geral || 0}%`,
-      `TOTAL:;${calcularTotal()}`
-    ].join('\n')
+    // PRODUTOS - ITENS
+    produtosSelecionados.forEach(item => {
+      linhas.push([
+        item.codigo || '',
+        item.produto || '',
+        item.classe || '',
+        item.mpa || '',
+        item.quantidade || 0,
+        formatarValor(item.preco),
+        formatarValor(item.quantidade * item.preco)
+      ])
+    })
+
+    // TOTAIS
+    linhas.push([''])
+    linhas.push(['', '', '', '', '', 'SUBTOTAL PRODUTOS', formatarValor(calcularSubtotal())])
+    linhas.push(['', '', '', '', '', 'FRETE', formatarValor(dadosFrete?.valor_total_frete || formData.frete || 0)])
+    linhas.push(['', '', '', '', '', 'DESCONTO', (formData.desconto_geral || 0) + '%'])
+    linhas.push(['', '', '', '', '', 'TOTAL GERAL', formatarValor(calcularTotal())])
+    
+    // FORMA DE PAGAMENTO
+    linhas.push([''])
+    linhas.push(['FORMA DE PAGAMENTO', formData.condicoes_pagamento || ''])
+    linhas.push(['PRAZO DE ENTREGA', formData.prazo_entrega || ''])
+    
+    // OBSERVAÇÕES
+    linhas.push([''])
+    linhas.push(['OBSERVAÇÕES', formData.observacoes || ''])
+    linhas.push(['OBSERVAÇÕES INTERNAS', formData.observacoes_internas || ''])
+
+    // Gerar CSV
+    const csvContent = linhas.map(row => row.join(';')).join('\n')
 
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `orcamento_${formData.numero || 'novo'}.csv`
+    link.download = `orcamento_${formData.numero || 'novo'}_${formData.numero_proposta || ''}.csv`
     link.click()
     URL.revokeObjectURL(url)
   }
