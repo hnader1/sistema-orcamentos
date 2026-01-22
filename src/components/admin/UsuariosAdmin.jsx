@@ -231,6 +231,7 @@ export default function UsuariosAdmin() {
         const dadosInsert = {
           email: emailLower,
           senha: formData.senha, // Senha em texto (sistema atual)
+          senha_hash: formData.senha, // Preenche também para NOT NULL constraint
           nome: formData.nome.trim(),
           tipo: formData.tipo,
           telefone: formData.telefone?.trim() || null,
@@ -281,7 +282,7 @@ export default function UsuariosAdmin() {
 
       const { error } = await supabase
         .from('usuarios')
-        .update({ senha: novaSenha })
+        .update({ senha: novaSenha, senha_hash: novaSenha })
         .eq('id', usuarioSenha.id)
 
       if (error) throw error
