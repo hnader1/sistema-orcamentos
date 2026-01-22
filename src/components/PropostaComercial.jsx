@@ -170,7 +170,7 @@ export default function PropostaComercial({
             numero_proposta: dadosOrcamento.numero_proposta || dadosOrcamento.numero,
             valor_total: valorTotal,
             status: 'gerada',
-            vendedor_id: dadosOrcamento.usuario_id, // ✅ CORREÇÃO: Adicionado vendedor_id
+            vendedor_id: dadosOrcamento.usuario_id_origina,l, // ✅ CORREÇÃO: Adicionado vendedor_id
             data_expiracao: new Date(Date.now() + (dadosOrcamento.validade_dias || 15) * 24 * 60 * 60 * 1000).toISOString()
           })
           .select()
