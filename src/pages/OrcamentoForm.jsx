@@ -70,7 +70,9 @@ function OrcamentoForm() {
   const [validandoSenha, setValidandoSenha] = useState(false)
   const [descontoLiberadoPor, setDescontoLiberadoPor] = useState(null)
   const [descontoTravado, setDescontoTravado] = useState(false)
-  const LIMITE_DESCONTO = 5
+  const [descontoSolicitado, setDescontoSolicitado] = useState(0)
+  const LIMITE_DESCONTO = 3
+  const LIMITE_DESCONTO_COMERCIAL = 5
   const [salvandoObs, setSalvandoObs] = useState(false);
 
   // ✅ NOVO: Estados para controle de PDF/Proposta travada
@@ -659,11 +661,13 @@ function OrcamentoForm() {
     const novoValor = parseFloat(valor) || 0
     
     if (descontoTravado && novoValor !== parseFloat(formData.desconto_geral)) {
+      setDescontoSolicitado(novoValor)
       setMostrarModalSenha(true)
       return
     }
     
     if (novoValor > LIMITE_DESCONTO && !descontoLiberado) {
+      setDescontoSolicitado(novoValor)
       setMostrarModalSenha(true)
       return
     }
@@ -703,7 +707,9 @@ function OrcamentoForm() {
         return
       }
 
-      const perfisPermitidos = ['admin', 'administrador', 'comercial', 'comercial_interno']
+      const perfisPermitidos = descontoSolicitado > LIMITE_DESCONTO_COMERCIAL 
+        ? ['admin', 'administrador']  // Acima de 5% só admin
+        : ['admin', 'administrador', 'comercial_interno']  // Entre 3% e 5% comercial_interno ou admin
       const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
       
       if (!perfisPermitidos.includes(tipoLower)) {
@@ -1587,15 +1593,19 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                 <Lock className="text-yellow-600" size={24} />
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">Desconto acima de {LIMITE_DESCONTO}%</h3>
-                <p className="text-sm text-gray-500">Requer autorização de um administrador</p>
+                <h3 className="font-bold text-gray-900">Desconto de {descontoSolicitado}%</h3>
+                <p className="text-sm text-gray-500">
+                  {descontoSolicitado > LIMITE_DESCONTO_COMERCIAL 
+                    ? 'Requer autorização de um Administrador'
+                    : 'Requer autorização de Comercial Interno ou Administrador'}
+                </p>
               </div>
             </div>
             
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuário (Admin/Comercial)
+                  Usuário {descontoSolicitado > LIMITE_DESCONTO_COMERCIAL ? '(Admin)' : '(Comercial/Admin)'}
                 </label>
                 <input
                   type="text"
@@ -1634,7 +1644,9 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
             
             {erroSenha && (
               <p className="text-red-600 text-sm mt-3">
-                ❌ Usuário ou senha inválidos, ou sem permissão para liberar desconto.
+                ❌ {descontoSolicitado > LIMITE_DESCONTO_COMERCIAL 
+                  ? 'Usuário ou senha inválidos. Apenas Administradores podem liberar acima de 5%.'
+                  : 'Usuário ou senha inválidos, ou sem permissão para liberar desconto.'}
               </p>
             )}
             
