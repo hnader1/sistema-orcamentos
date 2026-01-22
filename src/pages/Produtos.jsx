@@ -189,8 +189,8 @@ export default function Produtos() {
                   <Package className="text-white" size={24} />
                 </div>
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Cadastro de Produtos</h1>
-                  <p className="text-xs sm:text-sm text-gray-500">{produtos.length} produtos cadastrados</p>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gerenciar Produtos</h1>
+                  <p className="text-xs sm:text-sm text-gray-500">{produtos.length} produtos cadastrados ({produtosFiltrados.length} ativos)</p>
                 </div>
               </div>
             </div>
@@ -346,7 +346,7 @@ export default function Produtos() {
           </div>
         )}
 
-        {/* Tabela */}
+        {/* Tabela Compacta */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center text-gray-500">Carregando...</div>
@@ -356,44 +356,44 @@ export default function Produtos() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 border-b border-gray-200 sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Classe</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">MPA</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Peso Unit.</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd/Pallet</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Produto</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Classe</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">MPa</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Código</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Preço</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Peso</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Qtd/Pallet</th>
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-20">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-100">
                   {produtosFiltrados.map((produto) => (
-                    <tr key={produto.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900">{produto.codigo_sistema}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{produto.produto}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{produto.classe}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{produto.mpa}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">R$ {parseFloat(produto.preco).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{produto.peso_unitario} kg</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{produto.qtd_por_pallet} pç</td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
+                    <tr key={produto.id} className="hover:bg-blue-50 transition-colors">
+                      <td className="px-3 py-2 font-medium text-gray-900">{produto.produto}</td>
+                      <td className="px-3 py-2 text-gray-600">{produto.classe}</td>
+                      <td className="px-3 py-2 text-gray-600">{produto.mpa}</td>
+                      <td className="px-3 py-2 text-gray-500">{produto.codigo_sistema}</td>
+                      <td className="px-3 py-2 text-right font-medium text-green-600">R$ {parseFloat(produto.preco).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">{produto.peso_unitario} kg</td>
+                      <td className="px-3 py-2 text-right text-gray-600">{produto.qtd_por_pallet}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-center gap-1">
                           <button
                             onClick={() => iniciarEdicao(produto)}
-                            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                             title="Editar"
                           >
-                            <Edit2 size={16} />
+                            <Edit2 size={14} />
                           </button>
                           <button
                             onClick={() => excluir(produto.id, produto.produto)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                            className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
                             title="Excluir"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
