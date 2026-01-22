@@ -122,7 +122,8 @@ function OrcamentoForm() {
     desconto_liberado_por: null,
     desconto_liberado_por_id: null,
     desconto_liberado_em: null,
-    desconto_valor_liberado: null
+    desconto_valor_liberado: null,
+    data_entrega: ''
   })
 
   // ✅ NOVO: Verificar se orçamento está em status bloqueado
@@ -535,7 +536,8 @@ function OrcamentoForm() {
         desconto_liberado_por: orc.desconto_liberado_por || null,
         desconto_liberado_por_id: orc.desconto_liberado_por_id || null,
         desconto_liberado_em: orc.desconto_liberado_em || null,
-        desconto_valor_liberado: orc.desconto_valor_liberado || null
+        desconto_valor_liberado: orc.desconto_valor_liberado || null,
+        data_entrega: orc.data_entrega || ''
       })
 
       // ✅ NOVO: Guardar snapshot dos dados originais para comparação em revisões
@@ -1298,7 +1300,8 @@ const salvarObservacoesInternas = async () => {
         desconto_liberado_por: formData.desconto_liberado_por || null,
         desconto_liberado_por_id: formData.desconto_liberado_por_id || null,
         desconto_liberado_em: formData.desconto_liberado_em || null,
-        desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null
+        desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null,
+        data_entrega: formData.data_entrega || null
       }
 
       if (!id) {
@@ -1914,6 +1917,20 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                 />
               </div>
             )}
+            
+            {/* ✅ Campo Data de Entrega (opcional) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Data de Entrega
+              </label>
+              <input
+                type="date"
+                value={formData.data_entrega}
+                onChange={(e) => setFormData({ ...formData, data_entrega: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={modo !== 'edicao'}
+              />
+            </div>
           </div>
         </div>
 
