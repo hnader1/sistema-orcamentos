@@ -1,15 +1,25 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Power, Search, X, Save, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { Plus, Edit2, Power, Search, X, Save, AlertCircle, Eye, EyeOff, Key, RefreshCw } from 'lucide-react'
 import { supabase } from '../../services/supabase'
+import { 
+  criarUsuarioAuth, 
+  atualizarSenhaUsuario, 
+  buscarUsuarioPorEmail,
+  confirmarEmailUsuario 
+} from '../../services/adminAuth'
 
 export default function UsuariosAdmin() {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [mostrarModal, setMostrarModal] = useState(false)
+  const [mostrarModalSenha, setMostrarModalSenha] = useState(false)
   const [editando, setEditando] = useState(null)
+  const [usuarioSenha, setUsuarioSenha] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const [mostrarSenha, setMostrarSenha] = useState(false)
+  const [novaSenha, setNovaSenha] = useState('')
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState('')
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -97,6 +107,22 @@ export default function UsuariosAdmin() {
     setMostrarSenha(false)
   }
 
+  // Modal de Reset de Senha
+  const abrirModalSenha = (usuario) => {
+    setUsuarioSenha(usuario)
+    setNovaSenha('')
+    setConfirmarNovaSenha('')
+    setMostrarSenha(false)
+    setMostrarModalSenha(true)
+  }
+
+  const fecharModalSenha = () => {
+    setMostrarModalSenha(false)
+    setUsuarioSenha(null)
+    setNovaSenha('')
+    setConfirmarNovaSenha('')
+  }
+
   const validarEmail = (email) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return regex.test(email)
@@ -136,11 +162,6 @@ export default function UsuariosAdmin() {
       } else if (formData.senha.length < 6) {
         novosErros.senha = 'Senha deve ter no mínimo 6 caracteres'
       }
-    } else {
-      // Ao editar, validar apenas se senha foi preenchida
-      if (formData.senha && formData.senha.length < 6) {
-        novosErros.senha = 'Senha deve ter no mínimo 6 caracteres'
-      }
     }
 
     if (!formData.tipo) {
@@ -163,6 +184,7 @@ export default function UsuariosAdmin() {
       setSalvando(true)
 
       const codigo = formData.codigo_vendedor?.trim().toUpperCase() || null
+      const emailLower = formData.email.trim().toLowerCase()
 
       // Verificar duplicata de código
       if (codigo) {
@@ -179,39 +201,37 @@ export default function UsuariosAdmin() {
         }
       }
 
-      const dados = {
-        nome: formData.nome.trim(),
-        email: formData.email.trim().toLowerCase(),
-        tipo: formData.tipo,
-        telefone: formData.telefone?.trim() || null,
-        ativo: formData.ativo,
-        codigo_vendedor: codigo
-      }
-
-      // Incluir senha apenas se foi preenchida
-      if (formData.senha) {
-        dados.senha_hash = formData.senha
-      }
-
       if (editando) {
+        // ========== EDITANDO USUÁRIO EXISTENTE ==========
         console.log('📝 Atualizando usuário:', editando.id)
         
+        const dadosUpdate = {
+          nome: formData.nome.trim(),
+          tipo: formData.tipo,
+          telefone: formData.telefone?.trim() || null,
+          ativo: formData.ativo,
+          codigo_vendedor: codigo
+        }
+
         const { error } = await supabase
           .from('usuarios')
-          .update(dados)
+          .update(dadosUpdate)
           .eq('id', editando.id)
 
         if (error) throw error
+        
         console.log('✅ Usuário atualizado!')
         alert('Usuário atualizado com sucesso!')
+
       } else {
-        console.log('✨ Criando novo usuário')
+        // ========== CRIANDO NOVO USUÁRIO ==========
+        console.log('✨ Criando novo usuário...')
         
-        // Verificar se email já existe
+        // 1. Verificar se email já existe na tabela usuarios
         const { data: existente } = await supabase
           .from('usuarios')
           .select('id')
-          .eq('email', dados.email)
+          .eq('email', emailLower)
           .single()
 
         if (existente) {
@@ -220,13 +240,75 @@ export default function UsuariosAdmin() {
           return
         }
 
-        const { error } = await supabase
-          .from('usuarios')
-          .insert([dados])
+        // 2. Criar usuário no Supabase Auth (com email já confirmado!)
+        console.log('🔐 Criando usuário no Supabase Auth...')
+        const { user: authUser, error: authError } = await criarUsuarioAuth(
+          emailLower, 
+          formData.senha
+        )
 
-        if (error) throw error
-        console.log('✅ Usuário criado!')
-        alert('Usuário criado com sucesso!')
+        if (authError) {
+          // Se o erro for de usuário já existente no Auth, tenta buscar
+          if (authError.includes('already been registered') || authError.includes('already exists')) {
+            console.log('⚠️ Usuário já existe no Auth, buscando...')
+            const { user: existingUser } = await buscarUsuarioPorEmail(emailLower)
+            
+            if (existingUser) {
+              // Confirmar email e continuar
+              await confirmarEmailUsuario(existingUser.id)
+              
+              // Criar na tabela usuarios vinculando ao auth existente
+              const dadosInsert = {
+                auth_id: existingUser.id,
+                nome: formData.nome.trim(),
+                email: emailLower,
+                tipo: formData.tipo,
+                telefone: formData.telefone?.trim() || null,
+                ativo: formData.ativo,
+                codigo_vendedor: codigo
+              }
+
+              const { error: insertError } = await supabase
+                .from('usuarios')
+                .insert([dadosInsert])
+
+              if (insertError) throw insertError
+              
+              console.log('✅ Usuário criado (vinculado ao Auth existente)!')
+              alert('Usuário criado com sucesso!')
+              fecharModal()
+              carregarUsuarios()
+              return
+            }
+          }
+          
+          throw new Error(authError)
+        }
+
+        // 3. Criar registro na tabela usuarios vinculando ao auth_id
+        console.log('📋 Criando registro na tabela usuarios...')
+        const dadosInsert = {
+          auth_id: authUser.id,
+          nome: formData.nome.trim(),
+          email: emailLower,
+          tipo: formData.tipo,
+          telefone: formData.telefone?.trim() || null,
+          ativo: formData.ativo,
+          codigo_vendedor: codigo
+        }
+
+        const { error: insertError } = await supabase
+          .from('usuarios')
+          .insert([dadosInsert])
+
+        if (insertError) {
+          console.error('❌ Erro ao inserir na tabela usuarios:', insertError)
+          // Se falhar, tentar deletar o usuário do Auth para não deixar inconsistente
+          throw insertError
+        }
+
+        console.log('✅ Usuário criado com sucesso!')
+        alert('Usuário criado com sucesso! Já pode fazer login.')
       }
 
       fecharModal()
@@ -234,6 +316,49 @@ export default function UsuariosAdmin() {
     } catch (error) {
       console.error('❌ Erro ao salvar:', error)
       alert('Erro ao salvar usuário: ' + error.message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  // ========== RESETAR SENHA ==========
+  const resetarSenha = async () => {
+    if (!novaSenha) {
+      alert('Digite a nova senha')
+      return
+    }
+    
+    if (novaSenha.length < 6) {
+      alert('A senha deve ter no mínimo 6 caracteres')
+      return
+    }
+    
+    if (novaSenha !== confirmarNovaSenha) {
+      alert('As senhas não conferem')
+      return
+    }
+
+    if (!usuarioSenha?.auth_id) {
+      alert('Este usuário não está vinculado ao sistema de autenticação. Será necessário recriar o usuário.')
+      return
+    }
+
+    try {
+      setSalvando(true)
+      console.log('🔑 Resetando senha para:', usuarioSenha.email)
+
+      const { success, error } = await atualizarSenhaUsuario(usuarioSenha.auth_id, novaSenha)
+
+      if (error) {
+        throw new Error(error)
+      }
+
+      console.log('✅ Senha resetada com sucesso!')
+      alert(`Senha alterada com sucesso para ${usuarioSenha.nome}!`)
+      fecharModalSenha()
+    } catch (error) {
+      console.error('❌ Erro ao resetar senha:', error)
+      alert('Erro ao resetar senha: ' + error.message)
     } finally {
       setSalvando(false)
     }
@@ -291,13 +416,30 @@ export default function UsuariosAdmin() {
             {usuarios.length} usuários cadastrados ({usuarios.filter(u => u.ativo).length} ativos)
           </p>
         </div>
-        <button
-          onClick={() => abrirModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-        >
-          <Plus size={20} />
-          Novo Usuário
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={carregarUsuarios}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            title="Atualizar lista"
+          >
+            <RefreshCw size={18} />
+          </button>
+          <button
+            onClick={() => abrirModal()}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Plus size={20} />
+            Novo Usuário
+          </button>
+        </div>
+      </div>
+
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <p className="text-sm text-blue-800">
+          <strong>✨ Novo:</strong> Usuários criados aqui já podem fazer login imediatamente! 
+          Use o botão <Key size={14} className="inline" /> para resetar senhas diretamente.
+        </p>
       </div>
 
       {/* Busca */}
@@ -334,7 +476,7 @@ export default function UsuariosAdmin() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <h3 className="text-lg font-semibold text-gray-900">
                       {usuario.nome}
                     </h3>
@@ -355,6 +497,11 @@ export default function UsuariosAdmin() {
                     >
                       {usuario.ativo ? 'Ativo' : 'Inativo'}
                     </span>
+                    {!usuario.auth_id && (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                        ⚠️ Sem Auth
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -372,6 +519,13 @@ export default function UsuariosAdmin() {
                 </div>
 
                 <div className="flex gap-2 ml-4">
+                  <button
+                    onClick={() => abrirModalSenha(usuario)}
+                    className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                    title="Resetar Senha"
+                  >
+                    <Key size={20} />
+                  </button>
                   <button
                     onClick={() => abrirModal(usuario)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -397,7 +551,7 @@ export default function UsuariosAdmin() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal de Criar/Editar Usuário */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -460,35 +614,37 @@ export default function UsuariosAdmin() {
                 )}
               </div>
 
-              {/* Senha */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Senha {editando ? '(deixe em branco para manter)' : '*'}
-                </label>
-                <div className="relative">
-                  <input
-                    type={mostrarSenha ? 'text' : 'password'}
-                    value={formData.senha}
-                    onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 pr-10 ${
-                      erros.senha ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Mínimo 6 caracteres"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMostrarSenha(!mostrarSenha)}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {mostrarSenha ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
+              {/* Senha - Apenas ao criar */}
+              {!editando && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Senha *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={mostrarSenha ? 'text' : 'password'}
+                      value={formData.senha}
+                      onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 pr-10 ${
+                        erros.senha ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Mínimo 6 caracteres"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarSenha(!mostrarSenha)}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {mostrarSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                  {erros.senha && (
+                    <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
+                      <AlertCircle size={14} /> {erros.senha}
+                    </p>
+                  )}
                 </div>
-                {erros.senha && (
-                  <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
-                    <AlertCircle size={14} /> {erros.senha}
-                  </p>
-                )}
-              </div>
+              )}
 
               {/* Tipo e Telefone */}
               <div className="grid grid-cols-2 gap-4">
@@ -526,7 +682,7 @@ export default function UsuariosAdmin() {
                 </div>
               </div>
 
-              {/* ✨ NOVO CAMPO: CÓDIGO DO VENDEDOR */}
+              {/* ✨ CÓDIGO DO VENDEDOR */}
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Código do Vendedor (Propostas)
@@ -589,6 +745,101 @@ export default function UsuariosAdmin() {
                 <Save size={20} />
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reset de Senha */}
+      {mostrarModalSenha && usuarioSenha && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">
+                🔑 Resetar Senha
+              </h3>
+              <button
+                onClick={fecharModalSenha}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={24} className="text-gray-600" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-sm text-gray-600">Usuário:</p>
+                <p className="font-semibold text-gray-900">{usuarioSenha.nome}</p>
+                <p className="text-sm text-gray-500">{usuarioSenha.email}</p>
+              </div>
+
+              {!usuarioSenha.auth_id && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ Este usuário não está vinculado ao sistema de autenticação. 
+                    Será necessário excluí-lo e criar novamente.
+                  </p>
+                </div>
+              )}
+
+              {usuarioSenha.auth_id && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nova Senha
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={mostrarSenha ? 'text' : 'password'}
+                        value={novaSenha}
+                        onChange={(e) => setNovaSenha(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 pr-10"
+                        placeholder="Mínimo 6 caracteres"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setMostrarSenha(!mostrarSenha)}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {mostrarSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Confirmar Nova Senha
+                    </label>
+                    <input
+                      type={mostrarSenha ? 'text' : 'password'}
+                      value={confirmarNovaSenha}
+                      onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      placeholder="Digite a senha novamente"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={fecharModalSenha}
+                disabled={salvando}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              {usuarioSenha.auth_id && (
+                <button
+                  onClick={resetarSenha}
+                  disabled={salvando || !novaSenha}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
+                >
+                  <Key size={20} />
+                  {salvando ? 'Salvando...' : 'Resetar Senha'}
+                </button>
+              )}
             </div>
           </div>
         </div>
