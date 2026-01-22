@@ -617,7 +617,8 @@ function OrcamentoForm() {
           quantidade: item.quantidade,
           preco: item.preco_unitario,
           peso_unitario: item.peso_unitario,
-          qtd_por_pallet: item.qtd_por_pallet
+          qtd_por_pallet: item.qtd_por_pallet,
+          unidade: item.unidade || 'Unid.'
         }))
         
         setProdutosSelecionados(produtosCarregados)
@@ -783,7 +784,8 @@ function OrcamentoForm() {
       quantidade: 1,
       preco: 0,
       peso_unitario: 0,
-      qtd_por_pallet: 0
+      qtd_por_pallet: 0,
+      unidade: 'Unid.'
     }])
   }
 
@@ -804,7 +806,8 @@ function OrcamentoForm() {
         codigo: '',
         preco: 0,
         peso_unitario: 0,
-        qtd_por_pallet: 0
+        qtd_por_pallet: 0,
+        unidade: 'Unid.'
       }
     } else if (campo === 'classe') {
       novos[index] = {
@@ -815,7 +818,8 @@ function OrcamentoForm() {
         codigo: '',
         preco: 0,
         peso_unitario: 0,
-        qtd_por_pallet: 0
+        qtd_por_pallet: 0,
+        unidade: 'Unid.'
       }
     } else if (campo === 'mpa') {
       const produtoCompleto = getProdutoCompleto(
@@ -832,7 +836,8 @@ function OrcamentoForm() {
           codigo: produtoCompleto.codigo_sistema,
           preco: produtoCompleto.preco,
           peso_unitario: produtoCompleto.peso_unitario,
-          qtd_por_pallet: produtoCompleto.qtd_por_pallet
+          qtd_por_pallet: produtoCompleto.qtd_por_pallet,
+          unidade: produtoCompleto.unidade || 'Unid.'
         }
       }
     } else {
@@ -971,6 +976,7 @@ function OrcamentoForm() {
         preco_unitario: parseFloat(item.preco),
         peso_unitario: parseFloat(item.peso_unitario),
         qtd_por_pallet: parseInt(item.qtd_por_pallet),
+        unidade: item.unidade || 'Unid.',
         subtotal: item.quantidade * item.preco,
         ordem: index
       }))
@@ -1330,6 +1336,7 @@ const salvarObservacoesInternas = async () => {
         preco_unitario: parseFloat(item.preco),
         peso_unitario: parseFloat(item.peso_unitario),
         qtd_por_pallet: parseInt(item.qtd_por_pallet),
+        unidade: item.unidade || 'Unid.',
         subtotal: item.quantidade * item.preco,
         ordem: index
       }))
@@ -1999,6 +2006,7 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
                     <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Unid.</th>
                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
                     <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
@@ -2059,6 +2067,9 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                           className="w-20 px-2 py-1 border rounded text-sm text-center"
                           min="1"
                         />
+                      </td>
+                      <td className="px-2 py-1 text-center text-gray-600 text-xs">
+                        {item.unidade || 'Unid.'}
                       </td>
                       <td className="px-2 py-1 text-right text-gray-600">
                         {item.preco ? `R$ ${parseFloat(item.preco).toFixed(2)}` : '-'}
