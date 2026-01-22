@@ -15,20 +15,25 @@ export default function Header() {
 
   const getTipoIcon = () => {
     if (user?.tipo === 'admin') return <Shield size={16} className="text-yellow-600" />
-    if (user?.tipo === 'comercial_interno') return <Briefcase size={16} className="text-purple-600" />
+    if (user?.tipo === 'comercial' || user?.tipo === 'comercial_interno') return <Briefcase size={16} className="text-purple-600" />
     return <User size={16} className="text-blue-600" />
   }
 
   const getTipoLabel = () => {
-    if (user?.tipo === 'admin') return 'Administrador'
-    if (user?.tipo === 'comercial_interno') return 'Comercial Interno'
-    return 'Vendedor'
+    const labels = {
+      'admin': 'Administrador',
+      'comercial': 'Comercial',
+      'comercial_interno': 'Comercial Interno',
+      'vendedor': 'Vendedor'
+    }
+    return labels[user?.tipo] || 'Vendedor'
   }
 
   const getTipoBadge = () => {
     const badges = {
       'admin': 'bg-yellow-100 text-yellow-800',
       'vendedor': 'bg-blue-100 text-blue-800',
+      'comercial': 'bg-purple-100 text-purple-800',
       'comercial_interno': 'bg-purple-100 text-purple-800'
     }
     return badges[user?.tipo] || 'bg-gray-100 text-gray-800'
@@ -47,7 +52,7 @@ export default function Header() {
 
           {/* User Info + Painel Gerencial + Logout */}
           <div className="flex items-center gap-4">
-            {/* Link de Painel Gerencial (só para Admin e Comercial Interno) */}
+            {/* Link de Painel Gerencial (só para Admin e Comercial) */}
             {podeAcessarLancamento() && (
               <button
                 onClick={() => navigate('/admin')}
