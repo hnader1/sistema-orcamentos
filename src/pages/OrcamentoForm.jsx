@@ -1451,7 +1451,10 @@ const salvarObservacoesInternas = async () => {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `orcamento_${formData.numero || 'novo'}_${formData.numero_proposta || ''}.csv`
+    const nomeArquivo = formData.numero_proposta 
+  ? `${formData.numero_proposta}_${formData.cliente_nome || 'cliente'}.csv`
+  : `Rascunho_${formData.numero || 'ORC'}_${formData.cliente_nome || 'cliente'}.csv`
+link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
     link.click()
     URL.revokeObjectURL(url)
   }
