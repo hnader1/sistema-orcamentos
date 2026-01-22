@@ -583,7 +583,6 @@ export default function UsuariosAdmin() {
                     }`}
                   >
                     <option value="vendedor">Vendedor</option>
-                    <option value="comercial">Comercial</option>
                     <option value="comercial_interno">Comercial Interno</option>
                     <option value="admin">Administrador</option>
                   </select>
