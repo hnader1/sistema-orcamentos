@@ -113,7 +113,7 @@ export default function ProdutosAdmin() {
     if (!formData.peso_unitario || parseFloat(formData.peso_unitario) <= 0) {
       novosErros.peso_unitario = 'Peso deve ser maior que zero'
     }
-    if (!formData.qtd_por_pallet || parseInt(formData.qtd_por_pallet) <= 0) {
+    if (!formData.qtd_por_pallet || parseFloat(formData.qtd_por_pallet) <= 0) {
       novosErros.qtd_por_pallet = 'Quantidade deve ser maior que zero'
     }
 
@@ -129,7 +129,7 @@ export default function ProdutosAdmin() {
 
       // Calcular peso_pallet automaticamente
       const pesoUnitario = parseFloat(formData.peso_unitario)
-      const qtdPorPallet = parseInt(formData.qtd_por_pallet)
+      const qtdPorPallet = parseFloat(formData.qtd_por_pallet)
       const pesoPallet = pesoUnitario * qtdPorPallet
 
       const dados = {
@@ -465,6 +465,7 @@ export default function ProdutosAdmin() {
                   </label>
                   <input
                     type="number"
+                    step="any"
                     value={formData.qtd_por_pallet}
                     onChange={(e) => setFormData({ ...formData, qtd_por_pallet: e.target.value })}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
@@ -482,7 +483,7 @@ export default function ProdutosAdmin() {
               {formData.peso_unitario && formData.qtd_por_pallet && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-900">
-                    <strong>Peso do Pallet (calculado):</strong> {(parseFloat(formData.peso_unitario) * parseInt(formData.qtd_por_pallet)).toFixed(2)} kg
+                    <strong>Peso do Pallet (calculado):</strong> {(parseFloat(formData.peso_unitario) * parseFloat(formData.qtd_por_pallet)).toFixed(2)} kg
                   </p>
                 </div>
               )}
