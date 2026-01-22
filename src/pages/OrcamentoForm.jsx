@@ -1242,11 +1242,13 @@ const salvarObservacoesInternas = async () => {
       let numeroProposta = formData.numero_proposta || null
       
       // Se não tem numero_proposta ainda, tentar gerar
-      if (!numeroProposta && user?.id) {
+      // ✅ Usa o vendedor selecionado (não o usuário logado)
+      const vendedorIdParaProposta = formData.usuario_id_selecionado || user?.id
+      if (!numeroProposta && vendedorIdParaProposta) {
         try {
-          const codigoVendedor = await buscarCodigoVendedor(user.id)
+          const codigoVendedor = await buscarCodigoVendedor(vendedorIdParaProposta)
           if (codigoVendedor) {
-            numeroProposta = await gerarNumeroProposta(user.id, codigoVendedor)
+            numeroProposta = await gerarNumeroProposta(vendedorIdParaProposta, codigoVendedor)
             console.log('✅ Número de proposta gerado:', numeroProposta)
           }
         } catch (erroProposta) {
