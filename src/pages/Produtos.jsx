@@ -121,7 +121,7 @@ export default function Produtos() {
         mpa: formData.mpa,
         preco: parseFloat(formData.preco),
         peso_unitario: parseFloat(formData.peso_unitario) || 0,
-        qtd_por_pallet: parseInt(formData.qtd_por_pallet) || 0,
+        qtd_por_pallet: parseFloat(formData.qtd_por_pallet) || 0,
         peso_pallet: parseFloat(formData.peso_pallet) || 0,
         ativo: true
       }
@@ -307,6 +307,7 @@ export default function Produtos() {
                 </label>
                 <input
                   type="number"
+                  step="0.01"
                   value={formData.qtd_por_pallet}
                   onChange={(e) => setFormData({ ...formData, qtd_por_pallet: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
