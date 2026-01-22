@@ -30,7 +30,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, FileText, Plus, Search, Edit2, Copy, Ban, Calendar, User, DollarSign,
   Edit, Send, CheckCircle, XCircle, Briefcase, TrendingUp, MapPin, PackageCheck, ClipboardList,
-  Link as LinkIcon, Hand, Download
+  Link as LinkIcon, Hand, Download, Truck
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -61,8 +61,32 @@ export default function Orcamentos() {
   })
 
   // Verificar se pode ver dados da aceitação (Admin ou Comercial Interno)
- // Verificar se pode ver dados da aceitação (Admin ou Comercial Interno)
   const podeVerDadosAceitacao = () => isAdmin() || isComercialInterno()
+
+  // ====================================================================================
+  // FUNÇÃO PARA COR DA DATA DE ENTREGA
+  // ====================================================================================
+  const getDataEntregaStyle = (dataEntrega) => {
+    if (!dataEntrega) return null
+    
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    
+    const entrega = new Date(dataEntrega + 'T00:00:00')
+    
+    const diffDias = Math.floor((entrega - hoje) / (1000 * 60 * 60 * 24))
+    
+    if (diffDias < 0) {
+      // Passou - cinza
+      return { bg: 'bg-gray-100', text: 'text-gray-500', icon: 'text-gray-400' }
+    } else if (diffDias === 0) {
+      // Hoje - vermelho
+      return { bg: 'bg-red-100', text: 'text-red-700', icon: 'text-red-500' }
+    } else {
+      // Futuro - verde
+      return { bg: 'bg-green-100', text: 'text-green-700', icon: 'text-green-500' }
+    }
+  }
 
   // ====================================================================================
   // EXPORTAR PARA EXCEL
@@ -571,10 +595,20 @@ export default function Orcamentos() {
           </div>
         </div>
         
-        {/* Coluna Direita: Badge Status + Badge Origem + Botões de Ação */}
+        {/* Coluna Direita: Data Entrega + Badge Status + Badge Origem + Botões de Ação */}
         <div className="flex flex-col items-end gap-2">
-          {/* Badges de Status e Origem */}
+          {/* Data de Entrega + Badges de Status e Origem */}
           <div className="flex items-center gap-2">
+            {/* ✅ Data de Entrega com cores */}
+            {orc.data_entrega && (() => {
+              const style = getDataEntregaStyle(orc.data_entrega)
+              return (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`} title="Data de Entrega">
+                  <Truck size={12} className={style.icon} />
+                  {format(new Date(orc.data_entrega + 'T00:00:00'), 'dd/MM/yy')}
+                </div>
+              )
+            })()}
             {getStatusBadge(orc.status)}
             {/* ✅ CORRIGIDO: Mostrar badge de aprovação em aprovado, lançado e finalizado */}
             {['aprovado', 'lancado', 'finalizado'].includes(orc.status) && getAprovadoViaBadge(orc.aprovado_via)}
