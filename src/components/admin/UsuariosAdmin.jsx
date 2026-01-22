@@ -1,12 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Power, Search, X, Save, AlertCircle, Eye, EyeOff, Key, RefreshCw } from 'lucide-react'
 import { supabase } from '../../services/supabase'
-import { 
-  criarUsuarioAuth, 
-  atualizarSenhaUsuario, 
-  buscarUsuarioPorEmail,
-  confirmarEmailUsuario 
-} from '../../services/adminAuth'
+import { criarUsuarioAuth, atualizarSenhaUsuario } from '../../services/adminAuth'
 
 export default function UsuariosAdmin() {
   const [usuarios, setUsuarios] = useState([])
@@ -77,7 +72,7 @@ export default function UsuariosAdmin() {
       setFormData({
         nome: usuario.nome || '',
         email: usuario.email || '',
-        senha: '', // Não preencher senha ao editar
+        senha: '',
         tipo: usuario.tipo || 'vendedor',
         telefone: usuario.telefone || '',
         ativo: usuario.ativo !== false,
@@ -129,16 +124,10 @@ export default function UsuariosAdmin() {
   }
 
   const validarCodigoVendedor = (codigo) => {
-    if (!codigo) return true // Código é opcional
-    
+    if (!codigo) return true
     const codigoUpper = codigo.toUpperCase()
-    
-    // Deve ter 2 ou 3 caracteres
     if (codigoUpper.length < 2 || codigoUpper.length > 3) return false
-    
-    // Deve conter apenas letras
     if (!/^[A-Z]{2,3}$/.test(codigoUpper)) return false
-    
     return true
   }
 
@@ -168,7 +157,6 @@ export default function UsuariosAdmin() {
       novosErros.tipo = 'Campo obrigatório'
     }
 
-    // Validar código do vendedor
     if (formData.codigo_vendedor && !validarCodigoVendedor(formData.codigo_vendedor)) {
       novosErros.codigo_vendedor = 'Código deve ter 2 ou 3 letras (apenas A-Z)'
     }
@@ -225,9 +213,9 @@ export default function UsuariosAdmin() {
 
       } else {
         // ========== CRIANDO NOVO USUÁRIO ==========
-        console.log('✨ Criando novo usuário...')
+        console.log('✨ Criando novo usuário via Edge Function...')
         
-        // 1. Verificar se email já existe na tabela usuarios
+        // Verificar se email já existe na tabela usuarios
         const { data: existente } = await supabase
           .from('usuarios')
           .select('id')
@@ -240,71 +228,19 @@ export default function UsuariosAdmin() {
           return
         }
 
-        // 2. Criar usuário no Supabase Auth (com email já confirmado!)
-        console.log('🔐 Criando usuário no Supabase Auth...')
-        const { user: authUser, error: authError } = await criarUsuarioAuth(
-          emailLower, 
-          formData.senha
-        )
-
-        if (authError) {
-          // Se o erro for de usuário já existente no Auth, tenta buscar
-          if (authError.includes('already been registered') || authError.includes('already exists')) {
-            console.log('⚠️ Usuário já existe no Auth, buscando...')
-            const { user: existingUser } = await buscarUsuarioPorEmail(emailLower)
-            
-            if (existingUser) {
-              // Confirmar email e continuar
-              await confirmarEmailUsuario(existingUser.id)
-              
-              // Criar na tabela usuarios vinculando ao auth existente
-              const dadosInsert = {
-                auth_id: existingUser.id,
-                nome: formData.nome.trim(),
-                email: emailLower,
-                tipo: formData.tipo,
-                telefone: formData.telefone?.trim() || null,
-                ativo: formData.ativo,
-                codigo_vendedor: codigo
-              }
-
-              const { error: insertError } = await supabase
-                .from('usuarios')
-                .insert([dadosInsert])
-
-              if (insertError) throw insertError
-              
-              console.log('✅ Usuário criado (vinculado ao Auth existente)!')
-              alert('Usuário criado com sucesso!')
-              fecharModal()
-              carregarUsuarios()
-              return
-            }
-          }
-          
-          throw new Error(authError)
-        }
-
-        // 3. Criar registro na tabela usuarios vinculando ao auth_id
-        console.log('📋 Criando registro na tabela usuarios...')
-        const dadosInsert = {
-          auth_id: authUser.id,
-          nome: formData.nome.trim(),
+        // Chamar Edge Function que cria no Auth + tabela usuarios
+        const { success, error } = await criarUsuarioAuth({
           email: emailLower,
+          password: formData.senha,
+          nome: formData.nome.trim(),
           tipo: formData.tipo,
           telefone: formData.telefone?.trim() || null,
           ativo: formData.ativo,
           codigo_vendedor: codigo
-        }
+        })
 
-        const { error: insertError } = await supabase
-          .from('usuarios')
-          .insert([dadosInsert])
-
-        if (insertError) {
-          console.error('❌ Erro ao inserir na tabela usuarios:', insertError)
-          // Se falhar, tentar deletar o usuário do Auth para não deixar inconsistente
-          throw insertError
+        if (!success) {
+          throw new Error(error || 'Erro ao criar usuário')
         }
 
         console.log('✅ Usuário criado com sucesso!')
@@ -349,8 +285,8 @@ export default function UsuariosAdmin() {
 
       const { success, error } = await atualizarSenhaUsuario(usuarioSenha.auth_id, novaSenha)
 
-      if (error) {
-        throw new Error(error)
+      if (!success) {
+        throw new Error(error || 'Erro ao resetar senha')
       }
 
       console.log('✅ Senha resetada com sucesso!')
@@ -602,7 +538,7 @@ export default function UsuariosAdmin() {
                     erros.email ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="usuario@email.com"
-                  disabled={editando} // Não permitir editar email
+                  disabled={editando}
                 />
                 {erros.email && (
                   <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
@@ -682,7 +618,7 @@ export default function UsuariosAdmin() {
                 </div>
               </div>
 
-              {/* ✨ CÓDIGO DO VENDEDOR */}
+              {/* Código do Vendedor */}
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Código do Vendedor (Propostas)
@@ -708,8 +644,6 @@ export default function UsuariosAdmin() {
                 )}
                 <p className="text-xs text-gray-600 mt-2">
                   💡 Usado na numeração automática das propostas
-                  <br />
-                  Exemplo: <strong className="text-purple-700">NP-26-0001</strong> (Nilton Pezini, ano 2026, proposta 1)
                 </p>
               </div>
 
