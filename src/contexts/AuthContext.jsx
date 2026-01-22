@@ -87,11 +87,26 @@ export function AuthProvider({ children }) {
 
   const isAdmin = () => user?.tipo === 'admin'
   const isVendedor = () => user?.tipo === 'vendedor'
-  const isComercialInterno = () => user?.tipo === 'comercial_interno'
-  const podeAcessarLancamento = () => ['admin', 'comercial_interno'].includes(user?.tipo)
+  // Aceita tanto "comercial" quanto "comercial_interno"
+  const isComercial = () => ['comercial', 'comercial_interno'].includes(user?.tipo)
+  const isComercialInterno = () => ['comercial', 'comercial_interno'].includes(user?.tipo)
+  // Pode ver todos os orçamentos (não só os próprios)
+  const podeVerTodos = () => ['admin', 'comercial', 'comercial_interno'].includes(user?.tipo)
+  const podeAcessarLancamento = () => ['admin', 'comercial', 'comercial_interno'].includes(user?.tipo)
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isVendedor, isComercialInterno, podeAcessarLancamento }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      login, 
+      logout, 
+      isAdmin, 
+      isVendedor, 
+      isComercial,
+      isComercialInterno, 
+      podeVerTodos,
+      podeAcessarLancamento 
+    }}>
       {children}
     </AuthContext.Provider>
   )
