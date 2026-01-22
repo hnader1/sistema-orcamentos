@@ -19,6 +19,7 @@ export default function ProdutosAdmin() {
     peso_unitario: '',
     qtd_por_pallet: '',
     peso_pallet: '',
+    unidade: 'Unid.',
     ativo: true
   })
 
@@ -73,6 +74,7 @@ export default function ProdutosAdmin() {
         peso_unitario: produto.peso_unitario || '',
         qtd_por_pallet: produto.qtd_por_pallet || '',
         peso_pallet: produto.peso_pallet || '',
+        unidade: produto.unidade || 'Unid.',
         ativo: produto.ativo !== false
       })
     } else {
@@ -86,6 +88,7 @@ export default function ProdutosAdmin() {
         peso_unitario: '',
         qtd_por_pallet: '',
         peso_pallet: '',
+        unidade: 'Unid.',
         ativo: true
       })
     }
@@ -141,6 +144,7 @@ export default function ProdutosAdmin() {
         peso_unitario: pesoUnitario,
         qtd_por_pallet: qtdPorPallet,
         peso_pallet: pesoPallet,
+        unidade: formData.unidade,
         ativo: formData.ativo
       }
 
@@ -285,6 +289,10 @@ export default function ProdutosAdmin() {
                       <p className="font-medium text-green-600">
                         R$ {parseFloat(produto.preco).toFixed(2)}
                       </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Unidade:</span>
+                      <p className="font-medium">{produto.unidade || 'Unid.'}</p>
                     </div>
                     <div>
                       <span className="text-gray-600">Peso Unit.:</span>
@@ -487,6 +495,22 @@ export default function ProdutosAdmin() {
                   </p>
                 </div>
               )}
+
+              {/* Unidade */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unidade *
+                </label>
+                <select
+                  value={formData.unidade}
+                  onChange={(e) => setFormData({ ...formData, unidade: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Unid.">Unid.</option>
+                  <option value="M²">M²</option>
+                  <option value="Saco">Saco</option>
+                </select>
+              </div>
 
               {/* Ativo */}
               <div className="flex items-center gap-2">
