@@ -613,7 +613,9 @@ function OrcamentoForm() {
           frete_manual: orc.frete_manual || false,
           manual: orc.frete_manual || false,
           valor_manual_viagem: parseFloat(orc.frete_valor_manual_viagem) || parseFloat(orc.frete_valor_viagem) || 0,
-          qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1
+          qtd_manual_viagens: orc.frete_qtd_manual_viagens || orc.frete_qtd_viagens || 1,
+          observacao_frete_manual: orc.observacao_frete_manual || '',
+          justificativa_frete_manual: orc.observacao_frete_manual || ''
         }
         setDadosFrete(dadosFreteCarregados)
       }
@@ -953,6 +955,7 @@ function OrcamentoForm() {
         frete_manual: dadosFrete?.frete_manual || false,
         frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
         frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
+        observacao_frete_manual: dadosFrete?.frete_manual ? (dadosFrete?.observacao_frete_manual || dadosFrete?.justificativa_frete_manual) : null,
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas, 
@@ -1261,6 +1264,7 @@ const salvarObservacoesInternas = async () => {
         frete_manual: dadosFrete?.frete_manual || false,
         frete_valor_manual_viagem: dadosFrete?.frete_manual ? dadosFrete?.valor_manual_viagem : null,
         frete_qtd_manual_viagens: dadosFrete?.frete_manual ? dadosFrete?.qtd_manual_viagens : null,
+        observacao_frete_manual: dadosFrete?.frete_manual ? (dadosFrete?.observacao_frete_manual || dadosFrete?.justificativa_frete_manual) : null,
         total,
         observacoes: formData.observacoes,
         observacoes_internas: formData.observacoes_internas,
