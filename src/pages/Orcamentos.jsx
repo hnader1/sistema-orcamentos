@@ -30,7 +30,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, FileText, Plus, Search, Edit2, Copy, Ban, Calendar, User, DollarSign,
   Edit, Send, CheckCircle, XCircle, Briefcase, TrendingUp, MapPin, PackageCheck, ClipboardList,
-  Link as LinkIcon, Hand
+  Link as LinkIcon, Hand, Download
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -61,7 +61,99 @@ export default function Orcamentos() {
   })
 
   // Verificar se pode ver dados da aceitação (Admin ou Comercial Interno)
+ // Verificar se pode ver dados da aceitação (Admin ou Comercial Interno)
   const podeVerDadosAceitacao = () => isAdmin() || isComercialInterno()
+
+  // ====================================================================================
+  // EXPORTAR PARA EXCEL
+  // ====================================================================================
+  const exportarExcel = () => {
+    // Filtrar orçamentos conforme busca/filtro atual
+    const dados = orcamentosFiltrados.flatMap(orc => {
+      const itens = orc.orcamentos_itens || []
+      if (itens.length === 0) {
+        return [{
+          numero: orc.numero,
+          numero_proposta: orc.numero_proposta || '',
+          data: orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '',
+          cliente: orc.cliente_nome || '',
+          empresa: orc.cliente_empresa || '',
+          cpf_cnpj: orc.cnpj_cpf || '',
+          cidade: orc.obra_cidade || '',
+          vendedor: orc.vendedor || '',
+          status: orc.status || '',
+          produto_codigo: '',
+          produto: '',
+          quantidade: '',
+          valor_unitario: '',
+          subtotal: orc.subtotal || 0,
+          frete: orc.frete || 0,
+          desconto: orc.desconto_geral || 0,
+          total: orc.total || 0,
+          forma_pagamento: orc.formas_pagamento?.descricao || ''
+        }]
+      }
+      return itens.map((item, idx) => ({
+        numero: idx === 0 ? orc.numero : '',
+        numero_proposta: idx === 0 ? (orc.numero_proposta || '') : '',
+        data: idx === 0 ? (orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '') : '',
+        cliente: idx === 0 ? (orc.cliente_nome || '') : '',
+        empresa: idx === 0 ? (orc.cliente_empresa || '') : '',
+        cpf_cnpj: idx === 0 ? (orc.cnpj_cpf || '') : '',
+        cidade: idx === 0 ? (orc.obra_cidade || '') : '',
+        vendedor: idx === 0 ? (orc.vendedor || '') : '',
+        status: idx === 0 ? (orc.status || '') : '',
+        produto_codigo: item.produto_codigo || '',
+        produto: item.produto || '',
+        quantidade: item.quantidade || '',
+        valor_unitario: item.preco || '',
+        subtotal: idx === 0 ? (orc.subtotal || 0) : '',
+        frete: idx === 0 ? (orc.frete || 0) : '',
+        desconto: idx === 0 ? (orc.desconto_geral || 0) : '',
+        total: idx === 0 ? (orc.total || 0) : '',
+        forma_pagamento: idx === 0 ? (orc.formas_pagamento?.descricao || '') : ''
+      }))
+    })
+
+    // Criar CSV
+    const headers = ['Número', 'Proposta', 'Data', 'Cliente', 'Empresa', 'CPF/CNPJ', 'Cidade', 'Vendedor', 'Status', 'Cód. Produto', 'Produto', 'Qtd', 'Valor Unit.', 'Subtotal', 'Frete', 'Desconto %', 'Total', 'Forma Pagamento']
+    const csvContent = [
+      headers.join(';'),
+      ...dados.map(row => [
+        row.numero,
+        row.numero_proposta,
+        row.data,
+        row.cliente,
+        row.empresa,
+        row.cpf_cnpj,
+        row.cidade,
+        row.vendedor,
+        row.status,
+        row.produto_codigo,
+        row.produto,
+        row.quantidade,
+        row.valor_unitario,
+        row.subtotal,
+        row.frete,
+        row.desconto,
+        row.total,
+        row.forma_pagamento
+      ].join(';'))
+    ].join('\n')
+
+    // Download
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `orcamentos_${format(new Date(), 'yyyy-MM-dd')}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ====================================================================================
+  // CARREGAMENTO INICIAL DE DADOS
+  // ====================================================================================
 
   // ====================================================================================
   // CARREGAMENTO INICIAL DE DADOS
@@ -629,6 +721,13 @@ export default function Orcamentos() {
                 </div>
               </div>
             </div>
+            <button
+              onClick={exportarExcel}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Download size={20} />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
             <button
               onClick={() => navigate('/orcamentos/novo')}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
