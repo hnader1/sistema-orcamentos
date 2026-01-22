@@ -250,18 +250,18 @@ export default function ProdutosAdmin() {
           {produtosFiltrados.map((produto) => (
             <div
               key={produto.id}
-              className={`bg-white border rounded-lg p-4 hover:shadow-md transition-shadow ${
+              className={`bg-white border rounded-lg p-3 hover:shadow-md transition-shadow ${
                 produto.ativo ? 'border-gray-200' : 'border-red-200 bg-red-50'
               }`}
             >
-              <div className="flex items-start justify-between">
+              <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-base font-semibold text-gray-900">
                       {produto.produto}
                     </h3>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
+                      className={`px-1.5 py-0.5 rounded text-xs font-medium ${
                         produto.ativo
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
@@ -271,37 +271,13 @@ export default function ProdutosAdmin() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    <div>
-                      <span className="text-gray-600">Classe:</span>
-                      <p className="font-medium">{produto.classe}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">MPa:</span>
-                      <p className="font-medium">{produto.mpa}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Código:</span>
-                      <p className="font-medium">{produto.codigo_sistema}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Preço:</span>
-                      <p className="font-medium text-green-600">
-                        R$ {parseFloat(produto.preco).toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Unidade:</span>
-                      <p className="font-medium">{produto.unidade || 'Unid.'}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Peso Unit.:</span>
-                      <p className="font-medium">{produto.peso_unitario} kg</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Qtd/Pallet:</span>
-                      <p className="font-medium">{produto.qtd_por_pallet} un</p>
-                    </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                    <span><strong>Classe:</strong> {produto.classe}</span>
+                    <span><strong>MPa:</strong> {produto.mpa}</span>
+                    <span><strong>Cód:</strong> {produto.codigo_sistema}</span>
+                    <span className="text-green-600 font-semibold">R$ {parseFloat(produto.preco).toFixed(2)}/{produto.unidade || 'Unid.'}</span>
+                    <span><strong>Peso:</strong> {produto.peso_unitario} kg</span>
+                    <span><strong>Qtd/Pallet:</strong> {produto.qtd_por_pallet} {produto.unidade || 'Unid.'}</span>
                   </div>
                 </div>
 
