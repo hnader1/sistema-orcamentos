@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   FileText, Plus, Edit, Send, CheckCircle, XCircle, Briefcase,
-  TrendingUp, Calendar, User, PackageCheck
+  TrendingUp, Calendar, User, PackageCheck, CalendarDays
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -21,6 +21,7 @@ export default function Dashboard() {
     lancado: 0,
     finalizado: 0,
     cancelado: 0,
+    entregas: 0,
     total: 0
   })
 
@@ -40,7 +41,7 @@ export default function Dashboard() {
 
       let queryTodos = supabase
         .from('orcamentos')
-        .select('status')
+        .select('status, data_entrega')
         .eq('excluido', false)
 
       // Se for vendedor, filtrar apenas seus orçamentos
@@ -63,6 +64,11 @@ export default function Dashboard() {
 
       if (errorTodos) throw errorTodos
 
+      // Contar entregas (lancado com data_entrega)
+      const entregasCount = todos.filter(o => 
+        o.status === 'lancado' && o.data_entrega
+      ).length
+
       const stats = {
         rascunho: todos.filter(o => o.status === 'rascunho').length,
         enviado: todos.filter(o => o.status === 'enviado').length,
@@ -70,6 +76,7 @@ export default function Dashboard() {
         lancado: todos.filter(o => o.status === 'lancado').length,
         finalizado: todos.filter(o => o.status === 'finalizado').length,
         cancelado: todos.filter(o => o.status === 'cancelado').length,
+        entregas: entregasCount,
         total: todos.length
       }
 
@@ -147,6 +154,16 @@ export default function Dashboard() {
       corFundo: 'bg-red-50',
       corBorda: 'border-red-200',
       quantidade: estatisticas.cancelado
+    },
+    {
+      status: 'entregas',
+      titulo: 'Entregas',
+      icone: CalendarDays,
+      cor: 'from-amber-500 to-amber-600',
+      corFundo: 'bg-amber-50',
+      corBorda: 'border-amber-200',
+      quantidade: estatisticas.entregas,
+      link: '/entregas'
     }
   ]
 
@@ -199,7 +216,7 @@ export default function Dashboard() {
               return (
                 <button
                   key={card.status}
-                  onClick={() => navigate(`/orcamentos/status/${card.status}`)}
+                  onClick={() => navigate(card.link || `/orcamentos/status/${card.status}`)}
                   className={`${card.corFundo} border-2 ${card.corBorda} rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer group`}
                 >
                   <div className="flex items-center justify-between mb-2">
