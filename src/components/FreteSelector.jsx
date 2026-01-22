@@ -28,6 +28,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   const [freteManual, setFreteManual] = useState(false)
   const [valorManualViagem, setValorManualViagem] = useState('')
   const [qtdManualViagens, setQtdManualViagens] = useState(1)
+  const [justificativaFreteManual, setJustificativaFreteManual] = useState('')
   
   const [calculoFrete, setCalculoFrete] = useState(null)
 
@@ -54,6 +55,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         setFreteManual(true)
         setValorManualViagem(freteAtual.valor_manual_viagem || freteAtual.valor_unitario_viagem || '')
         setQtdManualViagens(freteAtual.qtd_manual_viagens || freteAtual.viagens_necessarias || 1)
+        setJustificativaFreteManual(freteAtual.justificativa_frete_manual || freteAtual.observacao_frete_manual || '')
       }
     }
   }, [freteAtual])
@@ -64,7 +66,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
 
   useEffect(() => {
     calcularFrete()
-  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, fretes])
+  }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, justificativaFreteManual, fretes])
 
   const carregarFretes = async () => {
     try {
@@ -192,8 +194,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       return
     }
 
-    // ✅ Se está usando frete manual
-    if (freteManual && valorManualViagem) {
+    // ✅ Se está usando frete manual - só calcula se tiver justificativa
+    if (freteManual && valorManualViagem && justificativaFreteManual) {
       const valorViagem = parseFloat(valorManualViagem) || 0
       const qtdViagens = parseInt(qtdManualViagens) || 1
       const valorTotal = valorViagem * qtdViagens
@@ -220,7 +222,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         frete_manual: true,
         manual: true,
         valor_manual_viagem: valorViagem,
-        qtd_manual_viagens: qtdViagens
+        qtd_manual_viagens: qtdViagens,
+        justificativa_frete_manual: justificativaFreteManual,
+        observacao_frete_manual: justificativaFreteManual
       }
 
       console.log('🚚 [FreteSelector] Frete MANUAL calculado:', resultado)
@@ -550,6 +554,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                     // Limpar valores manuais ao desmarcar
                     setValorManualViagem('')
                     setQtdManualViagens(1)
+                    setJustificativaFreteManual('')
                   }
                 }}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -593,8 +598,30 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                   </div>
                 </div>
 
+                {/* ✅ Justificativa OBRIGATÓRIA para frete manual */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Justificativa do Frete Manual <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={justificativaFreteManual}
+                    onChange={(e) => setJustificativaFreteManual(e.target.value)}
+                    placeholder="Informe o motivo do frete manual (ex: negociação especial, frete já incluso, acordo comercial...)"
+                    rows={2}
+                    className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
+                      !justificativaFreteManual ? 'border-red-300 bg-red-50' : 'border-blue-300'
+                    }`}
+                  />
+                  {!justificativaFreteManual && (
+                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      Justificativa obrigatória para frete manual
+                    </p>
+                  )}
+                </div>
+
                 {/* Valor Total (calculado) */}
-                {valorManualViagem && (
+                {valorManualViagem && justificativaFreteManual && (
                   <div className="pt-3 border-t border-blue-200">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm text-gray-600">Valor por Viagem:</span>
@@ -636,3 +663,4 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     </div>
   )
 }
+
