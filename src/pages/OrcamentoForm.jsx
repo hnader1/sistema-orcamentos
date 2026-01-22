@@ -38,7 +38,22 @@ function OrcamentoForm() {
   const [loading, setLoading] = useState(false)
   const [produtos, setProdutos] = useState([])
   const [vendedores, setVendedores] = useState([])
-  const [produtosSelecionados, setProdutosSelecionados] = useState([])
+  
+  // Estrutura padrão de produto vazio
+  const produtoVazio = {
+    produto_id: '',
+    codigo: '',
+    produto: '',
+    classe: '',
+    mpa: '',
+    quantidade: 1,
+    preco: 0,
+    peso_unitario: 0,
+    qtd_por_pallet: 0,
+    unidade: 'Unid.'
+  }
+  
+  const [produtosSelecionados, setProdutosSelecionados] = useState([{...produtoVazio}])
   const [dadosFrete, setDadosFrete] = useState(null)
   const [mostrarProposta, setMostrarProposta] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(false)
@@ -621,9 +636,9 @@ function OrcamentoForm() {
           unidade: item.unidade || 'Unid.'
         }))
         
-        setProdutosSelecionados(produtosCarregados)
+        setProdutosSelecionados(produtosCarregados.length > 0 ? produtosCarregados : [{...produtoVazio}])
       } else {
-        setProdutosSelecionados([])
+        setProdutosSelecionados([{...produtoVazio}])
       }
 
     } catch (error) {
@@ -775,40 +790,22 @@ function OrcamentoForm() {
   }
 
   const adicionarProduto = () => {
-    setProdutosSelecionados([...produtosSelecionados, {
-      produto_id: '',
-      codigo: '',
-      produto: '',
-      classe: '',
-      mpa: '',
-      quantidade: 1,
-      preco: 0,
-      peso_unitario: 0,
-      qtd_por_pallet: 0,
-      unidade: 'Unid.'
-    }])
+    setProdutosSelecionados([...produtosSelecionados, {...produtoVazio}])
   }
 
   const inserirProdutoEm = (index) => {
-    const novoProduto = {
-      produto_id: '',
-      codigo: '',
-      produto: '',
-      classe: '',
-      mpa: '',
-      quantidade: 1,
-      preco: 0,
-      peso_unitario: 0,
-      qtd_por_pallet: 0,
-      unidade: 'Unid.'
-    }
     const novos = [...produtosSelecionados]
-    novos.splice(index + 1, 0, novoProduto)
+    novos.splice(index + 1, 0, {...produtoVazio})
     setProdutosSelecionados(novos)
   }
 
   const removerProduto = (index) => {
-    setProdutosSelecionados(produtosSelecionados.filter((_, i) => i !== index))
+    // Se só tem 1 produto, limpa ele ao invés de remover
+    if (produtosSelecionados.length === 1) {
+      setProdutosSelecionados([{...produtoVazio}])
+    } else {
+      setProdutosSelecionados(produtosSelecionados.filter((_, i) => i !== index))
+    }
   }
 
   const atualizarProduto = (index, campo, valor) => {
@@ -2001,41 +1998,28 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Produtos</h2>
-            <button
-              onClick={adicionarProduto}
-              disabled={modo !== 'edicao'}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus size={18} />
-              Adicionar Produto
-            </button>
           </div>
 
-          {produtosSelecionados.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-              Clique em "Adicionar Produto" para incluir produtos no orçamento
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 w-10">Item</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
-                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Unid.</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
-                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
-                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
-                    <th className="px-2 py-2 w-16"></th>
-                  </tr>
-                </thead>
-                <tbody>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 w-10">Item</th>
+                  <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
+                  <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
+                  <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
+                  <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd</th>
+                  <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Unid.</th>
+                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Preço</th>
+                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
+                  <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
+                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
+                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
+                  <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
+                  <th className="px-2 py-2 w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
                   {produtosSelecionados.map((item, index) => (
                     <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-2 py-1 text-center text-xs font-semibold text-gray-500">
@@ -2150,7 +2134,6 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                 </tbody>
               </table>
             </div>
-          )}
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
