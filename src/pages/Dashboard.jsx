@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   FileText, Plus, Edit, Send, CheckCircle, XCircle, Briefcase,
-  TrendingUp, Calendar, User
+  TrendingUp, Calendar, User, PackageCheck
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -11,7 +11,7 @@ import Header from '../components/Header'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user, isVendedor } = useAuth()
+  const { user, isVendedor, podeVerTodos } = useAuth()
   const [loading, setLoading] = useState(true)
   const [ultimosOrcamentos, setUltimosOrcamentos] = useState([])
   const [estatisticas, setEstatisticas] = useState({
@@ -19,6 +19,7 @@ export default function Dashboard() {
     enviado: 0,
     aprovado: 0,
     lancado: 0,
+    finalizado: 0,
     cancelado: 0,
     total: 0
   })
@@ -34,7 +35,7 @@ export default function Dashboard() {
       // Query base
       let queryUltimos = supabase
         .from('orcamentos')
-        .select('id, numero, cliente_nome, data_orcamento, status, total')
+        .select('id, numero, numero_proposta, cliente_nome, data_orcamento, status, total')
         .eq('excluido', false)
 
       let queryTodos = supabase
@@ -43,6 +44,7 @@ export default function Dashboard() {
         .eq('excluido', false)
 
       // Se for vendedor, filtrar apenas seus orçamentos
+      // Se for admin ou comercial, ver todos
       if (isVendedor()) {
         queryUltimos = queryUltimos.eq('usuario_id', user.id)
         queryTodos = queryTodos.eq('usuario_id', user.id)
@@ -66,6 +68,7 @@ export default function Dashboard() {
         enviado: todos.filter(o => o.status === 'enviado').length,
         aprovado: todos.filter(o => o.status === 'aprovado').length,
         lancado: todos.filter(o => o.status === 'lancado').length,
+        finalizado: todos.filter(o => o.status === 'finalizado').length,
         cancelado: todos.filter(o => o.status === 'cancelado').length,
         total: todos.length
       }
@@ -84,6 +87,7 @@ export default function Dashboard() {
       'enviado': 'bg-blue-100 text-blue-700',
       'aprovado': 'bg-green-100 text-green-700',
       'lancado': 'bg-purple-100 text-purple-700',
+      'finalizado': 'bg-teal-100 text-teal-700',
       'cancelado': 'bg-red-100 text-red-700'
     }
     return colors[status] || colors.rascunho
@@ -125,6 +129,15 @@ export default function Dashboard() {
       corFundo: 'bg-purple-50',
       corBorda: 'border-purple-200',
       quantidade: estatisticas.lancado
+    },
+    {
+      status: 'finalizado',
+      titulo: 'Finalizados',
+      icone: PackageCheck,
+      cor: 'from-teal-500 to-teal-600',
+      corFundo: 'bg-teal-50',
+      corBorda: 'border-teal-200',
+      quantidade: estatisticas.finalizado
     },
     {
       status: 'cancelado',
@@ -180,26 +193,26 @@ export default function Dashboard() {
             <TrendingUp className="text-gray-600" size={20} />
             <h2 className="text-lg font-semibold text-gray-900">Estatísticas</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {statusCards.map((card) => {
               const IconComponent = card.icone
               return (
                 <button
                   key={card.status}
                   onClick={() => navigate(`/orcamentos/status/${card.status}`)}
-                  className={`${card.corFundo} border-2 ${card.corBorda} rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer group`}
+                  className={`${card.corFundo} border-2 ${card.corBorda} rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer group`}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`p-3 bg-gradient-to-br ${card.cor} rounded-lg shadow-md`}>
-                      <IconComponent className="text-white" size={24} />
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`p-2 bg-gradient-to-br ${card.cor} rounded-lg shadow-md`}>
+                      <IconComponent className="text-white" size={20} />
                     </div>
                     <div className="text-right">
-                      <div className="text-3xl font-bold text-gray-900">
+                      <div className="text-2xl font-bold text-gray-900">
                         {card.quantidade}
                       </div>
                     </div>
                   </div>
-                  <div className="text-sm font-medium text-gray-600 group-hover:text-gray-900">
+                  <div className="text-xs font-medium text-gray-600 group-hover:text-gray-900">
                     {card.titulo}
                   </div>
                 </button>
@@ -250,12 +263,12 @@ export default function Dashboard() {
                       {/* Número */}
                       <div className="flex-shrink-0">
                         <div className="text-lg font-bold">
-  {orc.numero_proposta ? (
-    <span className="text-purple-700">{orc.numero_proposta}</span>
-  ) : (
-    <span className="text-gray-400">{orc.numero}</span>
-  )}
-</div>
+                          {orc.numero_proposta ? (
+                            <span className="text-purple-700">{orc.numero_proposta}</span>
+                          ) : (
+                            <span className="text-gray-400">{orc.numero}</span>
+                          )}
+                        </div>
                         <div className="text-xs text-gray-500">
                           {orc.data_orcamento ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') : '-'}
                         </div>
