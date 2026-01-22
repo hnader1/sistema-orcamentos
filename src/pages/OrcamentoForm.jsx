@@ -789,6 +789,24 @@ function OrcamentoForm() {
     }])
   }
 
+  const inserirProdutoEm = (index) => {
+    const novoProduto = {
+      produto_id: '',
+      codigo: '',
+      produto: '',
+      classe: '',
+      mpa: '',
+      quantidade: 1,
+      preco: 0,
+      peso_unitario: 0,
+      qtd_por_pallet: 0,
+      unidade: 'Unid.'
+    }
+    const novos = [...produtosSelecionados]
+    novos.splice(index + 1, 0, novoProduto)
+    setProdutosSelecionados(novos)
+  }
+
   const removerProduto = (index) => {
     setProdutosSelecionados(produtosSelecionados.filter((_, i) => i !== index))
   }
@@ -2002,6 +2020,7 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
               <table className="w-full text-sm">
                 <thead className="bg-gray-100">
                   <tr>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 w-10">Item</th>
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Produto</th>
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">Classe</th>
                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600">MPa</th>
@@ -2013,12 +2032,15 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
                     <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
-                    <th className="px-2 py-2"></th>
+                    <th className="px-2 py-2 w-16"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {produtosSelecionados.map((item, index) => (
                     <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-2 py-1 text-center text-xs font-semibold text-gray-500">
+                        {index + 1}
+                      </td>
                       <td className="px-2 py-1">
                         <select
                           value={item.produto}
@@ -2104,13 +2126,24 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                         </span>
                       </td>
                       <td className="px-2 py-1">
-                        <button
-                          onClick={() => removerProduto(index)}
-                          disabled={modo !== 'edicao'}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => inserirProdutoEm(index)}
+                            disabled={modo !== 'edicao'}
+                            className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Inserir produto abaixo"
+                          >
+                            <Plus size={16} />
+                          </button>
+                          <button
+                            onClick={() => removerProduto(index)}
+                            disabled={modo !== 'edicao'}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Remover produto"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
