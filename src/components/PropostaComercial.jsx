@@ -186,7 +186,8 @@ export default function PropostaComercial({
       const resultado = await gerarESalvarPdfProposta(
         printRef.current,
         idProposta,
-        dadosOrcamento.numero_proposta || dadosOrcamento.numero
+        dadosOrcamento.numero_proposta || dadosOrcamento.numero,
+        dadosOrcamento.cliente_nome
       )
 
       if (resultado.sucesso) {

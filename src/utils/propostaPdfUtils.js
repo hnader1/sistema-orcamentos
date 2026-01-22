@@ -18,7 +18,7 @@ const BUCKET_NAME = 'propostas-pdf'
  * @param {string} numeroProposta - Número da proposta (ex: NH-26-0014)
  * @returns {Promise<Blob>} - Blob do PDF gerado
  */
-export const gerarPdfBlob = async (elemento, numeroProposta) => {
+export const gerarPdfBlob = async (elemento, numeroProposta, nomeCliente = '') => {
   // Importar html2pdf dinamicamente (para evitar problemas com SSR)
   // Se html2pdf não estiver instalado, retorna erro amigável
   let html2pdf
@@ -30,14 +30,16 @@ export const gerarPdfBlob = async (elemento, numeroProposta) => {
   }
   
   const options = {
-    margin: [10, 10, 10, 10],
-    filename: `Proposta-${numeroProposta}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
+    margin: [5, 5, 5, 5],
+    filename: `Proposta ${numeroProposta} - ${nomeCliente || 'Cliente'}.pdf`.replace(/[^a-zA-Z0-9\s\-\.]/g, ''),
+    image: { type: 'jpeg', quality: 0.95 },
     html2canvas: { 
       scale: 2, 
       useCORS: true,
       logging: false,
-      letterRendering: true
+      letterRendering: true,
+      width: 794,
+      windowWidth: 794
     },
     jsPDF: { 
       unit: 'mm', 
@@ -165,12 +167,12 @@ export const salvarPdfNaProposta = async (propostaId, pdfPath) => {
  * @param {string} numeroProposta - Número da proposta
  * @returns {Promise<{sucesso: boolean, pdfUrl: string|null, error: Error|null}>}
  */
-export const gerarESalvarPdfProposta = async (elemento, propostaId, numeroProposta) => {
+export const gerarESalvarPdfProposta = async (elemento, propostaId, numeroProposta, nomeCliente = '') => {
   try {
     console.log('📄 Gerando PDF da proposta...')
     
     // 1. Gerar o PDF como Blob
-    const pdfBlob = await gerarPdfBlob(elemento, numeroProposta)
+    const pdfBlob = await gerarPdfBlob(elemento, numeroProposta, nomeCliente)
     console.log('✅ PDF gerado com sucesso')
 
     // 2. Fazer upload para o Storage
@@ -207,7 +209,7 @@ export const gerarESalvarPdfProposta = async (elemento, propostaId, numeroPropos
  */
 export const gerarPdfParaEmail = async (elemento, numeroProposta) => {
   try {
-    const pdfBlob = await gerarPdfBlob(elemento, numeroProposta)
+    const pdfBlob = await gerarPdfBlob(elemento, numeroProposta, nomeCliente)
     
     // Converter Blob para Base64 (para enviar via API)
     const base64 = await new Promise((resolve, reject) => {
