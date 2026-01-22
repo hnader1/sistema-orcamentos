@@ -458,11 +458,13 @@ function OrcamentoForm() {
 
       if (error) throw error
 
-      let novoNumero = 'ORC-0001'
+      let novoNumero = 'Rascunho-00001'
       if (data && data.length > 0) {
         const ultimoNumero = data[0].numero
-        const numero = parseInt(ultimoNumero.split('-')[1]) + 1
-        novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
+        // Pega só os números do final, independente do prefixo
+        const match = ultimoNumero.match(/(\d+)$/)
+        const numero = match ? parseInt(match[1]) + 1 : 1
+        novoNumero = `Rascunho-${numero.toString().padStart(5, '0')}`
       }
 
       setFormData(prev => ({ ...prev, numero: novoNumero }))
@@ -908,11 +910,13 @@ function OrcamentoForm() {
 
       if (errorUltimo) throw errorUltimo
 
-      let novoNumero = 'ORC-0001'
+      let novoNumero = 'Rascunho-00001'
       if (ultimoOrc && ultimoOrc.length > 0) {
         const ultimoNumero = ultimoOrc[0].numero
-        const numero = parseInt(ultimoNumero.split('-')[1]) + 1
-        novoNumero = `ORC-${numero.toString().padStart(4, '0')}`
+        // Pega só os números do final, independente do prefixo
+        const match = ultimoNumero.match(/(\d+)$/)
+        const numero = match ? parseInt(match[1]) + 1 : 1
+        novoNumero = `Rascunho-${numero.toString().padStart(5, '0')}`
       }
 
       const subtotal = calcularSubtotal()
@@ -1220,31 +1224,8 @@ const salvarObservacoesInternas = async () => {
         }
       }
 
-      let numeroProposta = formData.numero_proposta
-      
-      if (!numeroProposta) {
-        try {
-          const codigoVendedor = await buscarCodigoVendedor(user?.id)
-          
-          if (!codigoVendedor) {
-            const resposta = confirm(
-              'Você não possui um código de vendedor cadastrado.\n' +
-              'Deseja continuar sem gerar número de proposta?\n\n' +
-              '(Solicite ao administrador para cadastrar seu código de 2 ou 3 letras)'
-            )
-            
-            if (!resposta) {
-              setLoading(false)
-              return
-            }
-          } else {
-            numeroProposta = await gerarNumeroProposta(user?.id, codigoVendedor)
-          }
-        } catch (error) {
-          console.error('❌ Erro ao gerar número de proposta:', error)
-          alert('Erro ao gerar número de proposta. Continuando sem numeração...')
-        }
-      }
+      // Manter número de proposta existente (só é gerado ao clicar em "Gerar Proposta")
+      const numeroProposta = formData.numero_proposta || null
 
       const subtotal = calcularSubtotal()
       const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
