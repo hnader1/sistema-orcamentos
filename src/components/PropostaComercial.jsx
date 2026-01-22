@@ -343,10 +343,11 @@ export default function PropostaComercial({
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={{...styles.th, width: '35%'}}>Material</th>
-                      <th style={{...styles.th, width: '15%'}}>Classe</th>
+                      <th style={{...styles.th, width: '30%'}}>Material</th>
+                      <th style={{...styles.th, width: '12%'}}>Classe</th>
                       <th style={{...styles.th, width: '10%'}}>MPa</th>
                       <th style={{...styles.thRight, width: '10%'}}>Qtd</th>
+                      <th style={{...styles.th, width: '8%'}}>Unid.</th>
                       <th style={{...styles.thRight, width: '15%'}}>Valor Unit.</th>
                       <th style={{...styles.thRight, width: '15%'}}>Total</th>
                     </tr>
@@ -358,6 +359,7 @@ export default function PropostaComercial({
                         <td style={styles.td}>{p.classe || '-'}</td>
                         <td style={styles.td}>{p.mpa || '-'}</td>
                         <td style={styles.tdRight}>{parseFloat(p.quantidade).toLocaleString('pt-BR')}</td>
+                        <td style={styles.td}>{p.unidade || 'Unid.'}</td>
                         <td style={styles.tdRight}>{formatarValor(p.preco)}</td>
                         <td style={{ ...styles.tdRight, fontWeight: 'bold' }}>{formatarValor(p.quantidade * p.preco)}</td>
                       </tr>
