@@ -37,12 +37,27 @@ export default function ProdutosAdmin() {
       const { data, error } = await supabase
         .from('produtos')
         .select('*')
-        .order('produto', { ascending: true })
 
       if (error) throw error
 
-      console.log('✅ Produtos carregados:', data?.length || 0)
-      setProdutos(data || [])
+      // Ordenar por: produto, classe, mpa (numérico)
+      const ordenados = (data || []).sort((a, b) => {
+        // 1. Por nome do produto
+        const nomeCmp = (a.produto || '').localeCompare(b.produto || '', 'pt-BR', { numeric: true })
+        if (nomeCmp !== 0) return nomeCmp
+        
+        // 2. Por classe
+        const classeCmp = (a.classe || '').localeCompare(b.classe || '', 'pt-BR')
+        if (classeCmp !== 0) return classeCmp
+        
+        // 3. Por MPa (numérico)
+        const mpaA = parseFloat((a.mpa || '0').replace(',', '.').replace(/[^0-9.]/g, '')) || 0
+        const mpaB = parseFloat((b.mpa || '0').replace(',', '.').replace(/[^0-9.]/g, '')) || 0
+        return mpaA - mpaB
+      })
+
+      console.log('✅ Produtos carregados:', ordenados.length)
+      setProdutos(ordenados)
     } catch (error) {
       console.error('❌ Erro ao carregar produtos:', error)
       alert('Erro ao carregar produtos: ' + error.message)
