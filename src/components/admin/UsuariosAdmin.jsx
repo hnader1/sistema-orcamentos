@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit2, Power, Search, X, Save, AlertCircle, Eye, EyeOff, Key, RefreshCw } from 'lucide-react'
 import { supabase } from '../../services/supabase'
-import { criarUsuarioAuth, atualizarSenhaUsuario } from '../../services/adminAuth'
 
 export default function UsuariosAdmin() {
   const [usuarios, setUsuarios] = useState([])
@@ -213,9 +212,9 @@ export default function UsuariosAdmin() {
 
       } else {
         // ========== CRIANDO NOVO USUÁRIO ==========
-        console.log('✨ Criando novo usuário via Edge Function...')
+        console.log('✨ Criando novo usuário...')
         
-        // Verificar se email já existe na tabela usuarios
+        // Verificar se email já existe
         const { data: existente } = await supabase
           .from('usuarios')
           .select('id')
@@ -228,22 +227,24 @@ export default function UsuariosAdmin() {
           return
         }
 
-        // Chamar Edge Function que cria no Auth + tabela usuarios
-        const { success, error } = await criarUsuarioAuth({
+        // Criar usuário na tabela
+        const dadosInsert = {
           email: emailLower,
-          password: formData.senha,
+          senha: formData.senha, // Senha em texto (sistema atual)
           nome: formData.nome.trim(),
           tipo: formData.tipo,
           telefone: formData.telefone?.trim() || null,
           ativo: formData.ativo,
           codigo_vendedor: codigo
-        })
-
-        if (!success) {
-          throw new Error(error || 'Erro ao criar usuário')
         }
 
-        console.log('✅ Usuário criado com sucesso!')
+        const { error } = await supabase
+          .from('usuarios')
+          .insert([dadosInsert])
+
+        if (error) throw error
+
+        console.log('✅ Usuário criado!')
         alert('Usuário criado com sucesso! Já pode fazer login.')
       }
 
@@ -257,7 +258,7 @@ export default function UsuariosAdmin() {
     }
   }
 
-  // ========== RESETAR SENHA ==========
+  // ========== RESETAR SENHA (direto na tabela) ==========
   const resetarSenha = async () => {
     if (!novaSenha) {
       alert('Digite a nova senha')
@@ -274,20 +275,16 @@ export default function UsuariosAdmin() {
       return
     }
 
-    if (!usuarioSenha?.auth_id) {
-      alert('Este usuário não está vinculado ao sistema de autenticação. Será necessário recriar o usuário.')
-      return
-    }
-
     try {
       setSalvando(true)
       console.log('🔑 Resetando senha para:', usuarioSenha.email)
 
-      const { success, error } = await atualizarSenhaUsuario(usuarioSenha.auth_id, novaSenha)
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ senha: novaSenha })
+        .eq('id', usuarioSenha.id)
 
-      if (!success) {
-        throw new Error(error || 'Erro ao resetar senha')
-      }
+      if (error) throw error
 
       console.log('✅ Senha resetada com sucesso!')
       alert(`Senha alterada com sucesso para ${usuarioSenha.nome}!`)
@@ -328,6 +325,7 @@ export default function UsuariosAdmin() {
     const labels = {
       admin: 'Administrador',
       comercial: 'Comercial',
+      comercial_interno: 'Comercial Interno',
       vendedor: 'Vendedor'
     }
     return labels[tipo] || tipo
@@ -337,6 +335,7 @@ export default function UsuariosAdmin() {
     const colors = {
       admin: 'bg-red-100 text-red-800',
       comercial: 'bg-blue-100 text-blue-800',
+      comercial_interno: 'bg-indigo-100 text-indigo-800',
       vendedor: 'bg-green-100 text-green-800'
     }
     return colors[tipo] || 'bg-gray-100 text-gray-800'
@@ -368,14 +367,6 @@ export default function UsuariosAdmin() {
             Novo Usuário
           </button>
         </div>
-      </div>
-
-      {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-        <p className="text-sm text-blue-800">
-          <strong>✨ Novo:</strong> Usuários criados aqui já podem fazer login imediatamente! 
-          Use o botão <Key size={14} className="inline" /> para resetar senhas diretamente.
-        </p>
       </div>
 
       {/* Busca */}
@@ -433,11 +424,6 @@ export default function UsuariosAdmin() {
                     >
                       {usuario.ativo ? 'Ativo' : 'Inativo'}
                     </span>
-                    {!usuario.auth_id && (
-                      <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                        ⚠️ Sem Auth
-                      </span>
-                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -597,6 +583,7 @@ export default function UsuariosAdmin() {
                   >
                     <option value="vendedor">Vendedor</option>
                     <option value="comercial">Comercial</option>
+                    <option value="comercial_interno">Comercial Interno</option>
                     <option value="admin">Administrador</option>
                   </select>
                   {erros.tipo && (
@@ -707,53 +694,40 @@ export default function UsuariosAdmin() {
                 <p className="text-sm text-gray-500">{usuarioSenha.email}</p>
               </div>
 
-              {!usuarioSenha.auth_id && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-800">
-                    ⚠️ Este usuário não está vinculado ao sistema de autenticação. 
-                    Será necessário excluí-lo e criar novamente.
-                  </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nova Senha
+                </label>
+                <div className="relative">
+                  <input
+                    type={mostrarSenha ? 'text' : 'password'}
+                    value={novaSenha}
+                    onChange={(e) => setNovaSenha(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 pr-10"
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarSenha(!mostrarSenha)}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {mostrarSenha ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
                 </div>
-              )}
+              </div>
 
-              {usuarioSenha.auth_id && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nova Senha
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={mostrarSenha ? 'text' : 'password'}
-                        value={novaSenha}
-                        onChange={(e) => setNovaSenha(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 pr-10"
-                        placeholder="Mínimo 6 caracteres"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setMostrarSenha(!mostrarSenha)}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {mostrarSenha ? <EyeOff size={20} /> : <Eye size={20} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirmar Nova Senha
-                    </label>
-                    <input
-                      type={mostrarSenha ? 'text' : 'password'}
-                      value={confirmarNovaSenha}
-                      onChange={(e) => setConfirmarNovaSenha(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                      placeholder="Digite a senha novamente"
-                    />
-                  </div>
-                </>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirmar Nova Senha
+                </label>
+                <input
+                  type={mostrarSenha ? 'text' : 'password'}
+                  value={confirmarNovaSenha}
+                  onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  placeholder="Digite a senha novamente"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
@@ -764,16 +738,14 @@ export default function UsuariosAdmin() {
               >
                 Cancelar
               </button>
-              {usuarioSenha.auth_id && (
-                <button
-                  onClick={resetarSenha}
-                  disabled={salvando || !novaSenha}
-                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
-                >
-                  <Key size={20} />
-                  {salvando ? 'Salvando...' : 'Resetar Senha'}
-                </button>
-              )}
+              <button
+                onClick={resetarSenha}
+                disabled={salvando || !novaSenha}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
+              >
+                <Key size={20} />
+                {salvando ? 'Salvando...' : 'Resetar Senha'}
+              </button>
             </div>
           </div>
         </div>
