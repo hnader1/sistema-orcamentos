@@ -1109,7 +1109,10 @@ const salvarObservacoesInternas = async () => {
         setLoading(false)
         return
       }
-
+        if (!dadosEndereco?.obra_cidade) {
+        alert('Cidade é obrigatória!');
+        return;
+        }
       if (!cnpjCpfOk) {
         alert('CNPJ/CPF é obrigatório!\n\nPreencha um CNPJ ou CPF válido, ou marque a opção "Não informar".')
         return
