@@ -1233,8 +1233,22 @@ const salvarObservacoesInternas = async () => {
         }
       }
 
-      // Manter número de proposta existente (só é gerado ao clicar em "Gerar Proposta")
-      const numeroProposta = formData.numero_proposta || null
+      // Manter número de proposta existente ou gerar novo se não existir
+      let numeroProposta = formData.numero_proposta || null
+      
+      // Se não tem numero_proposta ainda, tentar gerar
+      if (!numeroProposta && user?.id) {
+        try {
+          const codigoVendedor = await buscarCodigoVendedor(user.id)
+          if (codigoVendedor) {
+            numeroProposta = await gerarNumeroProposta(user.id, codigoVendedor)
+            console.log('✅ Número de proposta gerado:', numeroProposta)
+          }
+        } catch (erroProposta) {
+          console.warn('⚠️ Não foi possível gerar número de proposta:', erroProposta)
+          // Continua sem numero_proposta - pode ser gerado depois
+        }
+      }
 
       const subtotal = calcularSubtotal()
       const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
