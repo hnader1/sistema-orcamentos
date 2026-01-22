@@ -109,6 +109,7 @@ function OrcamentoForm() {
     status: 'rascunho',
     numero_lancamento_erp: '',
     usuario_id_original: null,
+    usuario_id_selecionado: null,
     cnpj_cpf: null,
     cnpj_cpf_nao_informado: false,
     cnpj_cpf_nao_informado_aceite_data: null,
@@ -353,14 +354,16 @@ function OrcamentoForm() {
         ...prev,
         vendedor: vendedorSelecionado.nome,
         vendedor_telefone: vendedorSelecionado.telefone || '',
-        vendedor_email: vendedorSelecionado.email || ''
+        vendedor_email: vendedorSelecionado.email || '',
+        usuario_id_selecionado: vendedorSelecionado.id // ✅ Guarda o ID do vendedor selecionado
       }))
     } else {
       setFormData(prev => ({
         ...prev,
         vendedor: nomeVendedor,
         vendedor_telefone: '',
-        vendedor_email: ''
+        vendedor_email: '',
+        usuario_id_selecionado: null
       }))
     }
   }
@@ -423,7 +426,8 @@ function OrcamentoForm() {
           ...prev,
           vendedor: user.nome,
           vendedor_telefone: user.telefone,
-          vendedor_email: user.email
+          vendedor_email: user.email,
+          usuario_id_selecionado: user.id // ✅ Novo orçamento pertence ao usuário logado
         }))
       }
     }
@@ -526,6 +530,7 @@ function OrcamentoForm() {
         status: orc.status || 'rascunho',
         numero_lancamento_erp: orc.numero_lancamento_erp || '',
         usuario_id_original: orc.usuario_id,
+        usuario_id_selecionado: orc.usuario_id, // ✅ Inicializa com o dono atual
         cnpj_cpf: orc.cnpj_cpf || null,
         cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
         cnpj_cpf_nao_informado_aceite_data: orc.cnpj_cpf_nao_informado_aceite_data || null,
@@ -1309,10 +1314,25 @@ const salvarObservacoesInternas = async () => {
         data_entrega: formData.data_entrega || null
       }
 
+      // ✅ LÓGICA DE PROPRIETÁRIO DO ORÇAMENTO
+      // - Vendedor: sempre ele mesmo
+      // - Admin/Comercial: usa o vendedor selecionado no dropdown
       if (!id) {
-        dadosOrcamento.usuario_id = user?.id || null
+        // Novo orçamento
+        if (isVendedor()) {
+          dadosOrcamento.usuario_id = user?.id || null
+        } else {
+          // Admin/Comercial escolheu um vendedor
+          dadosOrcamento.usuario_id = formData.usuario_id_selecionado || user?.id || null
+        }
       } else {
-        dadosOrcamento.usuario_id = formData.usuario_id_original
+        // Editando orçamento existente
+        if (isVendedor()) {
+          dadosOrcamento.usuario_id = formData.usuario_id_original
+        } else {
+          // Admin/Comercial pode mudar o proprietário
+          dadosOrcamento.usuario_id = formData.usuario_id_selecionado || formData.usuario_id_original
+        }
       }
 
       if (formData.status === 'lancado' && formData.numero_lancamento_erp) {
@@ -1871,14 +1891,25 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
               <select
                 value={formData.vendedor}
                 onChange={(e) => handleVendedorChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                disabled={modo !== 'edicao'}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  isVendedor() ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+                disabled={modo !== 'edicao' || isVendedor()}
               >
                 <option value="">Selecione...</option>
-                {vendedores.map(v => (
-                  <option key={v.id} value={v.nome}>{v.nome}</option>
-                ))}
+                {isVendedor() ? (
+                  // Vendedor só vê o próprio nome
+                  <option value={user?.nome}>{user?.nome}</option>
+                ) : (
+                  // Admin/Comercial pode escolher qualquer vendedor
+                  vendedores.map(v => (
+                    <option key={v.id} value={v.nome}>{v.nome}</option>
+                  ))
+                )}
               </select>
+              {isVendedor() && (
+                <p className="text-xs text-gray-500 mt-1">🔒 Vendedor não pode alterar</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Validade (dias)</label>
