@@ -17,6 +17,7 @@ import Conflitos from './pages/Conflitos'
 import FormasPagamentoAdmin from './pages/FormasPagamentoAdmin'
 import GerenciarCodigosVendedores from './pages/GerenciarCodigosVendedores'
 import AceiteProposta from './pages/AceiteProposta'
+import Entregas from './pages/Entregas'
 
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
           <Route path="/orcamentos/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
           <Route path="/orcamentos/editar/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
           <Route path="/relatorios/orcamentos" element={<ProtectedRoute><RelatorioOrcamentos /></ProtectedRoute>} />
+          <Route path="/entregas" element={<ProtectedRoute><Entregas /></ProtectedRoute>} />
 
           {/* Rotas Admin - APENAS ADMINISTRADORES */}
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
