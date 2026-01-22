@@ -1,7 +1,7 @@
 // src/pages/OrcamentoForm.jsx
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send, CheckCircle, Edit3, AlertTriangle, Eye } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Lock, FileText, Copy, Send, CheckCircle, Edit3, AlertTriangle, Eye, Download } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import FreteSelector from '../components/FreteSelector'
 import PropostaComercial from '../components/PropostaComercial'
@@ -1358,6 +1358,59 @@ const salvarObservacoesInternas = async () => {
     }
   }
 
+// ====================================================================================
+  // EXPORTAR ORÇAMENTO PARA EXCEL
+  // ====================================================================================
+  const exportarExcel = () => {
+    const dados = [{
+      numero: formData.numero,
+      numero_proposta: formData.numero_proposta || '',
+      data: formData.data_orcamento || '',
+      cliente: formData.cliente_nome || '',
+      empresa: formData.cliente_empresa || '',
+      cpf_cnpj: dadosCNPJCPF?.cnpj_cpf || formData.cnpj_cpf || '',
+      cidade: dadosEndereco?.obra_cidade || '',
+      vendedor: formData.vendedor || '',
+      status: formData.status || '',
+    }]
+
+    const itensData = produtosSelecionados.map(item => ({
+      produto_codigo: item.codigo || '',
+      produto: item.produto || '',
+      quantidade: item.quantidade || '',
+      valor_unitario: item.preco || '',
+      subtotal: (item.quantidade * item.preco) || 0
+    }))
+
+    const headers = ['Cód. Produto', 'Produto', 'Qtd', 'Valor Unit.', 'Subtotal']
+    const csvContent = [
+      `Orçamento: ${formData.numero} | Proposta: ${formData.numero_proposta || '-'} | Cliente: ${formData.cliente_nome || '-'}`,
+      `Vendedor: ${formData.vendedor || '-'} | Data: ${formData.data_orcamento || '-'} | Status: ${formData.status || '-'}`,
+      '',
+      headers.join(';'),
+      ...itensData.map(row => [
+        row.produto_codigo,
+        row.produto,
+        row.quantidade,
+        row.valor_unitario,
+        row.subtotal
+      ].join(';')),
+      '',
+      `Subtotal:;${calcularSubtotal()}`,
+      `Frete:;${dadosFrete?.valor_total_frete || 0}`,
+      `Desconto:;${formData.desconto_geral || 0}%`,
+      `TOTAL:;${calcularTotal()}`
+    ].join('\n')
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `orcamento_${formData.numero || 'novo'}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const podeGerarProposta = () => {
     if (produtosSelecionados.length === 0) return false
     if (!id) return false
@@ -1601,6 +1654,17 @@ const salvarObservacoesInternas = async () => {
               </h1>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Botão Exportar Excel */}
+              <button
+                onClick={exportarExcel}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
+                title="Exportar para Excel"
+              >
+                <Download size={20} />
+                <span className="hidden sm:inline">Exportar</span>
+              </button>
+              
               {/* Botão Duplicar - sempre visível */}
               <button
                 onClick={duplicar}
