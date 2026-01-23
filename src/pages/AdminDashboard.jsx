@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
       let queryOrcamentos = supabase
         .from('orcamentos')
-        .select(`*, usuario:usuarios(id, nome, codigo_vendedor), itens:orcamento_itens(*, produto:produtos(*))`)
+        .select(`*, usuario:usuarios(id, nome, codigo_vendedor), itens:orcamentos_itens(*, produto:produtos(*))`)
         .gte('created_at', inicio)
         .lte('created_at', fim)
         .eq('excluido', false)
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
       const inicio12Meses = subMonths(new Date(), 12).toISOString()
       let queryHistorico = supabase
         .from('orcamentos')
-        .select(`id, created_at, status, valor_total, total, usuario_id, usuario:usuarios(id, nome, codigo_vendedor)`)
+        .select(`id, created_at, status, total, usuario_id, usuario:usuarios(id, nome, codigo_vendedor)`)
         .gte('created_at', inicio12Meses)
         .eq('excluido', false)
 
@@ -903,7 +903,7 @@ export default function AdminDashboard() {
                               <p className="text-sm text-gray-500">{orc.cliente_nome}</p>
                             </div>
                             <div className="text-right">
-                              <p className="font-bold text-green-600">{formatarValor(parseFloat(orc.valor_total) || 0)}</p>
+                              <p className="font-bold text-green-600">{formatarValor(parseFloat(orc.total) || 0)}</p>
                               <p className="text-xs text-gray-500">{orc.usuario?.nome}</p>
                             </div>
                           </div>
