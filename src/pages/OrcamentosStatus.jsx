@@ -7,7 +7,8 @@
 //
 // FUNCIONALIDADES:
 // - Filtragem automática por status (vem da URL: /orcamentos/status/:status)
-// - Busca por número, cliente ou empresa
+// - Busca por número, cliente, empresa, cidade, bairro, ERP, produto
+// - Filtro por vendedor (admin/comercial vê todos, vendedor só os seus)
 // - Ações: Editar e Duplicar
 // - Header personalizado com ícone e cor do status
 // - Permissões: Vendedor vê apenas seus orçamentos, outros veem todos
@@ -40,7 +41,8 @@ export default function OrcamentosStatus() {
   const [orcamentos, setOrcamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
-  const [usuariosMap, setUsuariosMap] = useState({}) // NOVO: mapa de usuários para exibir nome
+  const [filtroVendedor, setFiltroVendedor] = useState('todos')
+  const [usuariosMap, setUsuariosMap] = useState({}) // mapa de usuários para exibir nome
   
   // Estado para o modal de dados da aceitação
   const [modalAceitacao, setModalAceitacao] = useState({
@@ -84,7 +86,7 @@ export default function OrcamentosStatus() {
     carregarUsuarios()
   }, [status, user])
 
-  // NOVO: Carregar mapa de usuários para exibir "aprovado por"
+  // Carregar mapa de usuários para exibir "aprovado por"
   const carregarUsuarios = async () => {
     try {
       const { data, error } = await supabase
@@ -110,10 +112,19 @@ export default function OrcamentosStatus() {
       console.log('📊 Carregando orçamentos com status:', status)
       
       // Query base: busca orçamentos não excluídos com o status específico
-      // ATUALIZADO: incluir data_entrega e aprovado_por
+      // Inclui itens para permitir busca por produto
       let query = supabase
         .from('orcamentos')
-        .select('*, aprovado_por, aprovado_em, data_entrega')
+        .select(`
+          *, 
+          aprovado_por, 
+          aprovado_em, 
+          data_entrega,
+          orcamentos_itens (
+            produto,
+            produto_codigo
+          )
+        `)
         .eq('excluido', false)
         .eq('status', status)
       
@@ -138,17 +149,33 @@ export default function OrcamentosStatus() {
   }
 
   // ====================================================================================
-  // FILTRO DE BUSCA
+  // FILTROS DE BUSCA E VENDEDOR
   // ====================================================================================
+  
+  // Lista de vendedores únicos para o filtro
+  const vendedoresUnicos = [...new Set(orcamentos.map(o => o.vendedor).filter(Boolean))].sort()
+  
   const orcamentosFiltrados = orcamentos.filter(orc => {
-    if (!busca) return true
-    
+    // Filtro de busca por texto (número, cliente, empresa, ERP, cidade, bairro, produto)
     const buscaLower = busca.toLowerCase()
-    return (
+    const matchBusca = !busca || 
       orc.numero?.toLowerCase().includes(buscaLower) ||
+      orc.numero_proposta?.toLowerCase().includes(buscaLower) ||
       orc.cliente_nome?.toLowerCase().includes(buscaLower) ||
-      orc.cliente_empresa?.toLowerCase().includes(buscaLower)
-    )
+      orc.cliente_empresa?.toLowerCase().includes(buscaLower) ||
+      orc.numero_lancamento_erp?.toLowerCase().includes(buscaLower) ||
+      orc.obra_cidade?.toLowerCase().includes(buscaLower) ||
+      orc.obra_bairro?.toLowerCase().includes(buscaLower) ||
+      orc.frete_cidade?.toLowerCase().includes(buscaLower) ||
+      orc.orcamentos_itens?.some(item => 
+        item.produto?.toLowerCase().includes(buscaLower) ||
+        item.produto_codigo?.toLowerCase().includes(buscaLower)
+      )
+    
+    // Filtro de vendedor
+    const matchVendedor = filtroVendedor === 'todos' || orc.vendedor === filtroVendedor
+    
+    return matchBusca && matchVendedor
   })
 
   // ====================================================================================
@@ -358,7 +385,7 @@ export default function OrcamentosStatus() {
     return null
   }
 
-  // NOVO: Função para obter nome do usuário a partir do UUID
+  // Função para obter nome do usuário a partir do UUID
   const getNomeAprovador = (aprovadoPor) => {
     if (!aprovadoPor) return null
     // Se está no mapa, retorna o nome
@@ -431,19 +458,32 @@ export default function OrcamentosStatus() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* ==================================================================== */}
-        {/* CAMPO DE BUSCA */}
+        {/* FILTROS DE BUSCA */}
         {/* ==================================================================== */}
-        <div className="mb-6">
-          <div className="relative">
+        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Buscar por número, cliente ou empresa..."
+              placeholder="Buscar por número, cliente, ERP, cidade, bairro ou produto..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          {/* Filtro por Vendedor - só aparece para admin/comercial */}
+          {!isVendedor() && vendedoresUnicos.length > 1 && (
+            <select
+              value={filtroVendedor}
+              onChange={(e) => setFiltroVendedor(e.target.value)}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="todos">Todos os Vendedores</option>
+              {vendedoresUnicos.map(vendedor => (
+                <option key={vendedor} value={vendedor}>{vendedor}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* ==================================================================== */}
@@ -457,7 +497,7 @@ export default function OrcamentosStatus() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
             <StatusIcon className={`mx-auto ${statusInfo.cor} mb-3`} size={48} />
             <p className="text-gray-500">
-              {busca 
+              {busca || filtroVendedor !== 'todos'
                 ? 'Nenhum orçamento encontrado com esse filtro' 
                 : `Nenhum orçamento ${statusInfo.titulo.toLowerCase()}`
               }
@@ -536,7 +576,7 @@ export default function OrcamentosStatus() {
                             </div>
                           </>
                         )}
-                        {/* NOVO: Aprovado por */}
+                        {/* Aprovado por */}
                         {['aprovado', 'lancado', 'finalizado'].includes(orc.status) && nomeAprovador && (
                           <>
                             <span className="text-gray-300">|</span>
@@ -553,7 +593,7 @@ export default function OrcamentosStatus() {
                     <div className="flex flex-col items-end gap-2">
                       {/* Data de Entrega + Badges de Status e Origem */}
                       <div className="flex items-center gap-2">
-                        {/* NOVO: Data de Entrega com cores */}
+                        {/* Data de Entrega com cores */}
                         {orc.data_entrega && dataEntregaStyle && (
                           <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${dataEntregaStyle.bg} ${dataEntregaStyle.text}`} title="Data de Entrega">
                             <Truck size={12} className={dataEntregaStyle.icon} />
