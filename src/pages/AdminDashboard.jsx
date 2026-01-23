@@ -74,7 +74,6 @@ export default function AdminDashboard() {
   const [orcamentosHistorico, setOrcamentosHistorico] = useState([])
   const [produtos, setProdutos] = useState([])
   const [usuarios, setUsuarios] = useState([])
-  const [metas, setMetas] = useState([])
 
   useEffect(() => {
     if (isAdmin()) {
@@ -133,7 +132,7 @@ export default function AdminDashboard() {
 
       const { data: usuariosData } = await supabase
         .from('usuarios')
-        .select('id, nome, codigo, perfil, meta_mensal')
+        .select('id, nome, codigo, perfil')
         .eq('ativo', true)
         .order('nome')
 
@@ -365,8 +364,7 @@ export default function AdminDashboard() {
     const percentualMes = (diaAtual / diasNoMes) * 100
 
     const vendedoresComMeta = metricas.porVendedor.map(v => {
-      const usuario = usuarios.find(u => u.id === v.id)
-      const meta = usuario?.meta_mensal || 100000 // Meta padrão de R$ 100k
+      const meta = 100000 // Meta padrão de R$ 100k
       const atingido = v.valorLancado
       const percentualAtingido = (atingido / meta) * 100
       const projecao = diaAtual > 0 ? (atingido / diaAtual) * diasNoMes : 0
@@ -396,8 +394,6 @@ export default function AdminDashboard() {
   const conquistas = useMemo(() => {
     if (!metricas || !orcamentos.length) return null
 
-    const hoje = new Date()
-    
     // Maior venda do período
     const maiorVenda = orcamentos.reduce((max, orc) => {
       const valor = parseFloat(orc.valor_total) || parseFloat(orc.total) || 0
@@ -552,7 +548,7 @@ export default function AdminDashboard() {
         ) : !metricas ? (
           <div className="text-center py-12">
             <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Nenhum dado encontrado</p>
+            <p className="text-gray-500">Nenhum dado encontrado para o período selecionado</p>
           </div>
         ) : (
           <>
