@@ -69,15 +69,19 @@ export default function Dashboard() {
         o.status === 'lancado' && o.data_entrega
       ).length
 
+      const rascunhoCount = todos.filter(o => o.status === 'rascunho').length
+      const enviadoCount = todos.filter(o => o.status === 'enviado').length
+
       const stats = {
-        rascunho: todos.filter(o => o.status === 'rascunho').length,
-        enviado: todos.filter(o => o.status === 'enviado').length,
+        rascunho: rascunhoCount,
+        enviado: enviadoCount,
         aprovado: todos.filter(o => o.status === 'aprovado').length,
         lancado: todos.filter(o => o.status === 'lancado').length,
         finalizado: todos.filter(o => o.status === 'finalizado').length,
         cancelado: todos.filter(o => o.status === 'cancelado').length,
         entregas: entregasCount,
-        total: todos.length
+        // Total agora é apenas Rascunhos + Enviados (orçamentos em andamento)
+        total: rascunhoCount + enviadoCount
       }
 
       setEstatisticas(stats)
@@ -320,11 +324,12 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Resumo Total */}
+        {/* Resumo Total - Agora mostra apenas Rascunhos + Enviados */}
         <div className="mt-6 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm opacity-90">Total de Orçamentos</div>
+              <div className="text-xs opacity-70 mt-0.5">Rascunhos + Enviados</div>
               <div className="text-3xl font-bold mt-1">{estatisticas.total}</div>
             </div>
             <FileText size={48} className="opacity-20" />
