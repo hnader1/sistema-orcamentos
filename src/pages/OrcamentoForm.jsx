@@ -769,9 +769,40 @@ function OrcamentoForm() {
     setErroSenha(false)
   }
 
+  // ✅ ORGANIZADO: Argamassa → Blocos → Pisos
   const getProdutosUnicos = () => {
     const unicos = [...new Set(produtos.map(p => p.produto))]
-    return unicos.sort()
+    
+    // Função para determinar o tipo do produto
+    const getTipoProduto = (nome) => {
+      const nomeLower = (nome || '').toLowerCase()
+      // Argamassa - prioridade 1
+      if (nomeLower.includes('argamassa') || nomeLower.includes('reboco') || 
+          nomeLower.includes('contrapiso')) {
+        return 1
+      }
+      // Piso - prioridade 3
+      if (nomeLower.includes('piso') || nomeLower.includes('paver') || 
+          nomeLower.includes('intertravado') || nomeLower.includes('16 faces') ||
+          nomeLower.includes('sextavado')) {
+        return 3
+      }
+      // Bloco - prioridade 2 (padrão)
+      return 2
+    }
+    
+    // Ordenar por tipo e depois alfabeticamente dentro do tipo
+    return unicos.sort((a, b) => {
+      const tipoA = getTipoProduto(a)
+      const tipoB = getTipoProduto(b)
+      
+      if (tipoA !== tipoB) {
+        return tipoA - tipoB
+      }
+      
+      // Mesmo tipo: ordenar alfabeticamente
+      return a.localeCompare(b)
+    })
   }
 
   const getClassesDisponiveis = (nomeProduto) => {
