@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Calendar, ChevronLeft, ChevronRight, X, Eye, Truck,
-  Filter, Package, Layers
+  Filter, Package, Layers, ArrowLeft
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,6 +20,7 @@ export default function Entregas() {
   // Filtros
   const [filtroVendedor, setFiltroVendedor] = useState('todos')
   const [filtroTipo, setFiltroTipo] = useState('todos')
+  const [filtroStatus, setFiltroStatus] = useState('todos') // NOVO: filtro de status
   const [visualizacao, setVisualizacao] = useState('semanal') // 'semanal' ou 'mensal'
   
   // Data atual para navegação
@@ -28,7 +29,7 @@ export default function Entregas() {
   useEffect(() => {
     carregarVendedores()
     carregarEntregas()
-  }, [user, dataAtual, filtroVendedor, filtroTipo])
+  }, [user, dataAtual, filtroVendedor, filtroTipo, filtroStatus])
 
   const carregarVendedores = async () => {
     try {
@@ -52,17 +53,18 @@ export default function Entregas() {
       // Calcular range de datas baseado na visualização
       const { inicio, fim } = calcularRangeDatas()
       
+      // CORRIGIDO: Incluir tanto 'aprovado' quanto 'lancado'
       let query = supabase
         .from('orcamentos')
         .select(`
           id, numero_proposta, cliente_nome, cliente_empresa, vendedor,
-          data_entrega, frete_modalidade, frete_cidade, usuario_id,
+          data_entrega, frete_modalidade, frete_cidade, usuario_id, status,
           obra_cidade, obra_bairro,
           orcamentos_itens (
             produto, classe, mpa, quantidade, unidade
           )
         `)
-        .eq('status', 'lancado')
+        .in('status', ['aprovado', 'lancado']) // CORRIGIDO: inclui aprovado
         .not('data_entrega', 'is', null)
         .gte('data_entrega', inicio)
         .lte('data_entrega', fim)
@@ -73,6 +75,11 @@ export default function Entregas() {
         query = query.eq('usuario_id', user?.id)
       } else if (filtroVendedor !== 'todos') {
         query = query.eq('usuario_id', filtroVendedor)
+      }
+
+      // NOVO: Filtro de status específico
+      if (filtroStatus !== 'todos') {
+        query = query.eq('status', filtroStatus)
       }
 
       const { data, error } = await query
@@ -245,6 +252,15 @@ export default function Entregas() {
     }
   }
 
+  // NOVO: Cor do status
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'aprovado': return { bg: 'bg-green-100', text: 'text-green-800', badge: 'bg-green-500' }
+      case 'lancado': return { bg: 'bg-purple-100', text: 'text-purple-800', badge: 'bg-purple-500' }
+      default: return { bg: 'bg-gray-100', text: 'text-gray-800', badge: 'bg-gray-500' }
+    }
+  }
+
   const getFreteLabel = (modalidade) => {
     switch (modalidade?.toUpperCase()) {
       case 'CIF': return 'CIF com descarga'
@@ -278,7 +294,9 @@ export default function Entregas() {
     const blocos = entregas.filter(e => e.tipo === 'Bloco').length
     const pisos = entregas.filter(e => e.tipo === 'Piso').length
     const argamassas = entregas.filter(e => e.tipo === 'Argamassa').length
-    return { total, blocos, pisos, argamassas }
+    const aprovados = entregas.filter(e => e.status === 'aprovado').length
+    const lancados = entregas.filter(e => e.status === 'lancado').length
+    return { total, blocos, pisos, argamassas, aprovados, lancados }
   }
 
   const nomeDiaSemana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB']
@@ -288,8 +306,16 @@ export default function Entregas() {
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Título */}
+        {/* Título com botão de voltar */}
         <div className="flex items-center gap-3 mb-6">
+          {/* NOVO: Botão de voltar */}
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Voltar"
+          >
+            <ArrowLeft size={24} className="text-gray-600" />
+          </button>
           <div className="p-2 bg-amber-100 rounded-lg">
             <Calendar className="w-6 h-6 text-amber-600" />
           </div>
@@ -300,7 +326,7 @@ export default function Entregas() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
           <div className="flex flex-wrap gap-4 items-end">
             {/* Filtro Vendedor */}
-            <div className="flex-1 min-w-[200px]">
+            <div className="flex-1 min-w-[150px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
               <select
                 value={filtroVendedor}
@@ -314,7 +340,7 @@ export default function Entregas() {
                   <option value={user?.id}>{user?.nome}</option>
                 ) : (
                   <>
-                    <option value="todos">Todos os vendedores</option>
+                    <option value="todos">Todos</option>
                     {vendedores.map(v => (
                       <option key={v.id} value={v.id}>{v.nome}</option>
                     ))}
@@ -323,9 +349,23 @@ export default function Entregas() {
               </select>
             </div>
 
+            {/* NOVO: Filtro Status */}
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="todos">Todos</option>
+                <option value="aprovado">✅ Aprovado</option>
+                <option value="lancado">📦 Lançado</option>
+              </select>
+            </div>
+
             {/* Filtro Tipo */}
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Produto</label>
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
               <select
                 value={filtroTipo}
                 onChange={(e) => setFiltroTipo(e.target.value)}
@@ -431,12 +471,15 @@ export default function Entregas() {
                     ) : (
                       entregasDia.map(entrega => {
                         const cores = getTipoColor(entrega.tipo)
+                        const statusCor = getStatusColor(entrega.status)
                         return (
                           <div
                             key={entrega.id}
                             onClick={() => setEntregaSelecionada(entrega)}
-                            className={`${cores.bg} border-l-4 ${cores.border} rounded p-2 text-xs cursor-pointer hover:shadow-md transition-shadow`}
+                            className={`${cores.bg} border-l-4 ${cores.border} rounded p-2 text-xs cursor-pointer hover:shadow-md transition-shadow relative`}
                           >
+                            {/* Badge de status */}
+                            <span className={`absolute top-1 right-1 w-2 h-2 rounded-full ${statusCor.badge}`} title={entrega.status}></span>
                             <p className={`font-bold ${cores.text}`}>{entrega.numero_proposta}</p>
                             <p className={cores.text}>{entrega.cliente_nome}</p>
                             <span className={`inline-block mt-1 px-1.5 py-0.5 ${cores.bg} ${cores.text} rounded text-[10px]`}>
@@ -482,12 +525,14 @@ export default function Entregas() {
                     <div className="space-y-1">
                       {entregasDia.slice(0, 3).map(entrega => {
                         const cores = getTipoColor(entrega.tipo)
+                        const statusCor = getStatusColor(entrega.status)
                         return (
                           <div
                             key={entrega.id}
                             onClick={() => setEntregaSelecionada(entrega)}
-                            className={`${cores.bg} rounded px-1 py-0.5 text-[10px] ${cores.text} truncate cursor-pointer hover:shadow`}
+                            className={`${cores.bg} rounded px-1 py-0.5 text-[10px] ${cores.text} truncate cursor-pointer hover:shadow relative`}
                           >
+                            <span className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${statusCor.badge}`}></span>
                             {entrega.numero_proposta}
                           </div>
                         )
@@ -517,6 +562,15 @@ export default function Entregas() {
             <span className="w-4 h-4 bg-orange-500 rounded"></span>
             <span className="text-gray-600">Argamassa</span>
           </div>
+          <span className="text-gray-300">|</span>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+            <span className="text-gray-600">Aprovado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
+            <span className="text-gray-600">Lançado</span>
+          </div>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-gray-500">Clique em uma entrega para ver detalhes</span>
           </div>
@@ -524,10 +578,18 @@ export default function Entregas() {
 
         {/* Resumo */}
         {visualizacao === 'semanal' && (
-          <div className="mt-6 grid grid-cols-4 gap-4">
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-gray-50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-gray-900">{resumoSemana().total}</p>
-              <p className="text-sm text-gray-500">Entregas na semana</p>
+              <p className="text-sm text-gray-500">Total</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-green-600">{resumoSemana().aprovados}</p>
+              <p className="text-sm text-gray-500">Aprovados</p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-purple-600">{resumoSemana().lancados}</p>
+              <p className="text-sm text-gray-500">Lançados</p>
             </div>
             <div className="bg-blue-50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-blue-600">{resumoSemana().blocos}</p>
@@ -567,6 +629,12 @@ export default function Entregas() {
                 <span className="text-gray-500">Proposta:</span>
                 <span className={`font-semibold ${getTipoColor(entregaSelecionada.tipo).text}`}>
                   {entregaSelecionada.numero_proposta}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Status:</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(entregaSelecionada.status).bg} ${getStatusColor(entregaSelecionada.status).text}`}>
+                  {entregaSelecionada.status?.toUpperCase()}
                 </span>
               </div>
               <div className="flex justify-between">

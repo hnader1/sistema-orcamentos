@@ -13,6 +13,8 @@
 // - Permissões: Vendedor vê apenas seus orçamentos, outros veem todos
 // - NOVO: Badge de origem da aprovação (Link/Manual)
 // - NOVO: Botão Ver Dados da Aceitação (Admin/Comercial Interno)
+// - NOVO: Data de entrega visível na listagem
+// - NOVO: Aprovado por (busca nome do usuário)
 //
 // STATUS SUPORTADOS:
 // - rascunho, enviado, aprovado, lancado, cancelado
@@ -23,7 +25,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { 
   ArrowLeft, Search, Edit2, Copy, FileText, Calendar, User, DollarSign,
   Edit, Send, CheckCircle, XCircle, Briefcase, MapPin, PackageCheck,
-  Link as LinkIcon, Hand, ClipboardList
+  Link as LinkIcon, Hand, ClipboardList, Truck
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { format } from 'date-fns'
@@ -38,6 +40,7 @@ export default function OrcamentosStatus() {
   const [orcamentos, setOrcamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
+  const [usuariosMap, setUsuariosMap] = useState({}) // NOVO: mapa de usuários para exibir nome
   
   // Estado para o modal de dados da aceitação
   const [modalAceitacao, setModalAceitacao] = useState({
@@ -49,11 +52,57 @@ export default function OrcamentosStatus() {
   const podeVerDadosAceitacao = () => isAdmin() || isComercialInterno()
 
   // ====================================================================================
+  // FUNÇÃO PARA COR DA DATA DE ENTREGA
+  // ====================================================================================
+  const getDataEntregaStyle = (dataEntrega) => {
+    if (!dataEntrega) return null
+    
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    
+    const entrega = new Date(dataEntrega + 'T00:00:00')
+    
+    const diffDias = Math.floor((entrega - hoje) / (1000 * 60 * 60 * 24))
+    
+    if (diffDias < 0) {
+      // Passou - cinza
+      return { bg: 'bg-gray-100', text: 'text-gray-500', icon: 'text-gray-400' }
+    } else if (diffDias === 0) {
+      // Hoje - vermelho
+      return { bg: 'bg-red-100', text: 'text-red-700', icon: 'text-red-500' }
+    } else {
+      // Futuro - verde
+      return { bg: 'bg-green-100', text: 'text-green-700', icon: 'text-green-500' }
+    }
+  }
+
+  // ====================================================================================
   // CARREGAMENTO INICIAL DE DADOS
   // ====================================================================================
   useEffect(() => {
     carregarOrcamentos()
+    carregarUsuarios()
   }, [status, user])
+
+  // NOVO: Carregar mapa de usuários para exibir "aprovado por"
+  const carregarUsuarios = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+      
+      if (error) throw error
+      
+      // Criar mapa id -> nome
+      const mapa = {}
+      data?.forEach(u => {
+        mapa[u.id] = u.nome
+      })
+      setUsuariosMap(mapa)
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error)
+    }
+  }
 
   const carregarOrcamentos = async () => {
     try {
@@ -61,9 +110,10 @@ export default function OrcamentosStatus() {
       console.log('📊 Carregando orçamentos com status:', status)
       
       // Query base: busca orçamentos não excluídos com o status específico
+      // ATUALIZADO: incluir data_entrega e aprovado_por
       let query = supabase
         .from('orcamentos')
-        .select('*')
+        .select('*, aprovado_por, aprovado_em, data_entrega')
         .eq('excluido', false)
         .eq('status', status)
       
@@ -156,6 +206,8 @@ export default function OrcamentosStatus() {
         lancado_por: null,
         usuario_id: user?.id || null,
         aprovado_via: null, // Reset aprovação
+        aprovado_por: null,
+        aprovado_em: null,
         created_at: undefined,
         updated_at: undefined
       }
@@ -306,6 +358,21 @@ export default function OrcamentosStatus() {
     return null
   }
 
+  // NOVO: Função para obter nome do usuário a partir do UUID
+  const getNomeAprovador = (aprovadoPor) => {
+    if (!aprovadoPor) return null
+    // Se está no mapa, retorna o nome
+    if (usuariosMap[aprovadoPor]) {
+      return usuariosMap[aprovadoPor]
+    }
+    // Se não é UUID, assume que já é nome
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(aprovadoPor)) {
+      return aprovadoPor
+    }
+    return null
+  }
+
   const statusInfo = getStatusInfo(status)
   const StatusIcon = statusInfo.icone
 
@@ -398,115 +465,138 @@ export default function OrcamentosStatus() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3">
-            {orcamentosFiltrados.map((orc) => (
-              <div 
-                key={orc.id} 
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  {/* Coluna Esquerda: Informações do Orçamento */}
-                  <div className="flex-1 min-w-0">
-                    {/* Linha 1: Número • Nome do Cliente */}
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <h3 className="text-base font-bold text-gray-900">
-                        {orc.numero_proposta ? (
-                          <span className="text-purple-700">{orc.numero_proposta}</span>
-                        ) : (
-                          <span className="text-gray-400">#{orc.numero}</span>
+            {orcamentosFiltrados.map((orc) => {
+              const nomeAprovador = getNomeAprovador(orc.aprovado_por)
+              const dataEntregaStyle = getDataEntregaStyle(orc.data_entrega)
+              
+              return (
+                <div 
+                  key={orc.id} 
+                  className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Coluna Esquerda: Informações do Orçamento */}
+                    <div className="flex-1 min-w-0">
+                      {/* Linha 1: Número • Nome do Cliente */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h3 className="text-base font-bold text-gray-900">
+                          {orc.numero_proposta ? (
+                            <span className="text-purple-700">{orc.numero_proposta}</span>
+                          ) : (
+                            <span className="text-gray-400">#{orc.numero}</span>
+                          )}
+                        </h3>
+                        <span className="text-blue-600 font-semibold">•</span>
+                        <span className="text-gray-700 font-medium truncate">
+                          {orc.cliente_nome || 'Sem cliente'}
+                        </span>
+                        {/* Badge ERP se existir */}
+                        {orc.numero_lancamento_erp && (
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-medium border border-purple-200">
+                            ERP: {orc.numero_lancamento_erp}
+                          </span>
                         )}
-                      </h3>
-                      <span className="text-blue-600 font-semibold">•</span>
-                      <span className="text-gray-700 font-medium truncate">
-                        {orc.cliente_nome || 'Sem cliente'}
-                      </span>
-                      {/* Badge ERP se existir */}
-                      {orc.numero_lancamento_erp && (
-                        <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-medium border border-purple-200">
-                          ERP: {orc.numero_lancamento_erp}
-                        </span>
-                      )}
+                      </div>
+                      
+                      {/* Linha 2: Cidade | Valor | Data | Vendedor | Aprovado por */}
+                      <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
+                        {orc.obra_cidade && (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <MapPin size={14} className="text-gray-400" />
+                              <span>{orc.obra_cidade}</span>
+                            </div>
+                            <span className="text-gray-300">|</span>
+                          </>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <DollarSign size={14} className="text-blue-500" />
+                          <span className="font-semibold text-gray-900">
+                            R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { 
+                              minimumFractionDigits: 2 
+                            })}
+                          </span>
+                        </div>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-1">
+                          <Calendar size={14} className="text-gray-400" />
+                          <span>
+                            {orc.data_orcamento 
+                              ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') 
+                              : '-'
+                            }
+                          </span>
+                        </div>
+                        {orc.vendedor && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                              <User size={14} className="text-gray-400" />
+                              <span className="text-xs">{orc.vendedor}</span>
+                            </div>
+                          </>
+                        )}
+                        {/* NOVO: Aprovado por */}
+                        {['aprovado', 'lancado', 'finalizado'].includes(orc.status) && nomeAprovador && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                              <CheckCircle size={14} className="text-green-500" />
+                              <span className="text-xs text-green-700">por {nomeAprovador}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                     
-                    {/* Linha 2: Cidade | Valor | Data | Vendedor */}
-                    <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-                      {orc.obra_cidade && (
-                        <>
-                          <div className="flex items-center gap-1">
-                            <MapPin size={14} className="text-gray-400" />
-                            <span>{orc.obra_cidade}</span>
+                    {/* Coluna Direita: Data Entrega + Badge Status + Badge Origem + Botões de Ação */}
+                    <div className="flex flex-col items-end gap-2">
+                      {/* Data de Entrega + Badges de Status e Origem */}
+                      <div className="flex items-center gap-2">
+                        {/* NOVO: Data de Entrega com cores */}
+                        {orc.data_entrega && dataEntregaStyle && (
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${dataEntregaStyle.bg} ${dataEntregaStyle.text}`} title="Data de Entrega">
+                            <Truck size={12} className={dataEntregaStyle.icon} />
+                            {format(new Date(orc.data_entrega + 'T00:00:00'), 'dd/MM/yy')}
                           </div>
-                          <span className="text-gray-300">|</span>
-                        </>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <DollarSign size={14} className="text-blue-500" />
-                        <span className="font-semibold text-gray-900">
-                          R$ {parseFloat(orc.total || 0).toLocaleString('pt-BR', { 
-                            minimumFractionDigits: 2 
-                          })}
-                        </span>
+                        )}
+                        {getStatusBadge(orc.status)}
+                        {/* Badge de aprovação em aprovado, lançado e finalizado */}
+                        {['aprovado', 'lancado', 'finalizado'].includes(orc.status) && getAprovadoViaBadge(orc.aprovado_via)}
                       </div>
-                      <span className="text-gray-300">|</span>
-                      <div className="flex items-center gap-1">
-                        <Calendar size={14} className="text-gray-400" />
-                        <span>
-                          {orc.data_orcamento 
-                            ? format(new Date(orc.data_orcamento), 'dd/MM/yyyy') 
-                            : '-'
-                          }
-                        </span>
-                      </div>
-                      {orc.vendedor && (
-                        <>
-                          <span className="text-gray-300">|</span>
-                          <div className="flex items-center gap-1">
-                            <User size={14} className="text-gray-400" />
-                            <span className="text-xs">{orc.vendedor}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Coluna Direita: Badge Status + Badge Origem + Botões de Ação */}
-                  <div className="flex flex-col items-end gap-2">
-                    {/* Badges de Status e Origem */}
-                    <div className="flex items-center gap-2">
-                      {getStatusBadge(orc.status)}
-                      {orc.status === 'aprovado' && getAprovadoViaBadge(orc.aprovado_via)}
-                    </div>
-                    
-                    {/* Botões de Ação */}
-                    <div className="flex gap-2">
-                      {/* Botão Ver Dados da Aceitação (só para Admin/Comercial + status aprovado) */}
-                      {orc.status === 'aprovado' && podeVerDadosAceitacao() && (
+                      
+                      {/* Botões de Ação */}
+                      <div className="flex gap-2">
+                        {/* Botão Ver Dados da Aceitação (em aprovado, lançado e finalizado) */}
+                        {['aprovado', 'lancado', 'finalizado'].includes(orc.status) && podeVerDadosAceitacao() && (
+                          <button
+                            onClick={() => abrirModalAceitacao(orc.id)}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Ver Dados da Aceitação"
+                          >
+                            <ClipboardList size={18} />
+                          </button>
+                        )}
                         <button
-                          onClick={() => abrirModalAceitacao(orc.id)}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Ver Dados da Aceitação"
+                          onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar"
                         >
-                          <ClipboardList size={18} />
+                          <Edit2 size={20} />
                         </button>
-                      )}
-                      <button
-                        onClick={() => navigate(`/orcamentos/editar/${orc.id}`)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 size={20} />
-                      </button>
-                      <button
-                        onClick={() => duplicar(orc.id)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Duplicar"
-                      >
-                        <Copy size={20} />
-                      </button>
+                        <button
+                          onClick={() => duplicar(orc.id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Duplicar"
+                        >
+                          <Copy size={20} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

@@ -14,12 +14,14 @@ import {
   UserCheck,
   Link as LinkIcon,
   Monitor,
-  MapPin
+  MapPin,
+  Truck
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 
 function HistoricoAprovacao({ orcamentoId, status }) {
   const [dados, setDados] = useState(null)
+  const [nomeUsuario, setNomeUsuario] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,12 +34,32 @@ function HistoricoAprovacao({ orcamentoId, status }) {
     try {
       const { data, error } = await supabase
         .from('orcamentos')
-        .select('aprovado_via, aprovado_em, aprovado_por, aprovacao_historico, aceite_ip, aceite_navegador')
+        .select('aprovado_via, aprovado_em, aprovado_por, aprovacao_historico, aceite_ip, aceite_navegador, data_entrega')
         .eq('id', orcamentoId)
         .single()
 
       if (error) throw error
       setDados(data)
+
+      // Se aprovado_por é um UUID válido, buscar o nome do usuário
+      if (data?.aprovado_por && data.aprovado_via !== 'cliente') {
+        // Verificar se parece ser um UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (uuidRegex.test(data.aprovado_por)) {
+          const { data: usuario, error: errorUsuario } = await supabase
+            .from('usuarios')
+            .select('nome')
+            .eq('id', data.aprovado_por)
+            .single()
+          
+          if (!errorUsuario && usuario) {
+            setNomeUsuario(usuario.nome)
+          }
+        } else {
+          // Se não é UUID, assumir que já é o nome
+          setNomeUsuario(data.aprovado_por)
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar dados de aprovação:', error)
     } finally {
@@ -63,6 +85,11 @@ function HistoricoAprovacao({ orcamentoId, status }) {
 
   const isAprovacaoCliente = dados.aprovado_via === 'cliente'
   const historico = dados.aprovacao_historico || {}
+
+  // Nome a exibir: nome buscado do banco ou valor original
+  const nomeExibir = isAprovacaoCliente 
+    ? dados.aprovado_por 
+    : (nomeUsuario || dados.aprovado_por)
 
   return (
     <div className={`rounded-xl border-2 p-4 mb-6 ${
@@ -93,12 +120,12 @@ function HistoricoAprovacao({ orcamentoId, status }) {
           </h3>
 
           <div className="mt-3 space-y-2">
-            {/* Data/hora */}
+            {/* Data/hora da aprovação */}
             {dados.aprovado_em && (
               <div className="flex items-center gap-2 text-sm">
                 <Calendar size={16} className="text-gray-500" />
                 <span className="text-gray-700">
-                  {new Date(dados.aprovado_em).toLocaleString('pt-BR', {
+                  Aprovado em: {new Date(dados.aprovado_em).toLocaleString('pt-BR', {
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric',
@@ -109,13 +136,25 @@ function HistoricoAprovacao({ orcamentoId, status }) {
               </div>
             )}
 
-            {/* Quem aprovou */}
-            {dados.aprovado_por && (
+            {/* Quem aprovou - CORRIGIDO: exibe nome ao invés de UUID */}
+            {nomeExibir && (
               <div className="flex items-center gap-2 text-sm">
                 <User size={16} className="text-gray-500" />
                 <span className="text-gray-700">
                   {isAprovacaoCliente ? 'Cliente: ' : 'Aprovado por: '}
-                  <strong>{dados.aprovado_por}</strong>
+                  <strong>{nomeExibir}</strong>
+                </span>
+              </div>
+            )}
+
+            {/* Data de Entrega - NOVO */}
+            {dados.data_entrega && (
+              <div className="flex items-center gap-2 text-sm">
+                <Truck size={16} className="text-amber-500" />
+                <span className="text-gray-700">
+                  Data de Entrega: <strong className="text-amber-700">
+                    {new Date(dados.data_entrega + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  </strong>
                 </span>
               </div>
             )}
