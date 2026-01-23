@@ -26,6 +26,16 @@ import {
   prepararEdicaoComRevisao 
 } from '../utils/revisaoUtils'
 
+// ✅ NOVOS IMPORTS PARA EMBUTIR VALORES
+import EmbutirValoresControles from '../components/EmbutirValoresControles'
+import { 
+  calcularDescontoUnitario, 
+  calcularFreteUnitario, 
+  calcularTotalUnidades,
+  calcularPrecoComEmbutido,
+  calcularTotaisComEmbutido
+} from '../utils/embutirValoresUtils'
+
 const TABELA_ITENS = 'orcamentos_itens'
 
 // ✅ STATUS QUE BLOQUEIAM EDIÇÃO TOTAL (exceto ERP para admin)
@@ -85,6 +95,10 @@ function OrcamentoForm() {
   const [dadosOriginais, setDadosOriginais] = useState(null) // Snapshot ao carregar
   const [motivoRevisao, setMotivoRevisao] = useState('')
   const [mostrarModalRevisao, setMostrarModalRevisao] = useState(false)
+
+  // ✅ NOVOS ESTADOS PARA EMBUTIR VALORES
+  const [descontoEmbutido, setDescontoEmbutido] = useState(false)
+  const [freteEmbutido, setFreteEmbutido] = useState(false)
   
   const [formData, setFormData] = useState({
     numero: '',
@@ -574,6 +588,10 @@ function OrcamentoForm() {
       // ✅ NOVO: Carregar revisão atual
       setRevisaoAtual(orc.revisao || 0)
 
+      // ✅ NOVO: Carregar estados de embutido
+      setDescontoEmbutido(orc.desconto_embutido || false)
+      setFreteEmbutido(orc.frete_embutido || false)
+
       setDadosCNPJCPF({
         cnpj_cpf: orc.cnpj_cpf || null,
         cnpj_cpf_nao_informado: orc.cnpj_cpf_nao_informado || false,
@@ -769,6 +787,47 @@ function OrcamentoForm() {
     setErroSenha(false)
   }
 
+  // ✅ NOVA FUNÇÃO: Validar senha admin para frete embutido
+  const validarSenhaAdmin = async (usuario, senha) => {
+    try {
+      const { data: usuarios, error } = await supabase
+        .from('usuarios')
+        .select('id, nome, email, senha, senha_hash, tipo')
+        .eq('ativo', true)
+
+      if (error) throw error
+
+      const inputLower = usuario.toLowerCase().trim()
+      
+      const usuarioEncontrado = usuarios?.find(u => {
+        const nomeLower = (u.nome || '').toLowerCase().trim()
+        const emailLower = (u.email || '').toLowerCase().trim()
+        return nomeLower === inputLower || emailLower === inputLower || 
+               nomeLower.includes(inputLower) || emailLower.includes(inputLower)
+      })
+
+      if (!usuarioEncontrado) {
+        return { sucesso: false, erro: 'Usuário não encontrado' }
+      }
+
+      // Só admin pode liberar frete embutido
+      const tipoLower = (usuarioEncontrado.tipo || '').toLowerCase().trim()
+      if (!['admin', 'administrador'].includes(tipoLower)) {
+        return { sucesso: false, erro: 'Usuário não é administrador' }
+      }
+
+      const senhaCorreta = usuarioEncontrado.senha_hash || usuarioEncontrado.senha
+      if (!senhaCorreta || senhaCorreta !== senha) {
+        return { sucesso: false, erro: 'Senha incorreta' }
+      }
+
+      return { sucesso: true, usuario: usuarioEncontrado }
+    } catch (error) {
+      console.error('Erro ao validar senha:', error)
+      return { sucesso: false, erro: error.message }
+    }
+  }
+
   // ✅ ORGANIZADO: Argamassa → Blocos → Pisos
   const getProdutosUnicos = () => {
     const unicos = [...new Set(produtos.map(p => p.produto))]
@@ -926,18 +985,73 @@ function OrcamentoForm() {
     }, 0)
   }
 
-  const calcularSubtotal = () => {
+  // ✅ NOVAS FUNÇÕES PARA CÁLCULO COM EMBUTIDO
+
+  // Função para calcular total de unidades
+  const calcularTotalUnidadesProdutos = () => {
+    return produtosSelecionados.reduce((total, item) => {
+      return total + (parseInt(item.quantidade) || 0)
+    }, 0)
+  }
+
+  // Função para calcular frete unitário
+  const getFreteUnitario = () => {
+    const freteTotal = dadosFrete?.valor_total_frete || 0
+    const totalUnidades = calcularTotalUnidadesProdutos()
+    if (freteTotal <= 0 || totalUnidades <= 0) return 0
+    return freteTotal / totalUnidades
+  }
+
+  // Função para calcular desconto unitário de um produto
+  const getDescontoUnitario = (precoOriginal) => {
+    if (!descontoEmbutido || !formData.desconto_geral) return 0
+    return parseFloat(precoOriginal) * (parseFloat(formData.desconto_geral) / 100)
+  }
+
+  // Função para calcular subtotal de um item (considerando embutido)
+  const calcularSubtotalItem = (item) => {
+    const quantidade = parseInt(item.quantidade) || 0
+    const precoOriginal = parseFloat(item.preco) || 0
+    
+    if (!descontoEmbutido && !freteEmbutido) {
+      return quantidade * precoOriginal
+    }
+    
+    const descontoUnit = descontoEmbutido ? getDescontoUnitario(precoOriginal) : 0
+    const freteUnit = freteEmbutido ? getFreteUnitario() : 0
+    
+    // Ordem: 1) desconto no preço, 2) adiciona frete (sem desconto)
+    const precoComDesconto = precoOriginal - descontoUnit
+    const precoFinal = precoComDesconto + freteUnit
+    
+    return quantidade * precoFinal
+  }
+
+  // Função auxiliar para calcular subtotal sem embutido (para comparação)
+  const calcularSubtotalProdutosSemEmbutido = () => {
     return produtosSelecionados.reduce((sum, item) => {
       return sum + (item.quantidade * item.preco)
     }, 0)
   }
 
+  // ✅ MODIFICADO: calcularSubtotal considerando embutido
+  const calcularSubtotal = () => {
+    return produtosSelecionados.reduce((sum, item) => {
+      return sum + calcularSubtotalItem(item)
+    }, 0)
+  }
+
+  // ✅ MODIFICADO: calcularTotal considerando embutido
   const calcularTotal = () => {
     const subtotal = calcularSubtotal()
-    const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-    const subtotalComDesconto = subtotal - desconto
-    const frete = dadosFrete?.valor_total_frete || 0
-    return subtotalComDesconto + frete
+    
+    // Se desconto embutido, não subtrai novamente
+    const desconto = descontoEmbutido ? 0 : (calcularSubtotalProdutosSemEmbutido() * (formData.desconto_geral || 0)) / 100
+    
+    // Se frete embutido, não adiciona novamente
+    const frete = freteEmbutido ? 0 : (dadosFrete?.valor_total_frete || 0)
+    
+    return subtotal - desconto + frete
   }
 
   const duplicar = async () => {
@@ -1020,7 +1134,10 @@ function OrcamentoForm() {
         desconto_liberado_por: null,
         desconto_liberado_por_id: null,
         desconto_liberado_em: null,
-        desconto_valor_liberado: null
+        desconto_valor_liberado: null,
+        // ✅ NOVO: Resetar embutido na duplicação
+        desconto_embutido: false,
+        frete_embutido: false
       }
 
       const { data: orcCriado, error: errorCriar } = await supabase
@@ -1289,9 +1406,9 @@ const salvarObservacoesInternas = async () => {
       }
 
       const subtotal = calcularSubtotal()
-      const desconto = (subtotal * (formData.desconto_geral || 0)) / 100
-      const subtotalComDesconto = subtotal - desconto
-      const frete = dadosFrete?.valor_total_frete || 0
+      const desconto = descontoEmbutido ? 0 : (calcularSubtotalProdutosSemEmbutido() * (formData.desconto_geral || 0)) / 100
+      const subtotalComDesconto = calcularSubtotalProdutosSemEmbutido() - desconto
+      const frete = freteEmbutido ? 0 : (dadosFrete?.valor_total_frete || 0)
       const total = subtotalComDesconto + frete
 
       const dadosOrcamento = {
@@ -1313,7 +1430,7 @@ const salvarObservacoesInternas = async () => {
         prazo_entrega: formData.prazo_entrega,
         desconto_geral: parseFloat(formData.desconto_geral),
         subtotal: subtotalComDesconto,
-        frete: frete,
+        frete: dadosFrete?.valor_total_frete || 0,
         frete_modalidade: dadosFrete?.modalidade || 'FOB',
         frete_qtd_viagens: dadosFrete?.viagens_necessarias || 0,
         frete_valor_viagem: dadosFrete?.valor_unitario_viagem || 0,
@@ -1344,7 +1461,10 @@ const salvarObservacoesInternas = async () => {
         desconto_liberado_por_id: formData.desconto_liberado_por_id || null,
         desconto_liberado_em: formData.desconto_liberado_em || null,
         desconto_valor_liberado: formData.desconto_liberado ? parseFloat(formData.desconto_geral) : null,
-        data_entrega: formData.data_entrega || null
+        data_entrega: formData.data_entrega || null,
+        // ✅ NOVO: Campos de embutido
+        desconto_embutido: descontoEmbutido,
+        frete_embutido: freteEmbutido
       }
 
       // ✅ LÓGICA DE PROPRIETÁRIO DO ORÇAMENTO
@@ -1596,7 +1716,10 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
   const getDadosOrcamentoParaProposta = () => {
     return {
       ...formData,
-      id: id
+      id: id,
+      // ✅ NOVO: Passar dados de embutido para PropostaComercial
+      desconto_embutido: descontoEmbutido,
+      frete_embutido: freteEmbutido
     }
   }
 
@@ -2094,6 +2217,7 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+              {/* ✅ CABEÇALHO DA TABELA - MODIFICADO COM COLUNAS CONDICIONAIS */}
               <thead className="bg-gray-100">
                 <tr>
                   <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 w-10">Item</th>
@@ -2106,13 +2230,36 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                   <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Unit.</th>
                   <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Qtd/Pallet</th>
                   <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Peso Total</th>
+                  
+                  {/* COLUNA FRETE - só aparece quando embutido */}
+                  {freteEmbutido && (
+                    <th className="px-2 py-2 text-right text-xs font-semibold text-indigo-600 bg-indigo-50">
+                      Frete Unit.
+                    </th>
+                  )}
+                  
+                  {/* COLUNA DESCONTO - só aparece quando embutido */}
+                  {descontoEmbutido && (
+                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-600 bg-green-50">
+                      Desc. Unit.
+                    </th>
+                  )}
+                  
                   <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600">Subtotal</th>
                   <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600">Pallets</th>
                   <th className="px-2 py-2 w-16"></th>
                 </tr>
               </thead>
+              
+              {/* ✅ CORPO DA TABELA - MODIFICADO COM COLUNAS CONDICIONAIS */}
               <tbody>
-                  {produtosSelecionados.map((item, index) => (
+                {produtosSelecionados.map((item, index) => {
+                  const precoOriginal = parseFloat(item.preco) || 0
+                  const descontoUnit = descontoEmbutido ? getDescontoUnitario(precoOriginal) : 0
+                  const freteUnit = freteEmbutido ? getFreteUnitario() : 0
+                  const subtotalItem = calcularSubtotalItem(item)
+                  
+                  return (
                     <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-2 py-1 text-center text-xs font-semibold text-gray-500">
                         {index + 1}
@@ -2189,9 +2336,24 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                           ? `${((item.peso_unitario * item.quantidade) / 1000).toFixed(2)} ton` 
                           : '-'} 
                       </td>
+                      
+                      {/* COLUNA FRETE UNITÁRIO - só aparece quando embutido */}
+                      {freteEmbutido && (
+                        <td className="px-2 py-1 text-right text-indigo-600 bg-indigo-50/50 font-medium">
+                          {freteUnit > 0 ? `+ R$ ${freteUnit.toFixed(2)}` : '-'}
+                        </td>
+                      )}
+                      
+                      {/* COLUNA DESCONTO UNITÁRIO - só aparece quando embutido */}
+                      {descontoEmbutido && (
+                        <td className="px-2 py-1 text-right text-green-600 bg-green-50/50 font-medium">
+                          {descontoUnit > 0 ? `- R$ ${descontoUnit.toFixed(2)}` : '-'}
+                        </td>
+                      )}
+                      
                       <td className="px-2 py-1 text-right font-semibold text-gray-900">
-                        {item.preco && item.quantidade 
-                          ? `R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
+                        {subtotalItem > 0
+                          ? `R$ ${subtotalItem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` 
                           : '-'}
                       </td>
                       <td className="px-2 py-1 text-center">
@@ -2222,11 +2384,26 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* ✅ NOVO: COMPONENTE DE CONTROLES PARA EMBUTIR VALORES */}
+        <EmbutirValoresControles
+          descontoEmbutido={descontoEmbutido}
+          freteEmbutido={freteEmbutido}
+          onDescontoEmbutidoChange={setDescontoEmbutido}
+          onFreteEmbutidoChange={setFreteEmbutido}
+          percentualDesconto={parseFloat(formData.desconto_geral) || 0}
+          freteTotal={dadosFrete?.valor_total_frete || 0}
+          totalUnidades={calcularTotalUnidadesProdutos()}
+          disabled={modo !== 'edicao'}
+          isAdmin={isAdmin()}
+          onValidarSenhaAdmin={validarSenhaAdmin}
+        />
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <FreteSelector 
@@ -2258,32 +2435,53 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
             <div>
               <h2 className="text-lg font-semibold mb-4">Resumo Financeiro</h2>
               <div className="space-y-2">
+                {/* ✅ MODIFICADO: Subtotal sem embutir (para referência) */}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal (sem desconto):</span>
+                  <span className="text-gray-600">
+                    Subtotal Produtos {(descontoEmbutido || freteEmbutido) ? '(original)' : ''}:
+                  </span>
                   <span className="font-medium">
-                    R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {calcularSubtotalProdutosSemEmbutido().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center">
+                {/* ✅ NOVO: Mostrar valor embutido no subtotal se aplicável */}
+                {(descontoEmbutido || freteEmbutido) && (
+                  <div className="flex justify-between text-sm bg-indigo-50 px-2 py-1 rounded">
+                    <span className="text-indigo-700 font-medium">
+                      Subtotal (com valores embutidos):
+                    </span>
+                    <span className="font-semibold text-indigo-700">
+                      R$ {calcularSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+
+                {/* ✅ MODIFICADO: Desconto - mostra diferente se embutido */}
+                <div className={`flex justify-between items-center ${descontoEmbutido ? 'opacity-50' : ''}`}>
                   <label className="text-sm text-gray-600 flex items-center gap-1 flex-wrap">
                     Desconto (%):
-                    {!descontoLiberado && !descontoTravado && (
+                    {descontoEmbutido && (
+                      <span className="text-xs text-green-600 flex items-center gap-0.5">
+                        ✓ Embutido no valor unitário
+                      </span>
+                    )}
+                    {!descontoEmbutido && !descontoLiberado && !descontoTravado && (
                       <span className="text-xs text-yellow-600 flex items-center gap-0.5">
                         <Lock size={10} /> máx {LIMITE_DESCONTO}%
                       </span>
                     )}
-                    {descontoTravado && descontoLiberadoPor && (
+                    {!descontoEmbutido && descontoTravado && descontoLiberadoPor && (
                       <span className="text-xs text-blue-600 flex items-center gap-0.5" title={`Liberado por ${descontoLiberadoPor.nome} em ${descontoLiberadoPor.data}\nPara alterar, clique no campo.`}>
                         🔒 {descontoLiberadoPor.nome} ({descontoLiberadoPor.data})
                       </span>
                     )}
-                    {descontoLiberado && !descontoTravado && descontoLiberadoPor && (
+                    {!descontoEmbutido && descontoLiberado && !descontoTravado && descontoLiberadoPor && (
                       <span className="text-xs text-green-600">
                         ✓ liberado por {descontoLiberadoPor.nome}
                       </span>
                     )}
-                    {descontoLiberado && !descontoLiberadoPor && (
+                    {!descontoEmbutido && descontoLiberado && !descontoLiberadoPor && (
                       <span className="text-xs text-green-600">✓ liberado</span>
                     )}
                   </label>
@@ -2294,16 +2492,18 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                       max={descontoLiberado ? 100 : LIMITE_DESCONTO}
                       value={formData.desconto_geral}
                       onChange={(e) => handleDescontoChange(e.target.value)}
-                      disabled={modo !== 'edicao'}
+                      disabled={modo !== 'edicao' || descontoEmbutido}
                       className={`w-20 px-2 py-1 border rounded text-center text-sm ${
-                        descontoTravado 
-                          ? 'border-blue-400 bg-blue-50 cursor-pointer' 
-                          : formData.desconto_geral > LIMITE_DESCONTO 
-                            ? 'border-yellow-400 bg-yellow-50' 
-                            : 'border-gray-300'
+                        descontoEmbutido
+                          ? 'border-green-400 bg-green-50 cursor-not-allowed'
+                          : descontoTravado 
+                            ? 'border-blue-400 bg-blue-50 cursor-pointer' 
+                            : formData.desconto_geral > LIMITE_DESCONTO 
+                              ? 'border-yellow-400 bg-yellow-50' 
+                              : 'border-gray-300'
                       }`}
                     />
-                    {descontoTravado && modo === 'edicao' && (
+                    {descontoTravado && modo === 'edicao' && !descontoEmbutido && (
                       <button
                         type="button"
                         onClick={() => setMostrarModalSenha(true)}
@@ -2316,17 +2516,31 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
                   </div>
                 </div>
 
-                <div className="flex justify-between text-sm border-t pt-2">
-                  <span className="text-gray-700 font-medium">Subtotal de Produtos:</span>
-                  <span className="font-semibold">
-                    R$ {(calcularSubtotal() - (calcularSubtotal() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+                {/* ✅ MODIFICADO: Subtotal com desconto - oculto se embutido */}
+                {!descontoEmbutido && (
+                  <div className="flex justify-between text-sm border-t pt-2">
+                    <span className="text-gray-700 font-medium">Subtotal de Produtos:</span>
+                    <span className="font-semibold">
+                      R$ {(calcularSubtotalProdutosSemEmbutido() - (calcularSubtotalProdutosSemEmbutido() * (formData.desconto_geral || 0) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
 
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Total Frete:</span>
+                {/* ✅ MODIFICADO: Frete - mostra diferente se embutido */}
+                <div className={`flex justify-between text-sm ${freteEmbutido ? 'opacity-50' : ''}`}>
+                  <span className="text-gray-600">
+                    Total Frete:
+                    {freteEmbutido && (
+                      <span className="text-xs text-green-600 ml-1">
+                        (Embutido no valor unitário)
+                      </span>
+                    )}
+                  </span>
                   <span className="font-medium">
-                    R$ {(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {freteEmbutido 
+                      ? 'R$ 0,00' 
+                      : `R$ ${(dadosFrete?.valor_total_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    }
                   </span>
                 </div>
 
@@ -2458,12 +2672,16 @@ link.download = nomeArquivo.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
         </div>
       )}
 
-      {/* ✅ CORRIGIDO: Passar callback onPdfGerado */}
+      {/* ✅ CORRIGIDO: Passar callback onPdfGerado e dados de embutido */}
       <PropostaComercial
         isOpen={mostrarProposta}
         onClose={() => setMostrarProposta(false)}
         dadosOrcamento={getDadosOrcamentoParaProposta()}
-        produtos={produtosSelecionados}
+        produtos={produtosSelecionados.map(p => ({
+          ...p,
+          desconto_unitario: descontoEmbutido ? getDescontoUnitario(p.preco) : 0,
+          frete_unitario: freteEmbutido ? getFreteUnitario() : 0
+        }))}
         dadosFrete={dadosFrete}
         propostaId={propostaIdAtual}
         onPdfGerado={handlePdfGerado}

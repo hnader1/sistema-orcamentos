@@ -91,11 +91,38 @@ export default function PropostaComercial({
     return `R$ ${parseFloat(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
   }
 
-  // Cálculos
-  const subtotalProdutos = produtos.reduce((acc, p) => acc + (p.quantidade * p.preco), 0)
-  const totalFrete = dadosFrete?.valor_total_frete || 0
-  const desconto = dadosOrcamento.desconto_geral || 0
-  const valorDesconto = (subtotalProdutos + totalFrete) * (desconto / 100)
+  // ============================================
+  // VERIFICAR SE VALORES ESTÃO EMBUTIDOS
+  // ============================================
+  const descontoEmbutido = dadosOrcamento.desconto_embutido || false
+  const freteEmbutido = dadosOrcamento.frete_embutido || false
+
+  // ============================================
+  // CÁLCULOS - CONSIDERANDO EMBUTIDO
+  // ============================================
+  const subtotalProdutos = produtos.reduce((acc, p) => {
+    const preco = parseFloat(p.preco) || 0
+    const quantidade = parseInt(p.quantidade) || 0
+    const descontoUnit = parseFloat(p.desconto_unitario) || 0
+    const freteUnit = parseFloat(p.frete_unitario) || 0
+    
+    // Se embutido, o preço já inclui os ajustes
+    if (descontoEmbutido || freteEmbutido) {
+      const precoAjustado = preco - (descontoEmbutido ? descontoUnit : 0) + (freteEmbutido ? freteUnit : 0)
+      return acc + (precoAjustado * quantidade)
+    }
+    
+    return acc + (preco * quantidade)
+  }, 0)
+
+  // Frete - se embutido, é 0 para exibição
+  const totalFrete = freteEmbutido ? 0 : (dadosFrete?.valor_total_frete || 0)
+
+  // Desconto - se embutido, é 0 para exibição
+  const desconto = descontoEmbutido ? 0 : (dadosOrcamento.desconto_geral || 0)
+  const valorDesconto = descontoEmbutido ? 0 : ((subtotalProdutos + totalFrete) * (desconto / 100))
+
+  // Total final
   const valorTotal = subtotalProdutos + totalFrete - valorDesconto
 
   // Peso total
@@ -170,7 +197,7 @@ export default function PropostaComercial({
             numero_proposta: dadosOrcamento.numero_proposta || dadosOrcamento.numero,
             valor_total: valorTotal,
             status: 'gerada',
-            vendedor_id: dadosOrcamento.usuario_id_original, // ✅ CORREÇÃO: Adicionado vendedor_id
+            vendedor_id: dadosOrcamento.usuario_id_original,
             data_expiracao: new Date(Date.now() + (dadosOrcamento.validade_dias || 15) * 24 * 60 * 60 * 1000).toISOString()
           })
           .select()
@@ -337,7 +364,7 @@ export default function PropostaComercial({
                 </div>
               </div>
 
-              {/* ========== PRODUTOS ========== */}
+              {/* ========== PRODUTOS (MODIFICADO PARA EMBUTIDO) ========== */}
               <div style={{ marginBottom: '10px' }}>
                 <div style={styles.secaoTitulo}>01. PRODUTOS</div>
                 <table style={styles.table}>
@@ -353,22 +380,36 @@ export default function PropostaComercial({
                     </tr>
                   </thead>
                   <tbody>
-                    {produtos.map((p, i) => (
-                      <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f7fafc' }}>
-                        <td style={styles.td}>{p.produto}</td>
-                        <td style={styles.td}>{p.classe || '-'}</td>
-                        <td style={styles.td}>{p.mpa || '-'}</td>
-                        <td style={styles.tdRight}>{parseFloat(p.quantidade).toLocaleString('pt-BR')}</td>
-                        <td style={styles.td}>{p.unidade || 'Unid.'}</td>
-                        <td style={styles.tdRight}>{formatarValor(p.preco)}</td>
-                        <td style={{ ...styles.tdRight, fontWeight: 'bold' }}>{formatarValor(p.quantidade * p.preco)}</td>
-                      </tr>
-                    ))}
+                    {produtos.map((p, i) => {
+                      const precoOriginal = parseFloat(p.preco) || 0
+                      const descontoUnit = parseFloat(p.desconto_unitario) || 0
+                      const freteUnit = parseFloat(p.frete_unitario) || 0
+                      
+                      // Preço para exibição - ajustado se embutido
+                      let precoExibicao = precoOriginal
+                      if (descontoEmbutido) precoExibicao -= descontoUnit
+                      if (freteEmbutido) precoExibicao += freteUnit
+                      
+                      const quantidade = parseInt(p.quantidade) || 0
+                      const subtotalItem = precoExibicao * quantidade
+                      
+                      return (
+                        <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#f7fafc' }}>
+                          <td style={styles.td}>{p.produto}</td>
+                          <td style={styles.td}>{p.classe || '-'}</td>
+                          <td style={styles.td}>{p.mpa || '-'}</td>
+                          <td style={styles.tdRight}>{quantidade.toLocaleString('pt-BR')}</td>
+                          <td style={styles.td}>{p.unidade || 'Unid.'}</td>
+                          <td style={styles.tdRight}>{formatarValor(precoExibicao)}</td>
+                          <td style={{ ...styles.tdRight, fontWeight: 'bold' }}>{formatarValor(subtotalItem)}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
-              {/* ========== FRETE ========== */}
+              {/* ========== FRETE (MODIFICADO PARA EMBUTIDO) ========== */}
               <div style={{ marginBottom: '10px' }}>
                 <div style={styles.secaoTitulo}>02. FRETE</div>
                 <div style={{ backgroundColor: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '8px 12px' }}>
@@ -376,7 +417,12 @@ export default function PropostaComercial({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
                       <div>
                         <span style={{ fontSize: '8px', color: '#666', display: 'block' }}>MODALIDADE</span>
-                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#4c7f8a' }}>{getTipoFreteExibicao()}</div>
+                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#4c7f8a' }}>
+                          {freteEmbutido 
+                            ? `${getTipoFreteExibicao()} (incluso no valor unitário)`
+                            : getTipoFreteExibicao()
+                          }
+                        </div>
                       </div>
                       {isCIF() && dadosFrete?.localidade && (
                         <div>
@@ -384,17 +430,22 @@ export default function PropostaComercial({
                           <div style={{ fontSize: '11px', fontWeight: '500' }}>{dadosFrete.localidade}</div>
                         </div>
                       )}
-                      {isCIF() && dadosFrete?.viagens_necessarias > 0 && (
+                      {!freteEmbutido && isCIF() && dadosFrete?.viagens_necessarias > 0 && (
                         <div>
                           <span style={{ fontSize: '8px', color: '#666', display: 'block' }}>VIAGENS</span>
-                          <div style={{ fontSize: '11px', fontWeight: '500' }}>{dadosFrete.viagens_necessarias}x de {formatarValor(dadosFrete.valor_unitario_viagem)}</div>
+                          <div style={{ fontSize: '11px', fontWeight: '500' }}>
+                            {dadosFrete.viagens_necessarias}x de {formatarValor(dadosFrete.valor_unitario_viagem)}
+                          </div>
                         </div>
                       )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ fontSize: '8px', color: '#666', display: 'block' }}>TOTAL FRETE</span>
-                      <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#c05621' }}>
-                        {totalFrete > 0 ? formatarValor(totalFrete) : 'SEM FRETE'}
+                      <div style={{ fontSize: '14px', fontWeight: 'bold', color: freteEmbutido ? '#059669' : '#c05621' }}>
+                        {freteEmbutido 
+                          ? 'INCLUSO NO VALOR'
+                          : (totalFrete > 0 ? formatarValor(totalFrete) : 'SEM FRETE')
+                        }
                       </div>
                     </div>
                   </div>
@@ -411,22 +462,43 @@ export default function PropostaComercial({
                 </div>
               </div>
 
-              {/* ========== RESUMO FINANCEIRO ========== */}
+              {/* ========== RESUMO FINANCEIRO (MODIFICADO PARA EMBUTIDO) ========== */}
               <div style={{ background: 'linear-gradient(135deg, #4c7f8a, #2d5a63)', borderRadius: '8px', padding: '15px', color: 'white', marginBottom: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', marginBottom: '12px' }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: descontoEmbutido && freteEmbutido 
+                    ? '1fr' 
+                    : (descontoEmbutido || freteEmbutido ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)'), 
+                  gap: '15px', 
+                  marginBottom: '12px' 
+                }}>
+                  
+                  {/* Subtotal Produtos - sempre aparece */}
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '8px', opacity: 0.8, textTransform: 'uppercase' }}>Subtotal Produtos</div>
+                    <div style={{ fontSize: '8px', opacity: 0.8, textTransform: 'uppercase' }}>
+                      {(descontoEmbutido || freteEmbutido) ? 'Valor dos Produtos' : 'Subtotal Produtos'}
+                    </div>
                     <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{formatarValor(subtotalProdutos)}</div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '8px', opacity: 0.8, textTransform: 'uppercase' }}>Frete</div>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{formatarValor(totalFrete)}</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '8px', opacity: 0.8, textTransform: 'uppercase' }}>Desconto ({desconto}%)</div>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold' }}>- {formatarValor(valorDesconto)}</div>
-                  </div>
+                  
+                  {/* Frete - só aparece se NÃO embutido */}
+                  {!freteEmbutido && (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '8px', opacity: 0.8, textTransform: 'uppercase' }}>Frete</div>
+                      <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{formatarValor(totalFrete)}</div>
+                    </div>
+                  )}
+                  
+                  {/* Desconto - só aparece se NÃO embutido E tiver desconto */}
+                  {!descontoEmbutido && desconto > 0 && (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '8px', opacity: 0.8, textTransform: 'uppercase' }}>Desconto ({desconto}%)</div>
+                      <div style={{ fontSize: '14px', fontWeight: 'bold' }}>- {formatarValor(valorDesconto)}</div>
+                    </div>
+                  )}
                 </div>
+                
+                {/* Total */}
                 <div style={{ borderTop: '2px solid rgba(255,255,255,0.3)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: '12px' }}>VALOR TOTAL DA PROPOSTA</div>
                   <div style={{ fontSize: '22px', fontWeight: 'bold' }}>{formatarValor(valorTotal)}</div>
