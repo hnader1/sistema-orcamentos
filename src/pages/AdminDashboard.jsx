@@ -61,6 +61,16 @@ const PERIODOS = [
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
+const STATUS_OPTIONS = [
+  { value: 'todos', label: 'Todos Status' },
+  { value: 'rascunho', label: 'Rascunho' },
+  { value: 'enviado', label: 'Enviado' },
+  { value: 'aprovado', label: 'Aprovado' },
+  { value: 'lancado', label: 'Lançado' },
+  { value: 'finalizado', label: 'Finalizado' },
+  { value: 'cancelado', label: 'Cancelado' }
+]
+
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
@@ -69,6 +79,7 @@ export default function AdminDashboard() {
   const [abaAtiva, setAbaAtiva] = useState('resumo')
   const [periodo, setPeriodo] = useState('mes')
   const [vendedorFiltro, setVendedorFiltro] = useState('todos')
+  const [statusFiltro, setStatusFiltro] = useState('todos')
   
   const [orcamentos, setOrcamentos] = useState([])
   const [orcamentosHistorico, setOrcamentosHistorico] = useState([])
@@ -116,7 +127,6 @@ export default function AdminDashboard() {
 
       const { data: orcamentosData } = await queryOrcamentos
 
-      // Carregar histórico dos últimos 12 meses para comparativos
       const inicio12Meses = subMonths(new Date(), 12).toISOString()
       let queryHistorico = supabase
         .from('orcamentos')
@@ -285,6 +295,119 @@ export default function AdminDashboard() {
   }, [orcamentos])
 
   // ==========================================
+  // ORÇAMENTOS FILTRADOS POR STATUS
+  // ==========================================
+  const orcamentosFiltrados = useMemo(() => {
+    if (statusFiltro === 'todos') return orcamentos
+    return orcamentos.filter(o => o.status === statusFiltro)
+  }, [orcamentos, statusFiltro])
+
+  // Métricas filtradas para Produtos
+  const metricasProdutosFiltradas = useMemo(() => {
+    const dados = orcamentosFiltrados
+    if (!dados.length) return { porProduto: [], toneladasTotal: 0, toneladasArgamassa: 0, totalOrcamentos: 0 }
+
+    const porProduto = {}
+    let toneladasTotal = 0, toneladasArgamassa = 0
+
+    dados.forEach(orc => {
+      if (orc.itens) {
+        orc.itens.forEach(item => {
+          const produtoNome = item.produto || 'Sem nome'
+          if (!porProduto[produtoNome]) porProduto[produtoNome] = { nome: produtoNome, quantidade: 0, valor: 0, peso: 0, ocorrencias: 0 }
+          porProduto[produtoNome].quantidade += item.quantidade || 0
+          porProduto[produtoNome].valor += (item.quantidade || 0) * (item.preco_unitario || item.preco || 0)
+          const peso = (item.quantidade || 0) * (item.peso_unitario || 0) / 1000
+          porProduto[produtoNome].peso += peso
+          porProduto[produtoNome].ocorrencias++
+          toneladasTotal += peso
+          if (item.produto?.toLowerCase().includes('argamassa')) toneladasArgamassa += peso
+        })
+      }
+    })
+
+    return {
+      porProduto: Object.values(porProduto).sort((a, b) => b.valor - a.valor),
+      toneladasTotal,
+      toneladasArgamassa,
+      totalOrcamentos: dados.length
+    }
+  }, [orcamentosFiltrados])
+
+  // Métricas filtradas para Clientes
+  const metricasClientesFiltradas = useMemo(() => {
+    const dados = orcamentosFiltrados
+    if (!dados.length) return { clientesUnicos: 0, porCidade: [], ticketMedio: 0, total: 0 }
+
+    const clientesUnicos = new Set(dados.map(o => o.cnpj_cpf || o.cliente_nome).filter(Boolean))
+    const porCidade = {}
+    let valorTotal = 0
+
+    dados.forEach(orc => {
+      const cidade = orc.obra_cidade || orc.cidade || 'Não informado'
+      if (!porCidade[cidade]) porCidade[cidade] = { nome: cidade, quantidade: 0, valor: 0 }
+      porCidade[cidade].quantidade++
+      const valor = parseFloat(orc.valor_total) || parseFloat(orc.total) || 0
+      porCidade[cidade].valor += valor
+      valorTotal += valor
+    })
+
+    return {
+      clientesUnicos: clientesUnicos.size,
+      porCidade: Object.values(porCidade).sort((a, b) => b.valor - a.valor),
+      ticketMedio: dados.length > 0 ? valorTotal / dados.length : 0,
+      total: dados.length
+    }
+  }, [orcamentosFiltrados])
+
+  // Métricas filtradas para Financeiro
+  const metricasFinanceiroFiltradas = useMemo(() => {
+    const dados = orcamentosFiltrados
+    if (!dados.length) return { valorTotal: 0, valorLancado: 0, valorPipeline: 0, valorCancelado: 0, descontoMedio: 0, valorDescontos: 0, porVendedor: [] }
+
+    const valorLancado = dados.filter(o => o.status === 'lancado' || o.status === 'finalizado')
+      .reduce((sum, o) => sum + (parseFloat(o.valor_total) || parseFloat(o.total) || 0), 0)
+    const valorPipeline = dados.filter(o => o.status === 'enviado' || o.status === 'aprovado')
+      .reduce((sum, o) => sum + (parseFloat(o.valor_total) || parseFloat(o.total) || 0), 0)
+    const valorCancelado = dados.filter(o => o.status === 'cancelado')
+      .reduce((sum, o) => sum + (parseFloat(o.valor_total) || parseFloat(o.total) || 0), 0)
+    
+    const comDesconto = dados.filter(o => (o.desconto_geral || 0) > 0)
+    const descontoMedio = comDesconto.length > 0 ? comDesconto.reduce((sum, o) => sum + (o.desconto_geral || 0), 0) / comDesconto.length : 0
+    const valorDescontos = dados.reduce((sum, o) => {
+      const subtotal = parseFloat(o.subtotal_produtos) || parseFloat(o.total) || 0
+      return sum + (subtotal * (o.desconto_geral || 0) / 100)
+    }, 0)
+
+    const porVendedor = {}
+    dados.forEach(orc => {
+      const codigo = orc.usuario?.codigo_vendedor || 'N/A'
+      const vendedorId = orc.usuario?.id || 'sem-id'
+      if (!porVendedor[vendedorId]) porVendedor[vendedorId] = { id: vendedorId, codigo, nome: orc.usuario?.nome || 'Sem vendedor', descontos: [], valorLancado: 0, total: 0, lancados: 0 }
+      porVendedor[vendedorId].total++
+      if (orc.desconto_geral > 0) porVendedor[vendedorId].descontos.push(orc.desconto_geral)
+      if (orc.status === 'lancado' || orc.status === 'finalizado') {
+        porVendedor[vendedorId].lancados++
+        porVendedor[vendedorId].valorLancado += parseFloat(orc.valor_total) || parseFloat(orc.total) || 0
+      }
+    })
+    Object.values(porVendedor).forEach(v => {
+      v.descontoMedio = v.descontos.length > 0 ? v.descontos.reduce((a, b) => a + b, 0) / v.descontos.length : 0
+      v.taxaConversao = v.total > 0 ? (v.lancados / v.total) * 100 : 0
+    })
+
+    return {
+      valorTotal: dados.reduce((sum, o) => sum + (parseFloat(o.valor_total) || parseFloat(o.total) || 0), 0),
+      valorLancado,
+      valorPipeline,
+      valorCancelado,
+      descontoMedio,
+      valorDescontos,
+      porVendedor: Object.values(porVendedor).sort((a, b) => b.descontoMedio - a.descontoMedio)
+    }
+  }, [orcamentosFiltrados])
+
+  // ==========================================
   // MÉTRICAS COMPARATIVO MÊS A MÊS
   // ==========================================
   const comparativo = useMemo(() => {
@@ -294,22 +417,13 @@ export default function AdminDashboard() {
     const mesAtual = getMonth(hoje)
     const anoAtual = getYear(hoje)
     
-    // Agrupar por mês
     const porMes = {}
     for (let i = 11; i >= 0; i--) {
       const data = subMonths(hoje, i)
       const mes = getMonth(data)
       const ano = getYear(data)
       const chave = `${ano}-${String(mes + 1).padStart(2, '0')}`
-      porMes[chave] = {
-        mes: MESES[mes],
-        ano,
-        chave,
-        total: 0,
-        lancados: 0,
-        valor: 0,
-        valorLancado: 0
-      }
+      porMes[chave] = { mes: MESES[mes], ano, chave, total: 0, lancados: 0, valor: 0, valorLancado: 0 }
     }
 
     orcamentosHistorico.forEach(orc => {
@@ -329,8 +443,6 @@ export default function AdminDashboard() {
     })
 
     const dados = Object.values(porMes)
-    
-    // Calcular variações
     const mesAtualData = dados[dados.length - 1]
     const mesAnteriorData = dados[dados.length - 2]
     const mesmoMesAnoPassado = dados.find(d => {
@@ -364,28 +476,16 @@ export default function AdminDashboard() {
     const percentualMes = (diaAtual / diasNoMes) * 100
 
     const vendedoresComMeta = metricas.porVendedor.map(v => {
-      const meta = 100000 // Meta padrão de R$ 100k
+      const meta = 100000
       const atingido = v.valorLancado
       const percentualAtingido = (atingido / meta) * 100
       const projecao = diaAtual > 0 ? (atingido / diaAtual) * diasNoMes : 0
       const status = percentualAtingido >= percentualMes ? 'no_ritmo' : percentualAtingido >= percentualMes * 0.8 ? 'atencao' : 'atrasado'
 
-      return {
-        ...v,
-        meta,
-        atingido,
-        percentualAtingido,
-        projecao,
-        status,
-        faltando: Math.max(0, meta - atingido)
-      }
+      return { ...v, meta, atingido, percentualAtingido, projecao, status, faltando: Math.max(0, meta - atingido) }
     }).sort((a, b) => b.percentualAtingido - a.percentualAtingido)
 
-    return {
-      vendedores: vendedoresComMeta,
-      percentualMes,
-      diasRestantes: diasNoMes - diaAtual
-    }
+    return { vendedores: vendedoresComMeta, percentualMes, diasRestantes: diasNoMes - diaAtual }
   }, [metricas, usuarios])
 
   // ==========================================
@@ -394,48 +494,28 @@ export default function AdminDashboard() {
   const conquistas = useMemo(() => {
     if (!metricas || !orcamentos.length) return null
 
-    // Maior venda do período
     const maiorVenda = orcamentos.reduce((max, orc) => {
       const valor = parseFloat(orc.valor_total) || parseFloat(orc.total) || 0
       return valor > max.valor ? { ...orc, valor } : max
     }, { valor: 0 })
 
-    // Vendedor com mais lançamentos
     const topLancamentos = metricas.porVendedor[0]
-
-    // Vendedor com melhor taxa de conversão (mínimo 5 orçamentos)
-    const topConversao = [...metricas.porVendedor]
-      .filter(v => v.total >= 5)
-      .sort((a, b) => b.taxaConversao - a.taxaConversao)[0]
-
-    // Venda mais rápida (menor tempo entre criação e lançamento)
+    const topConversao = [...metricas.porVendedor].filter(v => v.total >= 5).sort((a, b) => b.taxaConversao - a.taxaConversao)[0]
     const vendaMaisRapida = orcamentos
       .filter(o => o.status === 'lancado' && o.data_lancamento)
-      .map(o => ({
-        ...o,
-        diasParaFechar: differenceInDays(new Date(o.data_lancamento || o.updated_at), new Date(o.created_at))
-      }))
+      .map(o => ({ ...o, diasParaFechar: differenceInDays(new Date(o.data_lancamento || o.updated_at), new Date(o.created_at)) }))
       .sort((a, b) => a.diasParaFechar - b.diasParaFechar)[0]
 
-    // Recordes
-    const recordes = {
-      maiorVendaMes: maiorVenda,
-      maisLancamentos: topLancamentos,
-      melhorConversao: topConversao,
-      vendaMaisRapida
-    }
+    const recordes = { maiorVendaMes: maiorVenda, maisLancamentos: topLancamentos, melhorConversao: topConversao, vendaMaisRapida }
 
-    // Badges dos vendedores
     const badges = metricas.porVendedor.map(v => {
       const badgesList = []
-      
       if (v.lancados >= 10) badgesList.push({ icon: '🔥', label: 'Em Chamas', desc: '10+ lançamentos' })
       if (v.taxaConversao >= 60) badgesList.push({ icon: '🎯', label: 'Precisão', desc: '60%+ conversão' })
       if (v.valorLancado >= 200000) badgesList.push({ icon: '💰', label: 'Faturador', desc: 'R$ 200k+ lançado' })
       if (v.descontoMedio <= 3 && v.lancados >= 3) badgesList.push({ icon: '💎', label: 'Margem Alta', desc: 'Desconto ≤3%' })
       if (v.id === topLancamentos?.id) badgesList.push({ icon: '👑', label: 'Líder', desc: 'Mais lançamentos' })
       if (v.id === topConversao?.id) badgesList.push({ icon: '🏆', label: 'Campeão', desc: 'Melhor conversão' })
-
       return { ...v, badges: badgesList }
     })
 
@@ -505,6 +585,16 @@ export default function AdminDashboard() {
                   ))}
                 </select>
               </div>
+
+              {/* Filtro de Status - visível apenas em abas específicas */}
+              {['produtos', 'clientes', 'financeiro', 'vendedores'].includes(abaAtiva) && (
+                <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
+                  <Filter size={18} className="text-gray-500" />
+                  <select value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value)} className="bg-transparent border-none text-sm font-medium focus:ring-0">
+                    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+              )}
 
               <button onClick={carregarDados} disabled={loading} className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200">
                 <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -713,6 +803,11 @@ export default function AdminDashboard() {
             {/* ABA VENDEDORES */}
             {abaAtiva === 'vendedores' && (
               <div className="space-y-6">
+                {statusFiltro !== 'todos' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-sm text-purple-700">
+                    Filtrado por status: <span className="font-bold">{STATUS_OPTIONS.find(s => s.value === statusFiltro)?.label}</span>
+                  </div>
+                )}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <div className="p-4 border-b"><h3 className="text-lg font-bold">Performance dos Vendedores</h3></div>
                   <div className="overflow-x-auto">
@@ -750,17 +845,22 @@ export default function AdminDashboard() {
             {/* ABA PRODUTOS */}
             {abaAtiva === 'produtos' && (
               <div className="space-y-6">
+                {statusFiltro !== 'todos' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-sm text-purple-700">
+                    Filtrado por status: <span className="font-bold">{STATUS_OPTIONS.find(s => s.value === statusFiltro)?.label}</span> ({metricasProdutosFiltradas.totalOrcamentos} orçamentos)
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Tonelagem Total</p><p className="text-2xl font-bold">{metricas.toneladasTotal.toFixed(1)} ton</p></div>
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Argamassa</p><p className="text-2xl font-bold text-orange-600">{metricas.toneladasArgamassa.toFixed(1)} ton</p></div>
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Produtos</p><p className="text-2xl font-bold text-purple-600">{metricas.porProduto.length}</p></div>
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Valor</p><p className="text-2xl font-bold text-green-600">{formatarValor(metricas.porProduto.reduce((s, p) => s + p.valor, 0))}</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Tonelagem Total</p><p className="text-2xl font-bold">{metricasProdutosFiltradas.toneladasTotal.toFixed(1)} ton</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Argamassa</p><p className="text-2xl font-bold text-orange-600">{metricasProdutosFiltradas.toneladasArgamassa.toFixed(1)} ton</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Produtos</p><p className="text-2xl font-bold text-purple-600">{metricasProdutosFiltradas.porProduto.length}</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Valor</p><p className="text-2xl font-bold text-green-600">{formatarValor(metricasProdutosFiltradas.porProduto.reduce((s, p) => s + p.valor, 0))}</p></div>
                 </div>
 
                 <div className="bg-white rounded-xl border p-6 shadow-sm">
                   <h3 className="text-lg font-bold mb-4">Top 15 Produtos</h3>
                   <div className="space-y-2">
-                    {metricas.porProduto.slice(0, 15).map((p, i) => (
+                    {metricasProdutosFiltradas.porProduto.slice(0, 15).map((p, i) => (
                       <div key={i} className="flex items-center gap-3">
                         <span className="w-6 text-sm text-gray-500">{i + 1}</span>
                         <div className="flex-1">
@@ -769,7 +869,7 @@ export default function AdminDashboard() {
                             <span className="text-sm font-bold text-green-600">{formatarValor(p.valor)}</span>
                           </div>
                           <div className="w-full bg-gray-100 rounded-full h-2">
-                            <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(p.valor / metricas.porProduto[0].valor) * 100}%` }} />
+                            <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${metricasProdutosFiltradas.porProduto[0]?.valor ? (p.valor / metricasProdutosFiltradas.porProduto[0].valor) * 100 : 0}%` }} />
                           </div>
                         </div>
                       </div>
@@ -782,17 +882,22 @@ export default function AdminDashboard() {
             {/* ABA CLIENTES */}
             {abaAtiva === 'clientes' && (
               <div className="space-y-6">
+                {statusFiltro !== 'todos' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-sm text-purple-700">
+                    Filtrado por status: <span className="font-bold">{STATUS_OPTIONS.find(s => s.value === statusFiltro)?.label}</span> ({metricasClientesFiltradas.total} orçamentos)
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Clientes</p><p className="text-2xl font-bold">{metricas.clientesUnicos}</p></div>
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Ticket Médio</p><p className="text-2xl font-bold text-green-600">{formatarValor(metricas.ticketMedio)}</p></div>
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Cidades</p><p className="text-2xl font-bold text-blue-600">{metricas.porCidade.length}</p></div>
-                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Orç/Cliente</p><p className="text-2xl font-bold text-purple-600">{(metricas.total / Math.max(metricas.clientesUnicos, 1)).toFixed(1)}</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Clientes</p><p className="text-2xl font-bold">{metricasClientesFiltradas.clientesUnicos}</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Ticket Médio</p><p className="text-2xl font-bold text-green-600">{formatarValor(metricasClientesFiltradas.ticketMedio)}</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Cidades</p><p className="text-2xl font-bold text-blue-600">{metricasClientesFiltradas.porCidade.length}</p></div>
+                  <div className="bg-white rounded-xl border p-4"><p className="text-xs text-gray-500">Orç/Cliente</p><p className="text-2xl font-bold text-purple-600">{(metricasClientesFiltradas.total / Math.max(metricasClientesFiltradas.clientesUnicos, 1)).toFixed(1)}</p></div>
                 </div>
 
                 <div className="bg-white rounded-xl border p-6 shadow-sm">
                   <h3 className="text-lg font-bold mb-4">Top Cidades</h3>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={metricas.porCidade.slice(0, 10)} layout="vertical">
+                    <BarChart data={metricasClientesFiltradas.porCidade.slice(0, 10)} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
                       <YAxis dataKey="nome" type="category" width={120} />
@@ -807,30 +912,35 @@ export default function AdminDashboard() {
             {/* ABA FINANCEIRO */}
             {abaAtiva === 'financeiro' && (
               <div className="space-y-6">
+                {statusFiltro !== 'todos' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-sm text-purple-700">
+                    Filtrado por status: <span className="font-bold">{STATUS_OPTIONS.find(s => s.value === statusFiltro)?.label}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white">
                     <p className="text-xs uppercase opacity-80">Lançado</p>
-                    <p className="text-2xl font-bold">{formatarValor(metricas.valorPorStatus.lancado + metricas.valorPorStatus.finalizado)}</p>
+                    <p className="text-2xl font-bold">{formatarValor(metricasFinanceiroFiltradas.valorLancado)}</p>
                   </div>
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
                     <p className="text-xs uppercase opacity-80">Pipeline</p>
-                    <p className="text-2xl font-bold">{formatarValor(metricas.valorPorStatus.enviado + metricas.valorPorStatus.aprovado)}</p>
+                    <p className="text-2xl font-bold">{formatarValor(metricasFinanceiroFiltradas.valorPipeline)}</p>
                   </div>
                   <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 text-white">
                     <p className="text-xs uppercase opacity-80">Descontos</p>
-                    <p className="text-2xl font-bold">{formatarValor(metricas.valorDescontos)}</p>
-                    <p className="text-xs opacity-70">Média: {metricas.descontoMedio.toFixed(1)}%</p>
+                    <p className="text-2xl font-bold">{formatarValor(metricasFinanceiroFiltradas.valorDescontos)}</p>
+                    <p className="text-xs opacity-70">Média: {metricasFinanceiroFiltradas.descontoMedio.toFixed(1)}%</p>
                   </div>
                   <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-4 text-white">
                     <p className="text-xs uppercase opacity-80">Cancelado</p>
-                    <p className="text-2xl font-bold">{formatarValor(metricas.valorPorStatus.cancelado)}</p>
+                    <p className="text-2xl font-bold">{formatarValor(metricasFinanceiroFiltradas.valorCancelado)}</p>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-xl border p-6 shadow-sm">
                   <h3 className="text-lg font-bold mb-4">Desconto por Vendedor</h3>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={[...metricas.porVendedor].sort((a, b) => b.descontoMedio - a.descontoMedio).slice(0, 10)}>
+                    <BarChart data={metricasFinanceiroFiltradas.porVendedor.slice(0, 10)}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="codigo" />
                       <YAxis unit="%" />
@@ -918,7 +1028,6 @@ export default function AdminDashboard() {
             {/* ABA COMPARATIVO */}
             {abaAtiva === 'comparativo' && comparativo && (
               <div className="space-y-6">
-                {/* Cards de Comparação */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white rounded-xl border p-6 shadow-sm">
                     <p className="text-sm text-gray-500 mb-2">Este Mês</p>
@@ -945,7 +1054,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Gráfico de Evolução */}
                 <div className="bg-white rounded-xl border p-6 shadow-sm">
                   <h3 className="text-lg font-bold mb-4">Evolução Mensal (12 meses)</h3>
                   <ResponsiveContainer width="100%" height={350}>
@@ -962,7 +1070,6 @@ export default function AdminDashboard() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Tabela Comparativa */}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <div className="p-4 border-b"><h3 className="text-lg font-bold">Detalhamento Mensal</h3></div>
                   <div className="overflow-x-auto">
@@ -1035,7 +1142,6 @@ export default function AdminDashboard() {
             {/* ABA METAS */}
             {abaAtiva === 'metas' && metricasMetas && (
               <div className="space-y-6">
-                {/* Progresso do Mês */}
                 <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl p-6 text-white">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold">Progresso do Mês</h3>
@@ -1047,7 +1153,6 @@ export default function AdminDashboard() {
                   <p className="text-sm opacity-80">{metricasMetas.percentualMes.toFixed(0)}% do mês decorrido</p>
                 </div>
 
-                {/* Vendedores */}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <div className="p-4 border-b"><h3 className="text-lg font-bold">Metas por Vendedor</h3></div>
                   <div className="divide-y">
@@ -1085,7 +1190,6 @@ export default function AdminDashboard() {
             {/* ABA CONQUISTAS */}
             {abaAtiva === 'conquistas' && conquistas && (
               <div className="space-y-6">
-                {/* Recordes */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-xl p-4 text-white">
                     <div className="flex items-center gap-2 mb-2">
@@ -1121,7 +1225,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Badges por Vendedor */}
                 <div className="bg-white rounded-xl border shadow-sm">
                   <div className="p-4 border-b"><h3 className="text-lg font-bold flex items-center gap-2"><Medal size={20} className="text-yellow-500" />Conquistas dos Vendedores</h3></div>
                   <div className="divide-y">
@@ -1146,7 +1249,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Legenda de Badges */}
                 <div className="bg-gray-50 rounded-xl p-4">
                   <h4 className="font-medium mb-3">Legenda de Conquistas</h4>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-sm">
