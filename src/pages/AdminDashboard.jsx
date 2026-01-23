@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
       let queryOrcamentos = supabase
         .from('orcamentos')
-        .select(`*, usuario:usuarios(id, nome, codigo_vendedor), itens:orcamentos_itens(*, produto:produtos(*))`)
+        .select(`*, usuario:usuarios!orcamentos_usuario_id_fkey(id, nome, codigo_vendedor), itens:orcamentos_itens(*, produto:produtos(*))`)
         .gte('created_at', inicio)
         .lte('created_at', fim)
         .eq('excluido', false)
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
       const inicio12Meses = subMonths(new Date(), 12).toISOString()
       let queryHistorico = supabase
         .from('orcamentos')
-        .select(`id, created_at, status, total, usuario_id, usuario:usuarios(id, nome, codigo_vendedor)`)
+        .select(`id, created_at, status, total, usuario_id, usuario:usuarios!orcamentos_usuario_id_fkey(id, nome, codigo_vendedor)`)
         .gte('created_at', inicio12Meses)
         .eq('excluido', false)
 
