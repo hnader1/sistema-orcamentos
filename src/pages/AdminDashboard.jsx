@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
       let queryOrcamentos = supabase
         .from('orcamentos')
-        .select(`*, usuario:usuarios!orcamentos_usuario_id_fkey(id, nome, codigo_vendedor), itens:orcamentos_itens(*, produto:produtos(*))`)
+        .select(`*, usuario:usuarios!orcamentos_usuario_id_fkey(id, nome, codigo_vendedor), itens:orcamentos_itens(*)`)
         .gte('created_at', inicio)
         .lte('created_at', fim)
         .eq('excluido', false)
@@ -189,9 +189,9 @@ export default function AdminDashboard() {
     orcamentos.forEach(orc => {
       if ((orc.status === 'lancado' || orc.status === 'finalizado') && orc.itens) {
         orc.itens.forEach(item => {
-          const peso = (item.quantidade || 0) * (item.produto?.peso_unitario || 0) / 1000
+          const peso = (item.quantidade || 0) * (item.peso_unitario || 0) / 1000
           toneladasTotal += peso
-          if (item.produto?.produto?.toLowerCase().includes('argamassa')) toneladasArgamassa += peso
+          if (item.produto?.toLowerCase().includes('argamassa')) toneladasArgamassa += peso
         })
       }
     })
@@ -238,11 +238,11 @@ export default function AdminDashboard() {
     orcamentos.forEach(orc => {
       if (orc.itens) {
         orc.itens.forEach(item => {
-          const produtoNome = item.produto?.produto || item.produto_nome || 'Produto'
+          const produtoNome = item.produto || 'Sem nome'
           if (!porProduto[produtoNome]) porProduto[produtoNome] = { nome: produtoNome, quantidade: 0, valor: 0, peso: 0, ocorrencias: 0 }
           porProduto[produtoNome].quantidade += item.quantidade || 0
           porProduto[produtoNome].valor += (item.quantidade || 0) * (item.preco_unitario || item.preco || 0)
-          porProduto[produtoNome].peso += (item.quantidade || 0) * (item.produto?.peso_unitario || 0) / 1000
+          porProduto[produtoNome].peso += (item.quantidade || 0) * (item.peso_unitario || 0) / 1000
           porProduto[produtoNome].ocorrencias++
         })
       }
