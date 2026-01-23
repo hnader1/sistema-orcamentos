@@ -472,7 +472,7 @@ export default function OrcamentosStatus() {
             />
           </div>
           {/* Filtro por Vendedor - só aparece para admin/comercial */}
-          {!isVendedor() && vendedoresUnicos.length > 1 && (
+          {!isVendedor() && vendedoresUnicos.length >= 1 && (
             <select
               value={filtroVendedor}
               onChange={(e) => setFiltroVendedor(e.target.value)}
