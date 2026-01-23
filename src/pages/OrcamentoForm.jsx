@@ -286,7 +286,7 @@ function OrcamentoForm() {
           ...dadosUpdate,
           aprovado_via: 'manual',
           aprovado_em: new Date().toISOString(),
-          aprovado_por: user?.nome
+          aprovado_por: user?.id  // ✅ CORRIGIDO: usar ID ao invés de nome
         }
       }
 
@@ -1058,7 +1058,7 @@ function OrcamentoForm() {
           status: 'aprovado',
           aprovado_via: 'manual',
           aprovado_em: new Date().toISOString(),
-          aprovado_por: user?.nome
+          aprovado_por: user?.id  // ✅ CORRIGIDO: usar ID ao invés de nome
         })
         .eq('id', id)
 
