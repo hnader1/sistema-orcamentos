@@ -253,13 +253,10 @@ export default function Orcamentos() {
       orc.numero_proposta?.toLowerCase().includes(buscaLower) ||
       orc.cliente_nome?.toLowerCase().includes(buscaLower) ||
       orc.cliente_empresa?.toLowerCase().includes(buscaLower) ||
-      // ✅ NOVO: Busca por código ERP
       orc.numero_lancamento_erp?.toLowerCase().includes(buscaLower) ||
-      // ✅ NOVO: Busca por cidade e bairro da obra
       orc.obra_cidade?.toLowerCase().includes(buscaLower) ||
       orc.obra_bairro?.toLowerCase().includes(buscaLower) ||
       orc.frete_cidade?.toLowerCase().includes(buscaLower) ||
-      // ✅ NOVO: Busca por produto (nome ou código)
       orc.orcamentos_itens?.some(item => 
         item.produto?.toLowerCase().includes(buscaLower) ||
         item.produto_codigo?.toLowerCase().includes(buscaLower)
@@ -268,11 +265,20 @@ export default function Orcamentos() {
     // Filtro de status
     const matchStatus = filtroStatus === 'todos' || orc.status === filtroStatus
     
-    return matchBusca && matchStatus
+    // ✅ NOVO: Se filtroStatus é "todos", ocultar cancelados
+    // Só mostra cancelados se filtro específico "cancelado" estiver selecionado
+    const ocultarCancelado = filtroStatus === 'todos' && orc.status === 'cancelado'
+    
+    return matchBusca && matchStatus && !ocultarCancelado
   })
 
-  // Pega os 5 orçamentos mais recentes para exibir em destaque
-  const ultimos5 = orcamentos.slice(0, 5)
+  // ✅ ATUALIZADO: Últimos 5 orçamentos NÃO-CANCELADOS
+  const ultimos5 = orcamentos
+    .filter(orc => orc.status !== 'cancelado')
+    .slice(0, 5)
+  
+  // ✅ NOVO: Verificar se tem busca ativa (texto OU filtro de status)
+  const temBuscaAtiva = busca.trim() !== '' || filtroStatus !== 'todos'
 
   // ====================================================================================
   // AÇÕES DE ORÇAMENTO
@@ -792,7 +798,7 @@ export default function Orcamentos() {
               return (
                 <button
                   key={card.status}
-                  onClick={() => navigate(`/orcamentos/status/${card.status}`)}
+                  onClick={() => setFiltroStatus(card.status)}
                   className={`${card.corFundo} border-2 ${card.corBorda} rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer group`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -868,10 +874,13 @@ export default function Orcamentos() {
         </div>
 
         {/* ==================================================================== */}
-        {/* LISTA COMPLETA DE ORÇAMENTOS */}
+        {/* LISTA COMPLETA DE ORÇAMENTOS - SÓ APARECE COM BUSCA ATIVA */}
         {/* ==================================================================== */}
+        {temBuscaAtiva && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Todos os Orçamentos</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Resultados da Pesquisa ({orcamentosFiltrados.length})
+          </h2>
           
           {loading ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
@@ -879,7 +888,7 @@ export default function Orcamentos() {
             </div>
           ) : orcamentosFiltrados.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-              {busca || filtroStatus !== 'todos' ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento cadastrado'}
+              Nenhum orçamento encontrado
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
@@ -889,6 +898,7 @@ export default function Orcamentos() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )
