@@ -45,6 +45,7 @@ export default function Orcamentos() {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('todos')
+  const [filtroVendedor, setFiltroVendedor] = useState('todos')
   const [estatisticas, setEstatisticas] = useState({
     rascunho: 0,
     enviado: 0,
@@ -245,6 +246,10 @@ export default function Orcamentos() {
   // ====================================================================================
   // FILTROS E BUSCAS
   // ====================================================================================
+  
+  // Lista de vendedores únicos para o filtro
+  const vendedoresUnicos = [...new Set(orcamentos.map(o => o.vendedor).filter(Boolean))].sort()
+  
   const orcamentosFiltrados = orcamentos.filter(orc => {
     // Filtro de busca por texto (número, cliente, empresa, ERP, cidade, bairro, produto)
     const buscaLower = busca.toLowerCase()
@@ -265,11 +270,14 @@ export default function Orcamentos() {
     // Filtro de status
     const matchStatus = filtroStatus === 'todos' || orc.status === filtroStatus
     
+    // ✅ NOVO: Filtro de vendedor
+    const matchVendedor = filtroVendedor === 'todos' || orc.vendedor === filtroVendedor
+    
     // ✅ NOVO: Se filtroStatus é "todos", ocultar cancelados
     // Só mostra cancelados se filtro específico "cancelado" estiver selecionado
     const ocultarCancelado = filtroStatus === 'todos' && orc.status === 'cancelado'
     
-    return matchBusca && matchStatus && !ocultarCancelado
+    return matchBusca && matchStatus && matchVendedor && !ocultarCancelado
   })
 
   // ✅ ATUALIZADO: Últimos 5 orçamentos NÃO-CANCELADOS
@@ -277,8 +285,8 @@ export default function Orcamentos() {
     .filter(orc => orc.status !== 'cancelado')
     .slice(0, 5)
   
-  // ✅ NOVO: Verificar se tem busca ativa (texto OU filtro de status)
-  const temBuscaAtiva = busca.trim() !== '' || filtroStatus !== 'todos'
+  // ✅ NOVO: Verificar se tem busca ativa (texto OU filtro de status OU filtro de vendedor)
+  const temBuscaAtiva = busca.trim() !== '' || filtroStatus !== 'todos' || filtroVendedor !== 'todos'
 
   // ====================================================================================
   // AÇÕES DE ORÇAMENTO
@@ -798,7 +806,7 @@ export default function Orcamentos() {
               return (
                 <button
                   key={card.status}
-                  onClick={() => setFiltroStatus(card.status)}
+                  onClick={() => navigate(`/orcamentos/status/${card.status}`)}
                   className={`${card.corFundo} border-2 ${card.corBorda} rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer group`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -871,6 +879,19 @@ export default function Orcamentos() {
             <option value="rejeitado">Rejeitado</option>
             <option value="cancelado">Cancelado</option>
           </select>
+          {/* ✅ NOVO: Filtro por Vendedor */}
+          {!isVendedor() && vendedoresUnicos.length > 1 && (
+            <select
+              value={filtroVendedor}
+              onChange={(e) => setFiltroVendedor(e.target.value)}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="todos">Todos os Vendedores</option>
+              {vendedoresUnicos.map(vendedor => (
+                <option key={vendedor} value={vendedor}>{vendedor}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* ==================================================================== */}
