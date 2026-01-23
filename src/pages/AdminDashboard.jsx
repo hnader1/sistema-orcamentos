@@ -500,7 +500,7 @@ export default function AdminDashboard() {
                 <Users size={18} className="text-gray-500" />
                 <select value={vendedorFiltro} onChange={(e) => setVendedorFiltro(e.target.value)} className="bg-transparent border-none text-sm font-medium focus:ring-0">
                   <option value="todos">Todos Vendedores</option>
-                  {usuarios.filter(u => u.tipo === 'vendedor' || u.tipo === 'comercial').map(u => (
+                  {usuarios.filter(u => u.codigo_vendedor).map(u => (
                     <option key={u.id} value={u.id}>{u.codigo_vendedor} - {u.nome}</option>
                   ))}
                 </select>
