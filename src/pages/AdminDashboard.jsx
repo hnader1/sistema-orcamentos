@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
       let queryOrcamentos = supabase
         .from('orcamentos')
-        .select(`*, usuario:usuarios(id, nome, codigo), itens:orcamento_itens(*, produto:produtos(*))`)
+        .select(`*, usuario:usuarios(id, nome, codigo_vendedor), itens:orcamento_itens(*, produto:produtos(*))`)
         .gte('created_at', inicio)
         .lte('created_at', fim)
         .eq('excluido', false)
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
       const inicio12Meses = subMonths(new Date(), 12).toISOString()
       let queryHistorico = supabase
         .from('orcamentos')
-        .select(`id, created_at, status, valor_total, total, usuario_id, usuario:usuarios(id, nome, codigo)`)
+        .select(`id, created_at, status, valor_total, total, usuario_id, usuario:usuarios(id, nome, codigo_vendedor)`)
         .gte('created_at', inicio12Meses)
         .eq('excluido', false)
 
@@ -132,7 +132,7 @@ export default function AdminDashboard() {
 
       const { data: usuariosData } = await supabase
         .from('usuarios')
-        .select('id, nome, codigo, perfil')
+        .select('id, nome, codigo_vendedor, tipo')
         .eq('ativo', true)
         .order('nome')
 
@@ -211,7 +211,7 @@ export default function AdminDashboard() {
     orcamentos.forEach(orc => {
       const vendedor = orc.usuario?.nome || 'Sem vendedor'
       const vendedorId = orc.usuario?.id || 'sem-id'
-      const codigo = orc.usuario?.codigo || ''
+      const codigo = orc.usuario?.codigo_vendedor || ''
       
       if (!porVendedor[vendedorId]) {
         porVendedor[vendedorId] = { id: vendedorId, nome: vendedor, codigo, total: 0, enviados: 0, aprovados: 0, lancados: 0, cancelados: 0, valor: 0, valorLancado: 0, descontos: [] }
@@ -500,8 +500,8 @@ export default function AdminDashboard() {
                 <Users size={18} className="text-gray-500" />
                 <select value={vendedorFiltro} onChange={(e) => setVendedorFiltro(e.target.value)} className="bg-transparent border-none text-sm font-medium focus:ring-0">
                   <option value="todos">Todos Vendedores</option>
-                  {usuarios.filter(u => u.perfil === 'vendedor' || u.perfil === 'comercial').map(u => (
-                    <option key={u.id} value={u.id}>{u.codigo} - {u.nome}</option>
+                  {usuarios.filter(u => u.tipo === 'vendedor' || u.tipo === 'comercial').map(u => (
+                    <option key={u.id} value={u.id}>{u.codigo_vendedor} - {u.nome}</option>
                   ))}
                 </select>
               </div>
