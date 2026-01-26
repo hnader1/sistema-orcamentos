@@ -37,9 +37,10 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     if (freteAtual) {
       console.log('🚚 [FreteSelector] Inicializando com freteAtual:', freteAtual)
       
-      // Preencher modalidade
+      // Preencher modalidade - normalizar para o valor correto
       const mod = freteAtual.modalidade || freteAtual.tipo_frete || ''
-      setModalidade(mod)
+      const modNormalizada = normalizarModalidade(mod)
+      setModalidade(modNormalizada)
       
       // Preencher tipo de veículo
       const veiculo = freteAtual.tipo_veiculo || freteAtual.tipo_caminhao || ''
@@ -67,6 +68,26 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   useEffect(() => {
     calcularFrete()
   }, [modalidade, tipoVeiculo, cidadeSelecionada, pesoTotal, totalPallets, freteManual, valorManualViagem, qtdManualViagens, justificativaFreteManual, fretes])
+
+  // ✅ CORREÇÃO: Normalizar modalidade para evitar duplicatas
+  const normalizarModalidade = (mod) => {
+    if (!mod) return ''
+    const modUpper = mod.toUpperCase().replace(/[_\s-]+/g, '_')
+    
+    // Normalizar variantes de CIF Sem Descarga
+    if (modUpper === 'CIF' || modUpper === 'CIF_SEM_DESCARGA' || modUpper.includes('SEM_DESCARGA')) {
+      return 'CIF_SEM_DESCARGA'
+    }
+    // Normalizar variantes de CIF Com Descarga
+    if (modUpper === 'CIF_COM_DESCARGA' || modUpper.includes('COM_DESCARGA')) {
+      return 'CIF_COM_DESCARGA'
+    }
+    // FOB
+    if (modUpper === 'FOB' || modUpper.includes('RETIR')) {
+      return 'FOB'
+    }
+    return mod
+  }
 
   const carregarFretes = async () => {
     try {
@@ -104,25 +125,36 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
       setTiposVeiculoUnicos(veiculosArray)
       console.log('🚛 Tipos de veículos extraídos:', veiculosArray)
       
-      // ✅ Extrair modalidades únicas
-      const modalidadesSet = new Set()
+      // ✅ CORREÇÃO: Extrair modalidades únicas NORMALIZADAS (sem duplicatas)
+      const modalidadesMap = new Map()
       data?.forEach(f => {
         if (f.modalidade) {
-          modalidadesSet.add(f.modalidade)
+          const modNormalizada = normalizarModalidade(f.modalidade)
+          if (!modalidadesMap.has(modNormalizada)) {
+            modalidadesMap.set(modNormalizada, {
+              valor: modNormalizada,
+              label: formatarModalidade(modNormalizada)
+            })
+          }
         }
       })
       
-      // Converter para array com labels amigáveis
-      const modalidadesArray = Array.from(modalidadesSet).map(mod => ({
-        valor: mod,
-        label: formatarModalidade(mod)
-      }))
+      // Converter para array
+      const modalidadesArray = Array.from(modalidadesMap.values())
       
-      // Adicionar FOB manualmente (não está na tabela fretes)
-      modalidadesArray.unshift({ valor: 'FOB', label: 'FOB - Cliente retira' })
+      // Adicionar FOB manualmente se não existir (não está na tabela fretes)
+      if (!modalidadesMap.has('FOB')) {
+        modalidadesArray.unshift({ valor: 'FOB', label: 'FOB - Retirada' })
+      }
+      
+      // Ordenar: FOB primeiro, depois CIF Sem, depois CIF Com
+      modalidadesArray.sort((a, b) => {
+        const ordem = { 'FOB': 0, 'CIF_SEM_DESCARGA': 1, 'CIF_COM_DESCARGA': 2 }
+        return (ordem[a.valor] ?? 99) - (ordem[b.valor] ?? 99)
+      })
       
       setModalidadesUnicas(modalidadesArray)
-      console.log('📋 Modalidades extraídas:', modalidadesArray)
+      console.log('📋 Modalidades extraídas (sem duplicatas):', modalidadesArray)
       
     } catch (error) {
       console.error('Erro ao carregar fretes:', error)
@@ -132,7 +164,8 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
   // ✅ Formatar nome da modalidade para exibição
   const formatarModalidade = (mod) => {
     switch(mod) {
-      case 'CIF':
+      case 'FOB':
+        return 'FOB - Retirada'
       case 'CIF_SEM_DESCARGA':
         return 'CIF - Sem Descarga'
       case 'CIF_COM_DESCARGA':
@@ -149,11 +182,20 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     const modalidadeBusca = mod === 'CIF_COM_DESCARGA' ? 'COM DESCARGA' : 'SEM DESCARGA'
     const veiculoBusca = `${tipoVeic} - ${modalidadeBusca}`
     
-    const frete = fretes.find(f => 
+    // Buscar frete exato
+    let frete = fretes.find(f => 
       f.cidade === cidade && 
-      f.tipo_veiculo === veiculoBusca &&
-      f.modalidade === mod
+      f.tipo_veiculo === veiculoBusca
     )
+    
+    // Se não encontrar, tentar busca mais flexível
+    if (!frete) {
+      frete = fretes.find(f => 
+        f.cidade === cidade && 
+        f.tipo_veiculo?.startsWith(tipoVeic) &&
+        normalizarModalidade(f.modalidade) === mod
+      )
+    }
     
     return frete
   }
@@ -335,6 +377,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
     return `R$ ${(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
   }
 
+  // ✅ CORREÇÃO: Verificar se deve habilitar campos de CIF
+  const isCIF = modalidade && modalidade !== 'FOB'
+
   return (
     <div className="space-y-4">
       {/* ANÁLISE DE CARGA - Cards */}
@@ -416,8 +461,9 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             <select
               value={modalidade}
               onChange={(e) => {
-                setModalidade(e.target.value)
-                if (e.target.value === 'FOB') {
+                const novaModalidade = e.target.value
+                setModalidade(novaModalidade)
+                if (novaModalidade === 'FOB') {
                   resetarSelecoes()
                   setModalidade('FOB')
                 }
@@ -441,8 +487,10 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
             <select
               value={tipoVeiculo}
               onChange={(e) => setTipoVeiculo(e.target.value)}
-              disabled={!modalidade || modalidade === 'FOB'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              disabled={!isCIF}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                !isCIF ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
             >
               <option value="">Selecione...</option>
               {tiposVeiculoUnicos.map(v => (
@@ -451,13 +499,16 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
                 </option>
               ))}
             </select>
+            {!isCIF && modalidade === 'FOB' && (
+              <p className="text-xs text-gray-500 mt-1">FOB não requer veículo</p>
+            )}
           </div>
 
           {/* Destino - Busca de Cidade */}
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Search size={14} className="inline mr-1" />
-              Destino (Cidade/Bairro)
+              Destino (Cidade)
             </label>
             <input
               type="text"
@@ -469,13 +520,15 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
               }}
               onFocus={() => setMostrarSugestoes(true)}
               onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
-              disabled={!modalidade || modalidade === 'FOB'}
-              placeholder="Ex: Betim, BH Centro, Contagem..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              disabled={!isCIF}
+              placeholder={isCIF ? "Informe o endereço" : "Selecione modalidade CIF"}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                !isCIF ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
             />
             
             {/* Dropdown de sugestões */}
-            {mostrarSugestoes && cidadesFiltradas.length > 0 && (
+            {mostrarSugestoes && cidadesFiltradas.length > 0 && isCIF && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {cidadesFiltradas.map((cidade, idx) => (
                   <button
@@ -542,7 +595,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         )}
 
         {/* Checkbox para frete manual - só mostra se não for FOB */}
-        {modalidade && modalidade !== 'FOB' && (
+        {isCIF && (
           <div className="border-t border-gray-200 pt-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -649,7 +702,7 @@ export default function FreteSelector({ pesoTotal, totalPallets, onFreteChange, 
         )}
 
         {/* Aviso se não tem peso e não é FOB */}
-        {(!pesoTotal || pesoTotal === 0) && modalidade && modalidade !== 'FOB' && !freteManual && (
+        {(!pesoTotal || pesoTotal === 0) && isCIF && !freteManual && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
             <div className="flex items-start gap-2">
               <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={16} />
