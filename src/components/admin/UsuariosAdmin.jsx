@@ -125,7 +125,7 @@ export default function UsuariosAdmin() {
   const validarCodigoVendedor = (codigo) => {
     if (!codigo) return true
     const codigoUpper = codigo.toUpperCase()
-    if (codigoUpper.length < 2 || codigoUpper.length > 3) return false
+    if (codigoUpper.length < 2 || codigoUpper.length > 4) return false
     if (!/^[A-Z]{2,3}$/.test(codigoUpper)) return false
     return true
   }
