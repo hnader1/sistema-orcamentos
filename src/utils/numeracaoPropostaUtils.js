@@ -16,7 +16,7 @@ export const gerarNumeroProposta = async (usuarioId, codigoVendedor) => {
     console.log('🔢 [PROPOSTA] Gerando número para:', { usuarioId, codigoVendedor })
 
     // Validar código do vendedor
-    if (!codigoVendedor || codigoVendedor.length < 2 || codigoVendedor.length > 3) {
+    if (!codigoVendedor || codigoVendedor.length < 2 || codigoVendedor.length > 4) {
       throw new Error('Código do vendedor deve ter 2 ou 3 letras')
     }
 
@@ -85,7 +85,7 @@ export const validarCodigoVendedor = (codigo) => {
   const codigoUpper = codigo.toUpperCase()
   
   // Deve ter 2 ou 3 caracteres
-  if (codigoUpper.length < 2 || codigoUpper.length > 3) return false
+  if (codigoUpper.length < 2 || codigoUpper.length > 4) return false
   
   // Deve conter apenas letras
   if (!/^[A-Z]{2,3}$/.test(codigoUpper)) return false
