@@ -619,7 +619,7 @@ export default function UsuariosAdmin() {
                     codigo_vendedor: e.target.value.toUpperCase() 
                   })}
                   placeholder="Ex: NP, CF, MSS"
-                  maxLength={3}
+                  maxLength={4}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 uppercase font-bold text-center ${
                     erros.codigo_vendedor ? 'border-red-500 bg-red-50' : 'border-purple-300'
                   }`}
