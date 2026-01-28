@@ -12,6 +12,7 @@ import AdminProdutos from './pages/AdminProdutos'
 import AdminUsuarios from './pages/AdminUsuarios'
 import AdminFrete from './pages/AdminFrete'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminResetRevisao from './pages/AdminResetRevisao'
 import RelatorioOrcamentos from './pages/RelatorioOrcamentos'
 import Conflitos from './pages/Conflitos'
 import FormasPagamentoAdmin from './pages/FormasPagamentoAdmin'
@@ -49,6 +50,7 @@ function App() {
           <Route path="/admin/frete" element={<AdminRoute><AdminFrete /></AdminRoute>} />
           <Route path="/admin/codigos-vendedores" element={<AdminRoute><GerenciarCodigosVendedores /></AdminRoute>} />
           <Route path="/admin/formas-pagamento" element={<AdminRoute><FormasPagamentoAdmin /></AdminRoute>} />
+          <Route path="/admin/reset-revisao" element={<AdminRoute><AdminResetRevisao /></AdminRoute>} />
 
           {/* Rota não encontrada */}
           <Route path="*" element={<Navigate to="/login" />} />
