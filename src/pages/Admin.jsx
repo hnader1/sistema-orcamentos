@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Package, Users, Truck, BarChart3, ArrowLeft, Settings, AlertTriangle, CreditCard } from 'lucide-react'
+import { Package, Users, Truck, BarChart3, ArrowLeft, Settings, AlertTriangle, CreditCard, RefreshCcw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/Header'
 
@@ -82,6 +82,15 @@ export default function Admin() {
       cor: 'from-yellow-500 to-orange-600',
       rota: '/relatorios/orcamentos',
       stats: 'Orçamentos sem CNPJ/CPF'
+    },
+    {
+      id: 'reset-revisao',
+      titulo: 'Reset de Revisão',
+      descricao: 'Remover Rev.X de propostas',
+      icone: RefreshCcw,
+      cor: 'from-red-500 to-red-600',
+      rota: '/admin/reset-revisao',
+      stats: 'Resetar contador de revisão'
     }
   ]
 
