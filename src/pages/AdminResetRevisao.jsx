@@ -28,7 +28,7 @@ export default function AdminResetRevisao() {
   const [processando, setProcessando] = useState(false)
   const [mensagem, setMensagem] = useState(null)
 
-  // Buscar orçamentos com revisão > 0
+  // Buscar orçamentos com revisão (Rev. no numero_proposta ou revisao > 0)
   useEffect(() => {
     carregarOrcamentos()
   }, [])
@@ -36,6 +36,7 @@ export default function AdminResetRevisao() {
   const carregarOrcamentos = async () => {
     setLoading(true)
     try {
+      // Buscar TODOS os orçamentos e filtrar no cliente os que têm Rev.
       const { data, error } = await supabase
         .from('orcamentos')
         .select(`
@@ -48,15 +49,37 @@ export default function AdminResetRevisao() {
           created_at,
           usuarios:usuario_id (nome, codigo)
         `)
-        .gt('revisao', 0)
-        .order('revisao', { ascending: false })
         .order('updated_at', { ascending: false })
+        .limit(500)
 
       if (error) throw error
-      setOrcamentos(data || [])
+      
+      // Filtrar apenas os que têm "Rev." no numero_proposta OU revisao > 0
+      const comRevisao = (data || []).filter(o => {
+        const temRevNoNome = o.numero_proposta?.includes('Rev.')
+        const temRevisaoNumero = o.revisao && o.revisao > 0
+        return temRevNoNome || temRevisaoNumero
+      })
+
+      // Extrair número da revisão do nome se não tiver no campo
+      const processados = comRevisao.map(o => {
+        let revisaoNum = o.revisao || 0
+        if (!revisaoNum && o.numero_proposta) {
+          const match = o.numero_proposta.match(/Rev\.(\d+)/)
+          if (match) {
+            revisaoNum = parseInt(match[1], 10)
+          }
+        }
+        return { ...o, revisao: revisaoNum }
+      })
+
+      // Ordenar por revisão decrescente
+      processados.sort((a, b) => (b.revisao || 0) - (a.revisao || 0))
+
+      setOrcamentos(processados)
     } catch (error) {
       console.error('Erro ao carregar orçamentos:', error)
-      setMensagem({ tipo: 'erro', texto: 'Erro ao carregar orçamentos' })
+      setMensagem({ tipo: 'erro', texto: 'Erro ao carregar orçamentos: ' + error.message })
     } finally {
       setLoading(false)
     }
