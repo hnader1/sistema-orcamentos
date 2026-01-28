@@ -322,7 +322,9 @@ export default function ProdutosAdmin() {
             </div>
             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
               <button onClick={fecharModal} disabled={salvando} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"><Save size={20} />{salvando ? 'Salvando...' : 'Salvar'}</button>
+              <button onClick={salvar} disabled={salvando} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                <Save size={20} /> {salvando ? 'Salvando...' : 'Salvar'}
+              </button>
             </div>
           </div>
         </div>
