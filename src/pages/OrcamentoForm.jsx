@@ -383,10 +383,14 @@ function OrcamentoForm() {
     }
   }
 
+  // ✅ CORRIGIDO: Usar vendedor selecionado ao invés de usuário logado
   const verificarConcorrencia = async () => {
     if (!dadosCNPJCPF?.cnpj_cpf && !dadosEndereco?.obra_cidade) {
       return
     }
+
+    // ✅ CORREÇÃO: Usar o vendedor selecionado no formulário, não o usuário logado
+    const vendedorIdParaVerificacao = formData.usuario_id_selecionado || user?.id
 
     try {
       const resultado = await verificarConcorrenciaInterna(
@@ -396,7 +400,7 @@ function OrcamentoForm() {
           obra_cidade: dadosEndereco?.obra_cidade,
           obra_bairro: dadosEndereco?.obra_bairro
         },
-        user?.id,
+        vendedorIdParaVerificacao,  // ✅ CORRIGIDO: Agora usa o vendedor selecionado!
         id
       )
 
@@ -409,6 +413,7 @@ function OrcamentoForm() {
     }
   }
 
+  // ✅ CORRIGIDO: Adicionar formData.usuario_id_selecionado como dependência
   useEffect(() => {
     const modoAtual = getModoVisualizacao()
     if (modoAtual === 'visualizacao' || modoAtual === 'proposta_travada') return
@@ -425,7 +430,7 @@ function OrcamentoForm() {
     }, 1000)
 
     return () => clearTimeout(timer)
-  }, [dadosCNPJCPF, dadosEndereco, propostaTravada, formData.status])
+  }, [dadosCNPJCPF, dadosEndereco, propostaTravada, formData.status, formData.usuario_id_selecionado])
 
   useEffect(() => {
     carregarProdutos()
