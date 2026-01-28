@@ -36,7 +36,7 @@ export default function AdminResetRevisao() {
   const carregarOrcamentos = async () => {
     setLoading(true)
     try {
-      // Buscar TODOS os orçamentos e filtrar no cliente os que têm Rev.
+      // Buscar orçamentos SEM join para evitar erro de relacionamento ambíguo
       const { data, error } = await supabase
         .from('orcamentos')
         .select(`
@@ -47,7 +47,7 @@ export default function AdminResetRevisao() {
           cliente_empresa,
           status,
           created_at,
-          usuarios:usuario_id (nome, codigo)
+          usuario_id
         `)
         .order('updated_at', { ascending: false })
         .limit(500)
@@ -70,7 +70,9 @@ export default function AdminResetRevisao() {
             revisaoNum = parseInt(match[1], 10)
           }
         }
-        return { ...o, revisao: revisaoNum }
+        // Extrair código do vendedor do numero_proposta (ex: JC-26-0002 -> JC)
+        const codigoVendedor = o.numero_proposta?.split('-')[0] || '-'
+        return { ...o, revisao: revisaoNum, vendedor_codigo: codigoVendedor }
       })
 
       // Ordenar por revisão decrescente
@@ -312,7 +314,7 @@ export default function AdminResetRevisao() {
                       <div className="text-xs text-gray-500">{orcamento.cliente_empresa}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {orcamento.usuarios?.codigo || '-'}
+                      {orcamento.vendedor_codigo}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-bold">
