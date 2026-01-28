@@ -13,9 +13,20 @@ export const verificarConcorrenciaInterna = async (
     const data180DiasAtras = new Date();
     data180DiasAtras.setDate(data180DiasAtras.getDate() - 180);
 
+    // ✅ CORREÇÃO: Se não tiver vendedorAtualId, não pode verificar concorrência
+    if (!vendedorAtualId) {
+      console.log('⚠️ Sem vendedor selecionado, pulando verificação de concorrência');
+      return {
+        temConflito: false,
+        conflitos: [],
+        totalConflitos: 0
+      };
+    }
+
     // VERIFICAÇÃO CRÍTICA: Mesmo CNPJ/CPF
     if (dadosOrcamento.cnpj_cpf && !dadosOrcamento.cnpj_cpf_nao_informado) {
       console.log('🔍 Verificando CNPJ/CPF:', dadosOrcamento.cnpj_cpf);
+      console.log('🔍 Vendedor atual (selecionado no form):', vendedorAtualId);
       
       // TENTATIVA: Usar nome da constraint FK
       let queryCNPJ = supabase
@@ -34,7 +45,7 @@ export const verificarConcorrenciaInterna = async (
           usuarios!orcamentos_usuario_id_fkey!inner(nome)
         `)
         .eq('cnpj_cpf', dadosOrcamento.cnpj_cpf)
-        .neq('usuario_id', vendedorAtualId)
+        .neq('usuario_id', vendedorAtualId)  // ✅ Agora usa o vendedor selecionado, não o usuário logado
         .gte('created_at', data180DiasAtras.toISOString())
         .in('status', ['rascunho', 'enviado', 'aprovado']);
 
@@ -89,7 +100,7 @@ export const verificarConcorrenciaInterna = async (
         `)
         .eq('obra_cidade', dadosOrcamento.obra_cidade)
         .eq('obra_bairro', dadosOrcamento.obra_bairro)
-        .neq('usuario_id', vendedorAtualId)
+        .neq('usuario_id', vendedorAtualId)  // ✅ Agora usa o vendedor selecionado
         .gte('created_at', data180DiasAtras.toISOString())
         .in('status', ['rascunho', 'enviado', 'aprovado']);
 
