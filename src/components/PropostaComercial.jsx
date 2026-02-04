@@ -613,8 +613,8 @@ export default function PropostaComercial({
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: '10px' }}>
-                      <div>📞 (31) 3965-1515</div>
-                      <div>comercial@construcomartefatos.com.br</div>
+                      <div>📞 {dadosOrcamento.vendedor_telefone || '(31) 3965-1515'}</div>
+                      <div>{dadosOrcamento.vendedor_email || 'comercial@construcomartefatos.com.br'}</div>
                     </div>
                   </div>
                 </div>
