@@ -121,7 +121,7 @@ export default function PropostaComercial({
 
   // Desconto - se embutido, é 0 para exibição
   const desconto = descontoEmbutido ? 0 : (dadosOrcamento.desconto_geral || 0)
-  const valorDesconto = descontoEmbutido ? 0 : ((subtotalProdutos + totalFrete) * (desconto / 100))
+  const valorDesconto = descontoEmbutido ? 0 : (subtotalProdutos * (desconto / 100))
 
   // Total final
   const valorTotal = subtotalProdutos + totalFrete - valorDesconto
