@@ -983,6 +983,11 @@ function OrcamentoForm() {
     }, 0)
   }
 
+  // Arredonda para 2 casas decimais
+  const arredondar = (valor) => {
+    return Math.round(valor * 100) / 100
+  }
+
   const calcularTotalPallets = () => {
     return produtosSelecionados.reduce((sum, item) => {
       const quantidade = parseInt(item.quantidade) || 0
@@ -1020,15 +1025,16 @@ function OrcamentoForm() {
     const precoOriginal = parseFloat(item.preco) || 0
     
     if (!descontoEmbutido && !freteEmbutido) {
-      return quantidade * precoOriginal
+      return quantidade * arredondar(precoOriginal)
     }
     
     const descontoUnit = descontoEmbutido ? getDescontoUnitario(precoOriginal) : 0
     const freteUnit = freteEmbutido ? getFreteUnitario() : 0
     
     // Ordem: 1) desconto no preço, 2) adiciona frete (sem desconto)
+    // Arredondar cada valor unitário para 2 casas decimais
     const precoComDesconto = precoOriginal - descontoUnit
-    const precoFinal = precoComDesconto + freteUnit
+    const precoFinal = arredondar(precoComDesconto + freteUnit)
     
     return quantidade * precoFinal
   }
@@ -1048,16 +1054,32 @@ function OrcamentoForm() {
   }
 
   // ✅ MODIFICADO: calcularTotal considerando embutido
+  // IMPORTANTE: Desconto é aplicado no valor unitário, arredondado, depois somado
   const calcularTotal = () => {
-    const subtotal = calcularSubtotal()
+    let subtotal = 0
     
-    // Se desconto embutido, não subtrai novamente
-    const desconto = descontoEmbutido ? 0 : (calcularSubtotalProdutosSemEmbutido() * (formData.desconto_geral || 0)) / 100
+    // Calcular subtotal com desconto aplicado no unitário
+    produtosSelecionados.forEach(item => {
+      const quantidade = parseInt(item.quantidade) || 0
+      const precoOriginal = parseFloat(item.preco) || 0
+      
+      // Aplicar desconto no valor unitário (não embutido)
+      const percentualDesconto = !descontoEmbutido ? (formData.desconto_geral || 0) : 0
+      const precoComDesconto = precoOriginal * (1 - percentualDesconto / 100)
+      
+      // Arredondar valor unitário para 2 dígitos
+      const precoFinal = arredondar(precoComDesconto)
+      
+      subtotal += quantidade * precoFinal
+    })
+    
+    // Se desconto embutido, não subtrai novamente (já foi aplicado acima)
+    const desconto = 0
     
     // Se frete embutido, não adiciona novamente
-    const frete = freteEmbutido ? 0 : (dadosFrete?.valor_total_frete || 0)
+    const frete = freteEmbutido ? 0 : arredondar(dadosFrete?.valor_total_frete || 0)
     
-    return subtotal - desconto + frete
+    return arredondar(subtotal + frete)
   }
 
   const duplicar = async () => {
